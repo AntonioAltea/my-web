@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -lt 3 ]]; then
+  echo "Uso: $0 <app> <photos|music> <ruta-local>"
+  exit 1
+fi
+
+APP_NAME="${APP_NAME:-$1}"
+MEDIA_KIND="$2"
+LOCAL_PATH="$3"
+REMOTE_PATH="/data/${MEDIA_KIND}"
+
+if [[ "$MEDIA_KIND" != "photos" && "$MEDIA_KIND" != "music" ]]; then
+  echo "El segundo argumento debe ser 'photos' o 'music'."
+  exit 1
+fi
+
+if [[ ! -d "$LOCAL_PATH" ]]; then
+  echo "La ruta local debe ser una carpeta: $LOCAL_PATH"
+  exit 1
+fi
+
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT
+
+local_index="$tmp_dir/local.tsv"
+remote_index="$tmp_dir/remote.tsv"
+to_upload="$tmp_dir/upload.tsv"
+to_delete="$tmp_dir/delete.txt"
+upload_root="$LOCAL_PATH"
+
+if [[ "$MEDIA_KIND" == "photos" ]]; then
+  upload_root="$tmp_dir/photos-web"
+  python3 scripts/prepare-web-photos.py "$LOCAL_PATH" "$upload_root" >/dev/null
+fi
+
+python3 - "$upload_root" > "$local_index" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+for path in sorted(p for p in root.iterdir() if p.is_file() and p.name != ".gitkeep"):
+    print(f"{path.name}\t{path.stat().st_size}")
+PY
+
+fly ssh console -a "$APP_NAME" -C "python3 - <<'PY'
+from pathlib import Path
+root = Path('$REMOTE_PATH')
+if root.exists():
+    for path in sorted(p for p in root.iterdir() if p.is_file()):
+        print(f'{path.name}\t{path.stat().st_size}')
+PY" > "$remote_index"
+
+python3 - "$local_index" "$remote_index" "$to_upload" "$to_delete" <<'PY'
+from pathlib import Path
+import sys
+
+local_index = Path(sys.argv[1])
+remote_index = Path(sys.argv[2])
+to_upload = Path(sys.argv[3])
+to_delete = Path(sys.argv[4])
+
+def read_index(path: Path) -> dict[str, int]:
+    items: dict[str, int] = {}
+    if not path.exists():
+        return items
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        name, size = line.split("\t", 1)
+        items[name] = int(size)
+    return items
+
+local_files = read_index(local_index)
+remote_files = read_index(remote_index)
+
+upload_names = sorted(
+    name for name, size in local_files.items()
+    if remote_files.get(name) != size
+)
+delete_names = sorted(name for name in remote_files if name not in local_files)
+
+to_upload.write_text("\n".join(upload_names), encoding="utf-8")
+to_delete.write_text("\n".join(delete_names), encoding="utf-8")
+PY
+
+delete_count=0
+if [[ -s "$to_delete" ]]; then
+  mapfile -t delete_names < "$to_delete"
+  delete_count="${#delete_names[@]}"
+  delete_cmd="rm -f --"
+  for name in "${delete_names[@]}"; do
+    delete_cmd+=" $(printf '%q' "$REMOTE_PATH/$name")"
+  done
+  fly ssh console -a "$APP_NAME" -C "$delete_cmd" >/dev/null
+fi
+
+upload_count=0
+if [[ -s "$to_upload" ]]; then
+  mapfile -t upload_names < "$to_upload"
+  upload_count="${#upload_names[@]}"
+  {
+    for name in "${upload_names[@]}"; do
+      printf 'put %s %s/%s\n' "$upload_root/$name" "$REMOTE_PATH" "$name"
+    done
+  } | fly ssh sftp shell -a "$APP_NAME" >/dev/null
+fi
+
+echo "Sincronizacion de ${MEDIA_KIND}:"
+echo "- borrados en remoto: ${delete_count}"
+echo "- subidos o actualizados: ${upload_count}"

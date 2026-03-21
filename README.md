@@ -91,6 +91,35 @@ make fly-upload-music APP=manturon SRC=assets/music
 
 Tambien puedes subir una carpeta distinta o un fichero concreto cambiando `SRC=`.
 
+### Sincronizar con Fly
+
+Para que el volumen remoto quede igual que tus carpetas locales, borrando en Fly lo que ya no exista en local y subiendo lo nuevo o cambiado:
+
+```bash
+make fly-sync-photos APP=manturon SRC=assets/photos
+make fly-sync-music APP=manturon SRC=assets/music
+```
+
+O las dos cosas de una vez:
+
+```bash
+make fly-sync-all APP=manturon
+```
+
+En el caso de las fotos, la sincronizacion genera antes copias optimizadas para web. Tus originales locales no se tocan, pero a Fly suben versiones mas pequeñas para que carguen mucho mejor.
+
+Por defecto:
+
+- lado largo maximo: `2200px`
+- JPEG: calidad `82`
+- WebP: calidad `80`
+
+Si quieres generar esas copias a mano para inspeccionarlas:
+
+```bash
+make preparar-fotos-web SRC=assets/photos OUT=/tmp/fotos-web
+```
+
 Si quieres algo mas comodo, tienes atajos con la app `manturon` ya puesta:
 
 ```bash

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import errno
+import io
 import tempfile
 import unittest
 from pathlib import Path
@@ -74,6 +75,25 @@ class MediaRequestTests(unittest.TestCase):
         finally:
             server.CANONICAL_HOST = original_canonical
             server.REDIRECT_HOSTS = original_redirect_hosts
+
+    def test_end_headers_disables_cache_for_html_css_and_js(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/styles.css"
+        handler._headers_buffer = []
+        handler.wfile = io.BytesIO()
+        handler.request_version = "HTTP/1.1"
+        handler.command = "GET"
+
+        with mock.patch.object(server.SimpleHTTPRequestHandler, "end_headers", autospec=True) as end_headers_mock:
+            server.MediaHandler.end_headers(handler)
+
+        cache_headers = [
+            header.decode("latin-1")
+            for header in handler._headers_buffer
+            if b"Cache-Control" in header
+        ]
+        self.assertEqual(cache_headers, ["Cache-Control: no-store, max-age=0\r\n"])
+        end_headers_mock.assert_called_once_with(handler)
 
 
 class MediaPayloadTests(unittest.TestCase):

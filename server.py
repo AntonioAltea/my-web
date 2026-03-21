@@ -121,6 +121,14 @@ def redirect_target(host_header: str | None, request_path: str) -> str | None:
 
 
 class MediaHandler(SimpleHTTPRequestHandler):
+    def end_headers(self) -> None:
+        request_path = urlparse(self.path).path
+
+        if request_path in {"/", "/index.html"} or request_path.endswith((".css", ".js")):
+            self.send_header("Cache-Control", "no-store, max-age=0")
+
+        super().end_headers()
+
     def translate_path(self, path: str) -> str:
         asset_path = asset_disk_path(path)
         if asset_path is not None:
