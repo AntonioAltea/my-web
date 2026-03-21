@@ -32,6 +32,7 @@ upload_root="$LOCAL_PATH"
 
 if [[ "$MEDIA_KIND" == "photos" ]]; then
   upload_root="$tmp_dir/photos-web"
+  echo "Preparando copias web de las fotos..."
   python3 scripts/prepare-web-photos.py "$LOCAL_PATH" "$upload_root" >/dev/null
 fi
 
@@ -89,6 +90,7 @@ delete_count=0
 if [[ -s "$to_delete" ]]; then
   mapfile -t delete_names < "$to_delete"
   delete_count="${#delete_names[@]}"
+  echo "Borrando ${delete_count} archivos remotos que ya no existen en local..."
   delete_cmd="rm -f --"
   for name in "${delete_names[@]}"; do
     delete_cmd+=" $(printf '%q' "$REMOTE_PATH/$name")"
@@ -100,8 +102,18 @@ upload_count=0
 if [[ -s "$to_upload" ]]; then
   mapfile -t upload_names < "$to_upload"
   upload_count="${#upload_names[@]}"
+  echo "Reemplazando ${upload_count} archivos en remoto..."
+
+  replace_cmd="rm -f --"
+  for name in "${upload_names[@]}"; do
+    replace_cmd+=" $(printf '%q' "$REMOTE_PATH/$name")"
+  done
+  fly ssh console -a "$APP_NAME" -C "$replace_cmd" >/dev/null
+
   {
-    for name in "${upload_names[@]}"; do
+    for i in "${!upload_names[@]}"; do
+      name="${upload_names[$i]}"
+      printf '[%s/%s] %s\n' "$((i + 1))" "${upload_count}" "$name" >&2
       printf 'put %s %s/%s\n' "$upload_root/$name" "$REMOTE_PATH" "$name"
     done
   } | fly ssh sftp shell -a "$APP_NAME" >/dev/null

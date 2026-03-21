@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import shutil
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -90,11 +91,18 @@ def main() -> int:
         print(f"No existe la carpeta de origen: {source_dir}")
         return 1
 
-    for source in sorted(source_dir.iterdir()):
-        if not source.is_file() or source.name == ".gitkeep":
-            continue
-        if source.suffix.lower() not in PHOTO_EXTENSIONS:
-            continue
+    photo_sources = [
+        source
+        for source in sorted(source_dir.iterdir())
+        if source.is_file() and source.name != ".gitkeep" and source.suffix.lower() in PHOTO_EXTENSIONS
+    ]
+
+    total = len(photo_sources)
+    if total == 0:
+        print("No hay fotos para preparar.", file=sys.stderr)
+        return 0
+
+    for index, source in enumerate(photo_sources, start=1):
 
         target = target_dir / source.name
         optimize_photo(
@@ -104,7 +112,7 @@ def main() -> int:
             jpeg_quality=args.jpeg_quality,
             webp_quality=args.webp_quality,
         )
-        print(source.name)
+        print(f"[{index}/{total}] {source.name}", file=sys.stderr)
 
     return 0
 
