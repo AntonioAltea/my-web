@@ -79,3 +79,60 @@ make fly-upload-music APP=manturon SRC=assets/music
 ```
 
 Tambien puedes subir una carpeta distinta o un fichero concreto cambiando `SRC=`.
+
+Si quieres algo mas comodo, tienes atajos con la app `manturon` ya puesta:
+
+```bash
+make subir-fotos
+make subir-musica
+```
+
+Tambien puedes subir un fichero o carpeta concreta:
+
+```bash
+make subir-fotos SRC=assets/photos/mi-foto.jpg
+make subir-musica SRC=assets/music/mi-tema.flac
+```
+
+### Borrar archivos en Fly
+
+Borrar una foto:
+
+```bash
+make fly-delete-photo APP=manturon FILE=DSCF5123.JPG
+```
+
+Borrar una pista:
+
+```bash
+make fly-delete-music APP=manturon FILE=parado-master.flac
+```
+
+Atajos:
+
+```bash
+make borrar-foto FILE=DSCF5123.JPG
+make borrar-musica FILE=parado-master.flac
+```
+
+Los scripts equivalentes estan en `scripts/subir-fotos.sh`, `scripts/subir-musica.sh`, `scripts/borrar-foto.sh` y `scripts/borrar-musica.sh`.
+
+### Limpiar fotos rotas
+
+Para revisar `assets/photos` y borrar automaticamente las que no se puedan cargar:
+
+```bash
+make limpiar-fotos
+```
+
+Para solo comprobarlo sin borrar nada:
+
+```bash
+make limpiar-fotos-dry
+```
+
+Tambien puedes pasar otra carpeta:
+
+```bash
+make limpiar-fotos SRC=otra/carpeta
+```

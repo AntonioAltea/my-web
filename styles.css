@@ -103,6 +103,21 @@ a {
   position: relative;
 }
 
+.photo-loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--accent);
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  text-transform: lowercase;
+  padding: 6px 10px;
+  border: 1px solid rgba(45, 78, 63, 0.28);
+  background: rgba(255, 255, 255, 0.92);
+  z-index: 2;
+}
+
 .main-photo {
   grid-area: photo;
   max-width: 100%;
@@ -137,6 +152,11 @@ a {
   align-items: center;
 }
 
+.gallery-tools-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .photo-counter {
   justify-self: center;
 }
@@ -153,6 +173,10 @@ a {
   text-transform: lowercase;
   transition: color 120ms ease, border-color 120ms ease;
   padding: 0 0 2px;
+}
+
+.gallery-nav-mode {
+  font-size: 0.72rem;
 }
 
 .gallery-nav:hover,

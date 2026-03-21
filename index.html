@@ -24,6 +24,7 @@
 
     <main class="gallery-shell">
       <figure class="gallery-stage">
+        <div id="photo-loader" class="photo-loader" hidden>cargando...</div>
         <img id="main-photo" class="main-photo" src="" alt="" hidden>
 
         <figcaption class="gallery-meta">
@@ -34,6 +35,11 @@
             <span id="photo-counter" class="photo-counter">0 / 0</span>
             <button id="next-photo" class="gallery-nav gallery-nav-next" type="button" aria-label="Foto siguiente">
               <span aria-hidden="true">siguiente</span>
+            </button>
+          </div>
+          <div class="gallery-tools-row">
+            <button id="photo-random" class="gallery-nav gallery-nav-mode" type="button" aria-label="Ir a una foto aleatoria">
+              azar
             </button>
           </div>
           <span id="photo-caption" class="photo-caption">No hay fotos todavia.</span>

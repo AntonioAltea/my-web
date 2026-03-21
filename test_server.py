@@ -50,6 +50,10 @@ class MediaRequestTests(unittest.TestCase):
                 server.asset_disk_path("/assets/music/example.flac"),
                 Path("/tmp/music-test/example.flac"),
             )
+            self.assertEqual(
+                server.asset_disk_path("/assets/photos/callado-mu%C3%B1eco.JPG"),
+                Path("/tmp/photos-test/callado-muñeco.JPG"),
+            )
             self.assertIsNone(server.asset_disk_path("/styles.css"))
         finally:
             server.PHOTOS_DIR = original_photos
@@ -115,6 +119,32 @@ class MediaPayloadTests(unittest.TestCase):
         server.MEDIA_ROOT = original_root
         server.PHOTOS_DIR = original_photos
         server.MUSIC_DIR = original_music
+
+    def test_dedupe_photo_paths_prefers_variant_with_subtitle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            photos = Path(temp_dir)
+            plain = photos / "abcde1234.jpg"
+            edited = photos / "abcde1234_edited.jpg"
+            alt = photos / "otra.jpg"
+            plain.write_text("x")
+            edited.write_text("x")
+            alt.write_text("x")
+
+            deduped = server.dedupe_photo_paths([plain, edited, alt])
+
+        self.assertEqual([path.name for path in deduped], ["abcde1234_edited.jpg", "otra.jpg"])
+
+    def test_dedupe_photo_paths_keeps_plain_name_when_no_base_pair_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            photos = Path(temp_dir)
+            first = photos / "cielo_edited.jpg"
+            second = photos / "mar.jpg"
+            first.write_text("x")
+            second.write_text("x")
+
+            deduped = server.dedupe_photo_paths([first, second])
+
+        self.assertEqual([path.name for path in deduped], ["cielo_edited.jpg", "mar.jpg"])
 
 
 class MainTests(unittest.TestCase):

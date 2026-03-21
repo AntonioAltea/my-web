@@ -7,7 +7,7 @@ import os
 import socket
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 
 ROOT = Path(__file__).resolve().parent
@@ -36,13 +36,51 @@ def public_files(directory: Path, allowed_extensions: set[str], url_prefix: str)
     return files
 
 
+def dedupe_photo_paths(paths: list[Path]) -> list[Path]:
+    plain_names = {path.stem.lower() for path in paths}
+    preferred: dict[str, Path] = {}
+
+    for path in sorted(paths, key=lambda item: item.name.lower()):
+        stem = path.stem
+        group_key = stem.lower()
+
+        for separator in ("_", "-"):
+          if separator in stem:
+              base_stem = stem.split(separator, 1)[0]
+              if base_stem.lower() in plain_names:
+                  group_key = base_stem.lower()
+                  break
+
+        current = preferred.get(group_key)
+        if current is None:
+            preferred[group_key] = path
+            continue
+
+        current_has_subtitle = current.stem != group_key
+        new_has_subtitle = stem.lower() != group_key
+        if new_has_subtitle and not current_has_subtitle:
+            preferred[group_key] = path
+        elif new_has_subtitle == current_has_subtitle and len(stem) > len(current.stem):
+            preferred[group_key] = path
+
+    return sorted(preferred.values(), key=lambda item: item.name.lower())
+
+
 def is_media_request(path: str) -> bool:
     return urlparse(path).path == "/api/media"
 
 
 def media_payload() -> dict[str, list[str]]:
+    photo_paths = [
+        path
+        for path in sorted(PHOTOS_DIR.iterdir(), key=lambda item: item.name.lower())
+        if path.is_file() and path.suffix.lower() in PHOTO_EXTENSIONS
+    ] if PHOTOS_DIR.exists() else []
+
+    photo_paths = dedupe_photo_paths(photo_paths)
+
     return {
-        "photos": public_files(PHOTOS_DIR, PHOTO_EXTENSIONS, "/assets/photos"),
+        "photos": [f"/assets/photos/{path.name}" for path in photo_paths],
         "music": public_files(MUSIC_DIR, MUSIC_EXTENSIONS, "/assets/music"),
     }
 
@@ -53,7 +91,7 @@ def ensure_media_dirs() -> None:
 
 
 def asset_disk_path(request_path: str) -> Path | None:
-    parsed_path = urlparse(request_path).path
+    parsed_path = unquote(urlparse(request_path).path)
 
     if parsed_path.startswith("/assets/photos/"):
         file_name = Path(parsed_path).name

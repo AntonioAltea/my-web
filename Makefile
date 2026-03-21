@@ -1,4 +1,4 @@
-.PHONY: run test fly-upload-photos fly-upload-music
+.PHONY: run test fly-upload-photos fly-upload-music fly-delete-photo fly-delete-music subir-fotos subir-musica borrar-foto borrar-musica limpiar-fotos limpiar-fotos-dry
 
 run:
 	python3 server.py
@@ -15,3 +15,33 @@ fly-upload-music:
 	@test -n "$(APP)" || (echo "Usa: make fly-upload-music APP=tu-app SRC=ruta"; exit 1)
 	@test -n "$(SRC)" || (echo "Usa: make fly-upload-music APP=tu-app SRC=ruta"; exit 1)
 	bash scripts/upload-media.sh "$(APP)" music "$(SRC)"
+
+fly-delete-photo:
+	@test -n "$(APP)" || (echo "Usa: make fly-delete-photo APP=tu-app FILE=nombre.jpg"; exit 1)
+	@test -n "$(FILE)" || (echo "Usa: make fly-delete-photo APP=tu-app FILE=nombre.jpg"; exit 1)
+	bash scripts/delete-media.sh "$(APP)" photos "$(FILE)"
+
+fly-delete-music:
+	@test -n "$(APP)" || (echo "Usa: make fly-delete-music APP=tu-app FILE=nombre.flac"; exit 1)
+	@test -n "$(FILE)" || (echo "Usa: make fly-delete-music APP=tu-app FILE=nombre.flac"; exit 1)
+	bash scripts/delete-media.sh "$(APP)" music "$(FILE)"
+
+subir-fotos:
+	bash scripts/subir-fotos.sh "$(SRC)"
+
+subir-musica:
+	bash scripts/subir-musica.sh "$(SRC)"
+
+borrar-foto:
+	@test -n "$(FILE)" || (echo "Usa: make borrar-foto FILE=nombre.jpg"; exit 1)
+	bash scripts/borrar-foto.sh "$(FILE)"
+
+borrar-musica:
+	@test -n "$(FILE)" || (echo "Usa: make borrar-musica FILE=nombre.flac"; exit 1)
+	bash scripts/borrar-musica.sh "$(FILE)"
+
+limpiar-fotos:
+	python3 scripts/clean-broken-photos.py $(if $(SRC),"$(SRC)",)
+
+limpiar-fotos-dry:
+	python3 scripts/clean-broken-photos.py $(if $(SRC),"$(SRC)",) --dry-run

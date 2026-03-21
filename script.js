@@ -1,10 +1,12 @@
 const audioPlayer = document.querySelector("#audio-player");
 const nowPlaying = document.querySelector("#now-playing");
 const mainPhoto = document.querySelector("#main-photo");
+const photoLoader = document.querySelector("#photo-loader");
 const photoCaption = document.querySelector("#photo-caption");
 const photoCounter = document.querySelector("#photo-counter");
 const prevPhotoButton = document.querySelector("#prev-photo");
 const nextPhotoButton = document.querySelector("#next-photo");
+const photoRandomButton = document.querySelector("#photo-random");
 const prevTrackButton = document.querySelector("#prev-track");
 const nextTrackButton = document.querySelector("#next-track");
 const playToggleButton = document.querySelector("#play-toggle");
@@ -126,18 +128,22 @@ function updatePhoto() {
     photoCounter.textContent = "0 / 0";
     prevPhotoButton.disabled = true;
     nextPhotoButton.disabled = true;
+    photoRandomButton.disabled = true;
+    photoLoader.hidden = true;
     return;
   }
 
   prevPhotoButton.disabled = photos.length <= 1;
   nextPhotoButton.disabled = photos.length <= 1;
+  photoRandomButton.disabled = photos.length <= 1;
 
   const photo = photos[currentPhotoIndex];
-  mainPhoto.src = photo.file;
+  photoLoader.hidden = false;
   mainPhoto.alt = photo.title;
-  mainPhoto.hidden = false;
   photoCaption.textContent = photo.title;
   photoCounter.textContent = `${currentPhotoIndex + 1} / ${photos.length}`;
+  mainPhoto.hidden = true;
+  mainPhoto.src = photo.file;
 }
 
 function movePhoto(step) {
@@ -210,8 +216,10 @@ async function loadMedia() {
   }
 
   if (photosChanged) {
-    photos = shuffleIndices(nextPhotos.length).map((index) => nextPhotos[index]);
-    const matchingPhotoIndex = photos.findIndex((photo) => photo.file === currentPhotoFile);
+    photos = nextPhotos;
+    const matchingPhotoIndex = currentPhotoFile
+      ? photos.findIndex((photo) => photo.file === currentPhotoFile)
+      : -1;
     currentPhotoIndex = matchingPhotoIndex >= 0 ? matchingPhotoIndex : 0;
     updatePhoto();
   }
@@ -253,6 +261,19 @@ function startMediaPolling() {
 
 prevPhotoButton.addEventListener("click", () => movePhoto(-1));
 nextPhotoButton.addEventListener("click", () => movePhoto(1));
+photoRandomButton.addEventListener("click", () => {
+  if (photos.length <= 1) {
+    return;
+  }
+
+  let nextIndex = currentPhotoIndex;
+  while (nextIndex === currentPhotoIndex) {
+    nextIndex = Math.floor(Math.random() * photos.length);
+  }
+
+  currentPhotoIndex = nextIndex;
+  updatePhoto();
+});
 prevTrackButton.addEventListener("click", () => stepTrack(-1));
 nextTrackButton.addEventListener("click", () => stepTrack(1));
 
@@ -292,6 +313,14 @@ audioPlayer.addEventListener("timeupdate", updateProgress);
 audioPlayer.addEventListener("play", updatePlayButton);
 audioPlayer.addEventListener("pause", updatePlayButton);
 audioPlayer.addEventListener("ended", () => stepTrack(1, true));
+mainPhoto.addEventListener("load", () => {
+  mainPhoto.hidden = false;
+  photoLoader.hidden = true;
+});
+mainPhoto.addEventListener("error", () => {
+  photoLoader.hidden = true;
+  photoCaption.textContent = "No se pudo cargar la foto.";
+});
 
 document.addEventListener("keydown", (event) => {
   if (event.target instanceof HTMLInputElement) {
