@@ -34,6 +34,17 @@ python3 server.py
 
 Y luego abre `http://127.0.0.1:8000`.
 
+## Git hooks
+
+El repositorio incluye un hook `pre-push` para ejecutar los tests antes de cada `git push`.
+
+Para activarlo en tu copia local:
+
+```bash
+git config core.hooksPath .githooks
+chmod +x .githooks/pre-push
+```
+
 ## Bandcamp
 
 Ahora mismo la musica aparece en una barra fija inferior con orden aleatorio y enlace a `https://manturon.bandcamp.com`.
