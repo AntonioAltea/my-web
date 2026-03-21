@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+
+assets/photos/*
+assets/music/*
+!assets/photos/.gitkeep
+!assets/music/.gitkeep
+
+.env

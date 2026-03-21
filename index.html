@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>manturón</title>
+  <meta
+    name="description"
+    content="Musica y fotografia en una web personal sencilla, artesanal y viva."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page">
+    <header class="site-header">
+      <h1>manturón</h1>
+    </header>
+
+    <main class="gallery-shell">
+      <figure class="gallery-stage">
+        <img id="main-photo" class="main-photo" src="" alt="" hidden>
+
+        <figcaption class="gallery-meta">
+          <div class="gallery-nav-row">
+            <button id="prev-photo" class="gallery-nav gallery-nav-prev" type="button" aria-label="Foto anterior">
+              <span aria-hidden="true">anterior</span>
+            </button>
+            <span id="photo-counter" class="photo-counter">0 / 0</span>
+            <button id="next-photo" class="gallery-nav gallery-nav-next" type="button" aria-label="Foto siguiente">
+              <span aria-hidden="true">siguiente</span>
+            </button>
+          </div>
+          <span id="photo-caption" class="photo-caption">No hay fotos todavia.</span>
+        </figcaption>
+      </figure>
+    </main>
+  </div>
+
+  <footer class="player-bar">
+    <div class="player-bar-inner">
+      <div class="player-main">
+        <div class="track-copy">
+          <p class="player-label">sonando</p>
+          <p id="now-playing" class="now-playing">Cargando musica...</p>
+        </div>
+
+        <div class="player-controls">
+          <button id="prev-track" class="player-button" type="button" aria-label="Cancion anterior">
+            <span class="icon-step icon-step-back" aria-hidden="true"></span>
+          </button>
+          <button id="play-toggle" class="player-button player-button-primary" type="button" aria-label="Reproducir o pausar">
+            <span id="play-toggle-icon" class="icon-play" aria-hidden="true"></span>
+          </button>
+          <button id="next-track" class="player-button" type="button" aria-label="Siguiente cancion">
+            <span class="icon-step icon-step-forward" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="player-side">
+        <div class="player-progress-row">
+          <span id="current-time" class="timecode">0:00</span>
+          <input id="seek-bar" class="seek-bar" type="range" min="0" max="100" value="0" aria-label="Posicion de la cancion">
+          <span id="total-time" class="timecode">0:00</span>
+        </div>
+        <a href="https://manturon.bandcamp.com" target="_blank" rel="noreferrer">bandcamp</a>
+      </div>
+    </div>
+
+    <audio id="audio-player" preload="metadata"></audio>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

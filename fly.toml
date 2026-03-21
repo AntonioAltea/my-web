@@ -1,0 +1,18 @@
+app = "manturon"
+primary_region = "cdg"
+
+[build]
+
+[env]
+  MEDIA_ROOT = "/data"
+  CANONICAL_HOST = "www.manturon.es"
+  REDIRECT_HOSTS = "manturon.es"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  processes = ["app"]
+
+[[mounts]]
+  source = "manturon_data"
+  destination = "/data"
