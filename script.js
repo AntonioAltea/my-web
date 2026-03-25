@@ -104,7 +104,7 @@ function currentTrackFile() {
 }
 
 function updatePlayButton() {
-  playToggleIcon.className = audioPlayer.paused ? "icon-play" : "icon-pause";
+  playToggleButton.dataset.state = audioPlayer.paused ? "paused" : "playing";
   playToggleButton.setAttribute("aria-label", audioPlayer.paused ? "Reproducir" : "Pausar");
   seekBarShell.classList.toggle("seek-bar-shell-playing", !audioPlayer.paused);
   syncPlayerBarHeight();
