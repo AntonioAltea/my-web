@@ -77,7 +77,7 @@ class UploadMediaScriptTests(unittest.TestCase):
             result, uploads_dir, sources_path = self.run_upload("photos", photo_path)
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Preparando copia web de la foto...", result.stdout)
+        self.assertIn("Preparing a web copy of the photo...", result.stdout)
 
         uploaded_photo = uploads_dir / "foto.jpg"
         self.assertTrue(uploaded_photo.exists())

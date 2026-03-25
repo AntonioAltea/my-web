@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 3 ]]; then
-  echo "Uso: $0 <app> <photos|music> <nombre-de-fichero>"
+  echo "Usage: $0 <app> <photos|music> <file-name>"
   exit 1
 fi
 
@@ -16,7 +16,7 @@ if [[ -n "${MACHINE_ID:-}" ]]; then
 fi
 
 if [[ "$MEDIA_KIND" != "photos" && "$MEDIA_KIND" != "music" ]]; then
-  echo "El segundo argumento debe ser 'photos' o 'music'."
+  echo "The second argument must be 'photos' or 'music'."
   exit 1
 fi
 

@@ -387,8 +387,8 @@ class MainTests(unittest.TestCase):
         self.assertEqual(create_server_mock.call_args_list[1].args, ("127.0.0.1", 8001))
         fake_server.serve_forever.assert_called_once()
         fake_server.server_close.assert_called_once()
-        print_mock.assert_any_call("El puerto 8000 ya estaba en uso. Uso 8001 en su lugar.")
-        print_mock.assert_any_call("Sirviendo en http://127.0.0.1:8001")
+        print_mock.assert_any_call("Port 8000 was already in use. Using 8001 instead.")
+        print_mock.assert_any_call("Serving at http://127.0.0.1:8001")
 
     def test_main_closes_server_cleanly_on_keyboard_interrupt(self) -> None:
         fake_server = mock.Mock()

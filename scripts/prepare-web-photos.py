@@ -15,7 +15,7 @@ RESAMPLE_LANCZOS = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Genera copias optimizadas para web a partir de una carpeta de fotos."
+        description="Generate optimized web copies from a photo directory."
     )
     parser.add_argument("source")
     parser.add_argument("target")
@@ -88,7 +88,7 @@ def main() -> int:
     target_dir.mkdir(parents=True, exist_ok=True)
 
     if not source_dir.exists():
-        print(f"No existe la carpeta de origen: {source_dir}")
+        print(f"Source directory does not exist: {source_dir}")
         return 1
 
     photo_sources = [
@@ -99,7 +99,7 @@ def main() -> int:
 
     total = len(photo_sources)
     if total == 0:
-        print("No hay fotos para preparar.", file=sys.stderr)
+        print("There are no photos to prepare.", file=sys.stderr)
         return 0
 
     for index, source in enumerate(photo_sources, start=1):

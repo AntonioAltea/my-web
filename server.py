@@ -214,10 +214,10 @@ def main() -> int:
             raise
 
         chosen_port = find_available_port(args.host, args.port + 1)
-        print(f"El puerto {args.port} ya estaba en uso. Uso {chosen_port} en su lugar.")
+        print(f"Port {args.port} was already in use. Using {chosen_port} instead.")
         server = create_server(args.host, chosen_port)
 
-    print(f"Sirviendo en http://{args.host}:{chosen_port}")
+    print(f"Serving at http://{args.host}:{chosen_port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -13,18 +13,18 @@ PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"}
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Carga todas las fotos y elimina las que no se puedan leer."
+        description="Load all photos and remove the ones that cannot be read."
     )
     parser.add_argument(
         "directory",
         nargs="?",
         default="assets/photos",
-        help="Carpeta de fotos. Por defecto: assets/photos",
+        help="Photo directory. Default: assets/photos",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Solo muestra que borraria, sin borrar nada.",
+        help="Only show what would be deleted, without deleting anything.",
     )
     return parser.parse_args()
 
@@ -57,7 +57,7 @@ def main() -> int:
     directory = Path(args.directory).resolve()
 
     if not directory.exists():
-        print(f"No existe la carpeta: {directory}")
+        print(f"Directory does not exist: {directory}")
         return 1
 
     photo_paths = sorted(
@@ -66,7 +66,7 @@ def main() -> int:
     )
 
     if not photo_paths:
-        print(f"No hay fotos en {directory}")
+        print(f"There are no photos in {directory}")
         return 0
 
     broken = []
@@ -76,20 +76,20 @@ def main() -> int:
             print(f"OK     {path.name}")
             continue
         broken.append(path)
-        print(f"BORRAR {path.name}")
+        print(f"DELETE {path.name}")
 
     if not broken:
-        print(f"Todas bien. Revisadas: {len(photo_paths)}")
+        print(f"All good. Checked: {len(photo_paths)}")
         return 0
 
     if args.dry_run:
-        print(f"Detectadas {len(broken)} fotos rotas. No se ha borrado nada.")
+        print(f"Detected {len(broken)} broken photos. Nothing was deleted.")
         return 0
 
     for path in broken:
         path.unlink(missing_ok=True)
 
-    print(f"Borradas {len(broken)} fotos rotas de {len(photo_paths)} revisadas.")
+    print(f"Deleted {len(broken)} broken photos out of {len(photo_paths)} checked.")
     return 0
 
 

@@ -1,46 +1,46 @@
-# Web personal sencilla
+# Simple Personal Website
 
-Base sencilla para una web de musica y fotografia con aire DIY.
+A simple music-and-photography site with a DIY feel.
 
-## Estructura
+## Structure
 
-- `index.html`: estructura principal
-- `styles.css`: estilo visual
-- `script.js`: carga automatica de fotos y canciones, visor y reproductor
-- `server.py`: servidor Python que lista los archivos
-- `Dockerfile`: contenedor para despliegue
-- `fly.toml`: configuracion de Fly.io
-- `assets/photos/`: mete aqui tus imagenes
-- `assets/music/`: mete aqui tus mp3
+- `index.html`: main structure
+- `styles.css`: visual styling
+- `script.js`: automatic photo and track loading, viewer, and player
+- `server.py`: Python server that lists files
+- `Dockerfile`: deployment container
+- `fly.toml`: Fly.io configuration
+- `assets/photos/`: put your images here
+- `assets/music/`: put your mp3 files here
 
-## Como usarla
+## How To Use It
 
-1. Copia tus fotos dentro de `assets/photos/`.
-2. Copia tu musica dentro de `assets/music/`.
-3. Arranca el servidor y la web las mostrara automaticamente.
+1. Copy your photos into `assets/photos/`.
+2. Copy your music into `assets/music/`.
+3. Start the server and the site will show them automatically.
 
-El titulo de cada foto o pista sale del nombre del fichero:
+Each photo or track title is derived from the file name:
 
-- `granada-de-noche.jpg` se vera como `granada de noche`
-- `cinta_01.mp3` se vera como `cinta 01`
+- `granada-de-noche.jpg` will show up as `granada de noche`
+- `cinta_01.mp3` will show up as `cinta 01`
 
-## Verla en local
+## Run Locally
 
-Arrancala con:
+Start it with:
 
 ```bash
 python3 server.py
 ```
 
-Y luego abre `http://127.0.0.1:8000`.
+Then open `http://127.0.0.1:8000`.
 
 ## Git hooks
 
-El repositorio incluye un hook `pre-push` para ejecutar los tests antes de cada `git push`.
+The repository includes a `pre-push` hook that runs tests before each `git push`.
 
-`make test` ejecuta tanto los tests Python como los tests de comportamiento del frontend.
+`make test` runs both the Python tests and the frontend behavior tests.
 
-Para activarlo en tu copia local:
+To enable it in your local clone:
 
 ```bash
 git config core.hooksPath .githooks
@@ -49,119 +49,119 @@ chmod +x .githooks/pre-push
 
 ## Bandcamp
 
-Ahora mismo la musica aparece en una barra fija inferior con orden aleatorio y enlace a `https://manturon.bandcamp.com`.
+Music currently appears in a fixed bottom bar in random order, with a link to `https://manturon.bandcamp.com`.
 
 ## Fly.io
 
-La app esta preparada para desplegarse en Fly.io usando un volumen persistente en `/data`.
-En Fly, las fotos iran en `/data/photos` y la musica en `/data/music`.
+The app is set up for deployment on Fly.io using a persistent volume at `/data`.
+On Fly, photos live in `/data/photos` and music lives in `/data/music`.
 
-### Primer despliegue
+### First Deploy
 
-1. Instala `flyctl` y haz login.
-2. Crea la app si hace falta:
+1. Install `flyctl` and log in.
+2. Create the app if needed:
 
 ```bash
 fly apps create manturon
 ```
 
-3. Crea el volumen persistente:
+3. Create the persistent volume:
 
 ```bash
 fly volumes create manturon_data_2g --region cdg --size 2 --app manturon
 ```
 
-4. Despliega:
+4. Deploy:
 
 ```bash
 fly deploy
 ```
 
-Si el deploy se lanza desde CI o desde una integracion no interactiva, usa confirmacion automatica:
+If the deploy runs from CI or another non-interactive integration, use automatic confirmation:
 
 ```bash
 fly deploy --yes
 ```
 
-Si no, Fly puede parar con un error del tipo `yes flag must be specified when not running interactively`, sobre todo cuando la app ya tiene un volumen montado y el deploy necesita confirmar que mantiene esa configuracion.
+Otherwise Fly may stop with an error such as `yes flag must be specified when not running interactively`, especially when the app already has a mounted volume and deployment needs to confirm that setup is preserved.
 
-Si conectas el repo en la UI de Fly y activas el auto-deploy para `main`, los siguientes cambios de codigo pueden desplegarse solos al hacer `push`.
-Eso no borra el volumen `/data`: las fotos y la musica ya subidas siguen ahi entre deploys.
-Lo que no hace el auto-deploy es copiar archivos nuevos desde `assets/` al volumen remoto, asi que para eso se sigue usando `make upload ...`, `make sync ...` o `make sync-all`.
+If you connect the repo in the Fly UI and enable auto-deploy for `main`, subsequent code changes can deploy automatically on `push`.
+That does not wipe the `/data` volume: already-uploaded photos and music remain there between deploys.
+What auto-deploy does not do is copy new files from `assets/` to the remote volume, so for that you still use `make upload ...`, `make sync ...`, or `make sync-all`.
 
-### Subir fotos o musica nuevas
+### Upload New Photos Or Music
 
-Usa un solo comando y cambia `KIND=`:
+Use one command and change `KIND=`:
 
 ```bash
 make upload KIND=photos SRC=assets/photos
 make upload KIND=music SRC=assets/music
 ```
 
-Tambien puedes subir una carpeta distinta o un fichero concreto cambiando `SRC=`.
-`APP=manturon` es ahora el valor por defecto, asi que solo hace falta si quieres otra app.
-Si `KIND=photos`, antes de subir se generan copias optimizadas para web y nunca se suben los originales gordos.
+You can also upload a different directory or a specific file by changing `SRC=`.
+`APP=manturon` is now the default value, so you only need it for another app.
+If `KIND=photos`, optimized web copies are generated before upload and the large original files are never uploaded.
 
-### Sincronizar con Fly
+### Sync With Fly
 
-Para que el volumen remoto quede igual que tus carpetas locales, borrando en Fly lo que ya no exista en local y subiendo lo nuevo o cambiado:
+To make the remote volume match your local folders, deleting files on Fly that no longer exist locally and uploading anything new or changed:
 
 ```bash
 make sync KIND=photos SRC=assets/photos
 make sync KIND=music SRC=assets/music
 ```
 
-O las dos cosas de una vez:
+Or both at once:
 
 ```bash
 make sync-all
 ```
 
-En el caso de las fotos, tanto `make upload` como `make sync` generan antes copias optimizadas para web. Tus originales locales no se tocan, pero a Fly suben versiones mas pequeñas para que carguen mucho mejor.
+For photos, both `make upload` and `make sync` generate optimized web copies first. Your local originals are not touched, but smaller versions are uploaded to Fly so they load much better.
 
-Por defecto:
+By default:
 
-- lado largo maximo: `2200px`
-- JPEG: calidad `82`
-- WebP: calidad `80`
+- max long edge: `2200px`
+- JPEG: quality `82`
+- WebP: quality `80`
 
-Si quieres generar esas copias a mano para inspeccionarlas:
+If you want to generate those copies manually to inspect them:
 
 ```bash
 make preparar-fotos-web SRC=assets/photos OUT=/tmp/fotos-web
 ```
 
-Tambien puedes subir un fichero o carpeta concreta:
+You can also upload a specific file or folder:
 
 ```bash
 make upload KIND=photos SRC=assets/photos/mi-foto.jpg
 make upload KIND=music SRC=assets/music/mi-tema.flac
 ```
 
-### Borrar archivos en Fly
+### Delete Files On Fly
 
-Usa un solo comando y cambia `KIND=`:
+Use one command and change `KIND=`:
 
 ```bash
 make delete KIND=photos FILE=DSCF5123.JPG
 make delete KIND=music FILE=parado-master.flac
 ```
 
-### Limpiar fotos rotas
+### Clean Broken Photos
 
-Para revisar `assets/photos` y borrar automaticamente las que no se puedan cargar:
+To inspect `assets/photos` and automatically delete the ones that cannot be loaded:
 
 ```bash
 make limpiar-fotos
 ```
 
-Para solo comprobarlo sin borrar nada:
+To only check without deleting anything:
 
 ```bash
 make limpiar-fotos-dry
 ```
 
-Tambien puedes pasar otra carpeta:
+You can also pass another folder:
 
 ```bash
 make limpiar-fotos SRC=otra/carpeta

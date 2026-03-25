@@ -1,39 +1,39 @@
 # AGENTS.md
 
-Guia breve para trabajar en este repo sin perder tiempo.
+Short guide to work in this repo without wasting time.
 
-## Flujo de trabajo
+## Workflow
 
-- Primero cambiar y probar en local; desplegar solo despues.
-- Si para probar algo hace falta levantar la web, pedir al usuario que ejecute `python3 server.py` o `make run`; no arrancarlo automaticamente.
-- Si durante una tarea aparece una convencion o advertencia que vaya a ahorrar trabajo en el futuro, actualizar este archivo.
-- Si el usuario pide commits y hay cambios logicamente separados, hacer un commit por cada bloque en vez de mezclarlo todo en uno.
-- Responder de forma concisa por defecto; no alargarse salvo que el usuario pida mas detalle.
+- Change and test locally first; deploy afterwards.
+- If testing requires running the site, ask the user to run `python3 server.py` or `make run`; do not start it automatically.
+- If a task reveals a convention or warning that will save time later, update this file.
+- If the user asks for commits and there are logically separate changes, make one commit per block instead of mixing everything together.
+- Respond concisely by default; do not be verbose unless the user asks for more detail.
 
-## Mapa rapido
+## Quick Map
 
-- `index.html`, `styles.css`, `script.js`: frontend sin build step.
-- `server.py`: sirve la web y expone `/api/media`.
-- `test_server.py`: tests del servidor.
-- `test_script.js`: tests de comportamiento del frontend sin dependencias externas.
-- `Makefile`: comandos habituales.
-- `scripts/prepare-web-photos.py`: optimiza fotos para web.
-- `scripts/sync-media.sh`: sincroniza media con Fly; para fotos genera antes copias web.
+- `index.html`, `styles.css`, `script.js`: frontend without a build step.
+- `server.py`: serves the site and exposes `/api/media`.
+- `test_server.py`: server tests.
+- `test_script.js`: frontend behavior tests without external dependencies.
+- `Makefile`: common commands.
+- `scripts/prepare-web-photos.py`: optimizes photos for the web.
+- `scripts/sync-media.sh`: syncs media with Fly; for photos it generates web copies first.
 
-## Cosas que importan de verdad
+## Things That Actually Matter
 
-- En local los assets salen de `assets/`; en Fly salen de `/data`. Si un cambio toca rutas, no asumir que produccion lee del repo.
-- `/api/media` devuelve las claves `photos` y `music` con rutas web. Si cambias ese contrato, ajustar tambien `script.js`.
-- Si cambias comportamiento de `server.py`, añadir o actualizar tests en `test_server.py`.
-- Mantener la cobertura de tests alta en la parte Python; si baja, subirla con tests utiles antes de cerrar.
-- Si se añade comportamiento nuevo, intentar dejar tambien tests que lo cubran siempre que sea razonable.
-- Si el cambio toca `script.js` o interacciones relevantes del cliente, valorar añadir o actualizar tests en `test_script.js` siempre que sea razonable.
-- Si cambias operativa, comandos o despliegue, actualizar `README.md`.
-- Si aparece un archivo local, de editor o generado que no deba versionarse, añadirlo a `.gitignore`.
-- No meter build steps, frameworks ni dependencias pesadas salvo que se pida expresamente.
-- Si la app esta conectada al repo en la UI de Fly, el auto-deploy actualiza codigo en cada `push` a `main`, pero no sube fotos ni musica nuevas al volumen `/data`.
+- Locally, assets come from `assets/`; on Fly, they come from `/data`. If a change touches paths, do not assume production reads from the repo.
+- `/api/media` returns the `photos` and `music` keys with web paths. If you change that contract, update `script.js` too.
+- If you change `server.py` behavior, add or update tests in `test_server.py`.
+- Keep Python test coverage high; if it drops, bring it back up with useful tests before closing the task.
+- If new behavior is added, try to leave tests covering it whenever reasonable.
+- If the change touches `script.js` or relevant client interactions, consider adding or updating tests in `test_script.js` whenever reasonable.
+- If you change operations, commands, or deployment, update `README.md`.
+- If a local, editor, or generated file appears and should not be versioned, add it to `.gitignore`.
+- Do not add build steps, frameworks, or heavy dependencies unless explicitly requested.
+- If the app is connected to the repo in the Fly UI, auto-deploy updates code on each `push` to `main`, but it does not upload new photos or music to the `/data` volume.
 
-## Comandos utiles
+## Useful Commands
 
 - `make test`
 - `make test-front`
@@ -42,9 +42,9 @@ Guia breve para trabajar en este repo sin perder tiempo.
 - `make limpiar-fotos`
 - `make limpiar-fotos-dry`
 
-## Antes de cerrar
+## Before Closing
 
-- Ejecutar `make test` si se tocó Python o el flujo de media.
-- Recordar que el hook `pre-push` ejecuta `make test`, asi que los tests de backend y frontend deben quedar verdes antes de empujar.
-- Si se tocó frontend o integracion cliente-servidor, indicar al usuario que lo pruebe en local levantando el server el mismo.
-- Revisar `README.md` y este `AGENTS.md` si el cambio ha alterado flujos o decisiones utiles.
+- Run `make test` if Python or the media flow changed.
+- Remember that the `pre-push` hook runs `make test`, so backend and frontend tests must be green before pushing.
+- If frontend or client-server integration changed, tell the user to test it locally by starting the server themselves.
+- Review `README.md` and this `AGENTS.md` if the change altered useful flows or decisions.

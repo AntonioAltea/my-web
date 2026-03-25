@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 3 ]]; then
-  echo "Uso: $0 <app> <photos|music> <ruta-local>"
+  echo "Usage: $0 <app> <photos|music> <local-path>"
   exit 1
 fi
 
@@ -18,14 +18,14 @@ if [[ -n "${MACHINE_ID:-}" ]]; then
 fi
 
 if [[ "$MEDIA_KIND" != "photos" && "$MEDIA_KIND" != "music" ]]; then
-  echo "El segundo argumento debe ser 'photos' o 'music'."
+  echo "The second argument must be 'photos' or 'music'."
   exit 1
 fi
 
 REMOTE_PATH="/data/${MEDIA_KIND}"
 
 if [[ ! -e "$LOCAL_PATH" ]]; then
-  echo "La ruta local no existe: $LOCAL_PATH"
+  echo "The local path does not exist: $LOCAL_PATH"
   exit 1
 fi
 
@@ -35,16 +35,16 @@ if [[ "$MEDIA_KIND" == "photos" ]]; then
   upload_root="$TMP_DIR/photos-web"
 
   if [[ -d "$LOCAL_PATH" ]]; then
-    echo "Preparando copias web de las fotos..."
+    echo "Preparing web copies of the photos..."
     python3 scripts/prepare-web-photos.py "$LOCAL_PATH" "$upload_root" >/dev/null
     UPLOAD_PATH="$upload_root"
   else
-    echo "Preparando copia web de la foto..."
+    echo "Preparing a web copy of the photo..."
     mkdir -p "$upload_root"
     python3 scripts/prepare-web-photos.py "$(dirname "$LOCAL_PATH")" "$upload_root" >/dev/null
     prepared_file="$upload_root/$(basename "$LOCAL_PATH")"
     if [[ ! -f "$prepared_file" ]]; then
-      echo "No se pudo preparar la foto: $LOCAL_PATH"
+      echo "Could not prepare the photo: $LOCAL_PATH"
       exit 1
     fi
     UPLOAD_PATH="$prepared_file"
@@ -55,7 +55,7 @@ if [[ -d "$UPLOAD_PATH" ]]; then
   mapfile -t files < <(find "$UPLOAD_PATH" -maxdepth 1 -type f ! -name '.gitkeep' | sort)
 
   if [[ "${#files[@]}" -eq 0 ]]; then
-    echo "No hay archivos para subir en: $LOCAL_PATH"
+    echo "There are no files to upload in: $LOCAL_PATH"
     exit 0
   fi
 

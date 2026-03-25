@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 3 ]]; then
-  echo "Uso: $0 <app> <photos|music> <ruta-local>"
+  echo "Usage: $0 <app> <photos|music> <local-path>"
   exit 1
 fi
 
@@ -17,12 +17,12 @@ if [[ -n "${MACHINE_ID:-}" ]]; then
 fi
 
 if [[ "$MEDIA_KIND" != "photos" && "$MEDIA_KIND" != "music" ]]; then
-  echo "El segundo argumento debe ser 'photos' o 'music'."
+  echo "The second argument must be 'photos' or 'music'."
   exit 1
 fi
 
 if [[ ! -d "$LOCAL_PATH" ]]; then
-  echo "La ruta local debe ser una carpeta: $LOCAL_PATH"
+  echo "The local path must be a directory: $LOCAL_PATH"
   exit 1
 fi
 
@@ -37,7 +37,7 @@ upload_root="$LOCAL_PATH"
 
 if [[ "$MEDIA_KIND" == "photos" ]]; then
   upload_root="$tmp_dir/photos-web"
-  echo "Preparando copias web de las fotos..."
+  echo "Preparing web copies of the photos..."
   python3 scripts/prepare-web-photos.py "$LOCAL_PATH" "$upload_root" >/dev/null
 fi
 
@@ -95,7 +95,7 @@ delete_count=0
 if [[ -s "$to_delete" ]]; then
   mapfile -t delete_names < "$to_delete"
   delete_count="${#delete_names[@]}"
-  echo "Borrando ${delete_count} archivos remotos que ya no existen en local..."
+  echo "Deleting ${delete_count} remote files that no longer exist locally..."
   delete_cmd="rm -f --"
   for name in "${delete_names[@]}"; do
     delete_cmd+=" $(printf '%q' "$REMOTE_PATH/$name")"
@@ -107,7 +107,7 @@ upload_count=0
 if [[ -s "$to_upload" ]]; then
   mapfile -t upload_names < "$to_upload"
   upload_count="${#upload_names[@]}"
-  echo "Reemplazando ${upload_count} archivos en remoto..."
+  echo "Replacing ${upload_count} remote files..."
 
   replace_cmd="rm -f --"
   for name in "${upload_names[@]}"; do
@@ -124,6 +124,6 @@ if [[ -s "$to_upload" ]]; then
   } | fly ssh sftp shell -a "$APP_NAME" "${MACHINE_ARGS[@]}" >/dev/null
 fi
 
-echo "Sincronizacion de ${MEDIA_KIND}:"
-echo "- borrados en remoto: ${delete_count}"
-echo "- subidos o actualizados: ${upload_count}"
+echo "${MEDIA_KIND} sync:"
+echo "- deleted remotely: ${delete_count}"
+echo "- uploaded or updated: ${upload_count}"
