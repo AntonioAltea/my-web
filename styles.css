@@ -77,8 +77,7 @@ a {
   border-bottom: 1px solid var(--line);
 }
 
-.player-label,
-.photo-counter {
+.player-label {
   margin: 0;
   color: var(--accent);
   font-size: 0.78rem;
@@ -155,29 +154,36 @@ a {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--line);
-  display: grid;
-  gap: 8px;
+  display: block;
 }
 
 .photo-caption {
-  overflow-wrap: anywhere;
+  position: absolute;
+  left: 14px;
+  bottom: 52px;
+  transform: none;
+  max-width: min(32ch, calc(100% - 32px));
+  padding: 6px 10px;
+  border: 1px solid var(--control-line);
+  background: var(--surface-soft);
   color: var(--accent);
+  line-height: 1.2;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+  z-index: 1;
 }
 
 .gallery-nav-row {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
-.gallery-tools-row {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.photo-counter {
-  justify-self: center;
+.photo-caption-visible {
+  opacity: 1;
 }
 
 .gallery-nav {
@@ -195,7 +201,9 @@ a {
 }
 
 .gallery-nav-mode {
-  font-size: 0.72rem;
+  justify-self: center;
+  font-size: 0.84rem;
+  letter-spacing: 0.1em;
 }
 
 .gallery-nav:hover,
@@ -250,6 +258,45 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--accent);
+}
+
+.now-playing-enter-next {
+  animation: now-playing-slide-next 300ms ease;
+}
+
+.now-playing-enter-prev {
+  animation: now-playing-slide-prev 300ms ease;
+}
+
+@keyframes now-playing-slide-next {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes now-playing-slide-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .now-playing-enter-next,
+  .now-playing-enter-prev {
+    animation: none;
+  }
 }
 
 .player-controls {
@@ -586,8 +633,16 @@ a {
   }
 
   .gallery-meta {
-    gap: 4px;
     margin-top: 0;
+  }
+
+  .gallery-nav-row {
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+  }
+
+  .photo-caption {
+    display: none;
   }
 
   .player-controls {

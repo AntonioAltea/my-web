@@ -3,7 +3,6 @@ const nowPlaying = document.querySelector("#now-playing");
 const mainPhoto = document.querySelector("#main-photo");
 const photoLoader = document.querySelector("#photo-loader");
 const photoCaption = document.querySelector("#photo-caption");
-const photoCounter = document.querySelector("#photo-counter");
 const prevPhotoButton = document.querySelector("#prev-photo");
 const nextPhotoButton = document.querySelector("#next-photo");
 const photoRandomButton = document.querySelector("#photo-random");
@@ -25,6 +24,7 @@ let trackCursor = 0;
 let isSeeking = false;
 let mediaPollTimer = null;
 let photoControlsLocked = false;
+let nowPlayingAnimationTimer = null;
 
 function syncPhotoControls() {
   const hasPhotos = photos.length > 0;
@@ -110,10 +110,30 @@ function updatePlayButton() {
   syncPlayerBarHeight();
 }
 
-function loadCurrentTrack({ autoplay = false } = {}) {
+function setNowPlayingText(nextTitle, direction = "none") {
+  if (nowPlayingAnimationTimer !== null) {
+    window.clearTimeout(nowPlayingAnimationTimer);
+    nowPlayingAnimationTimer = null;
+  }
+
+  nowPlaying.classList.remove("now-playing-enter-next", "now-playing-enter-prev");
+  nowPlaying.textContent = nextTitle;
+
+  if (direction === "next" || direction === "prev") {
+    const className = direction === "next" ? "now-playing-enter-next" : "now-playing-enter-prev";
+    void nowPlaying.offsetWidth;
+    nowPlaying.classList.add(className);
+    nowPlayingAnimationTimer = window.setTimeout(() => {
+      nowPlaying.classList.remove(className);
+      nowPlayingAnimationTimer = null;
+    }, 220);
+  }
+}
+
+function loadCurrentTrack({ autoplay = false, direction = "none" } = {}) {
   const track = currentTrack();
   if (!track) {
-    nowPlaying.textContent = "No hay canciones en assets/music";
+    setNowPlayingText("No hay canciones en assets/music");
     audioPlayer.removeAttribute("src");
     playToggleButton.disabled = true;
     prevTrackButton.disabled = true;
@@ -126,7 +146,7 @@ function loadCurrentTrack({ autoplay = false } = {}) {
   }
 
   audioPlayer.src = track.file;
-  nowPlaying.textContent = track.title;
+  setNowPlayingText(track.title, direction);
   playToggleButton.disabled = false;
   prevTrackButton.disabled = tracks.length <= 1;
   nextTrackButton.disabled = tracks.length <= 1;
@@ -149,7 +169,7 @@ function stepTrack(step, autoplay = true) {
   }
 
   trackCursor = (trackCursor + step + shuffledTrackOrder.length) % shuffledTrackOrder.length;
-  loadCurrentTrack({ autoplay });
+  loadCurrentTrack({ autoplay, direction: step > 0 ? "next" : "prev" });
 }
 
 function updatePhoto() {
@@ -158,7 +178,7 @@ function updatePhoto() {
     mainPhoto.removeAttribute("src");
     mainPhoto.alt = "";
     photoCaption.textContent = "No hay fotos todavia.";
-    photoCounter.textContent = "0 / 0";
+    photoCaption.classList.remove("photo-caption-visible");
     photoControlsLocked = false;
     syncPhotoControls();
     photoLoader.hidden = true;
@@ -169,9 +189,9 @@ function updatePhoto() {
   photoControlsLocked = true;
   syncPhotoControls();
   photoLoader.hidden = false;
+  photoCaption.classList.remove("photo-caption-visible");
   mainPhoto.alt = photo.title;
   photoCaption.textContent = photo.title;
-  photoCounter.textContent = `${currentPhotoIndex + 1} / ${photos.length}`;
   mainPhoto.hidden = true;
   mainPhoto.src = photo.file;
 }
@@ -212,9 +232,9 @@ async function loadMedia() {
 
     media = await response.json();
   } catch (error) {
-    nowPlaying.textContent = "Arranca la web con python3 server.py";
+    setNowPlayingText("Arranca la web con python3 server.py");
     photoCaption.textContent = "No se pudieron cargar las fotos.";
-    photoCounter.textContent = "0 / 0";
+    photoCaption.classList.remove("photo-caption-visible");
     prevPhotoButton.disabled = true;
     nextPhotoButton.disabled = true;
     playToggleButton.disabled = true;
@@ -356,8 +376,19 @@ mainPhoto.addEventListener("load", () => {
 mainPhoto.addEventListener("error", () => {
   photoLoader.hidden = true;
   photoCaption.textContent = "No se pudo cargar la foto.";
+  photoCaption.classList.remove("photo-caption-visible");
   photoControlsLocked = false;
   syncPhotoControls();
+});
+
+mainPhoto.addEventListener("mouseenter", () => {
+  if (!mainPhoto.hidden && photos.length) {
+    photoCaption.classList.add("photo-caption-visible");
+  }
+});
+
+mainPhoto.addEventListener("mouseleave", () => {
+  photoCaption.classList.remove("photo-caption-visible");
 });
 
 document.addEventListener("keydown", (event) => {
