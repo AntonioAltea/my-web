@@ -8,6 +8,7 @@ Guia breve para trabajar en este repo sin perder tiempo.
 - Si para probar algo hace falta levantar la web, pedir al usuario que ejecute `python3 server.py` o `make run`; no arrancarlo automaticamente.
 - Si durante una tarea aparece una convencion o advertencia que vaya a ahorrar trabajo en el futuro, actualizar este archivo.
 - Si el usuario pide commits y hay cambios logicamente separados, hacer un commit por cada bloque en vez de mezclarlo todo en uno.
+- Responder de forma concisa por defecto; no alargarse salvo que el usuario pida mas detalle.
 
 ## Mapa rapido
 

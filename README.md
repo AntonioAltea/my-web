@@ -75,6 +75,14 @@ fly volumes create manturon_data_2g --region cdg --size 2 --app manturon
 fly deploy
 ```
 
+Si el deploy se lanza desde CI o desde una integracion no interactiva, usa confirmacion automatica:
+
+```bash
+fly deploy --yes
+```
+
+Si no, Fly puede parar con un error del tipo `yes flag must be specified when not running interactively`, sobre todo cuando la app ya tiene un volumen montado y el deploy necesita confirmar que mantiene esa configuracion.
+
 Si conectas el repo en la UI de Fly y activas el auto-deploy para `main`, los siguientes cambios de codigo pueden desplegarse solos al hacer `push`.
 Eso no borra el volumen `/data`: las fotos y la musica ya subidas siguen ahi entre deploys.
 Lo que no hace el auto-deploy es copiar archivos nuevos desde `assets/` al volumen remoto, asi que para eso se sigue usando `make upload ...`, `make sync ...` o `make sync-all`.
