@@ -27,6 +27,7 @@ Guia breve para trabajar en este repo sin perder tiempo.
 - Si cambias operativa, comandos o despliegue, actualizar `README.md`.
 - Si aparece un archivo local, de editor o generado que no deba versionarse, añadirlo a `.gitignore`.
 - No meter build steps, frameworks ni dependencias pesadas salvo que se pida expresamente.
+- Si la app esta conectada al repo en la UI de Fly, el auto-deploy actualiza codigo en cada `push` a `main`, pero no sube fotos ni musica nuevas al volumen `/data`.
 
 ## Comandos utiles
 

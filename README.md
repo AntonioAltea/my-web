@@ -75,6 +75,10 @@ fly volumes create manturon_data --region mad --size 3 --app manturon
 fly deploy
 ```
 
+Si conectas el repo en la UI de Fly y activas el auto-deploy para `main`, los siguientes cambios de codigo pueden desplegarse solos al hacer `push`.
+Eso no borra el volumen `/data`: las fotos y la musica ya subidas siguen ahi entre deploys.
+Lo que no hace el auto-deploy es copiar archivos nuevos desde `assets/` al volumen remoto, asi que para eso se sigue usando `make upload ...`, `make sync ...` o `make sync-all`.
+
 ### Subir fotos o musica nuevas
 
 Usa un solo comando y cambia `KIND=`:
