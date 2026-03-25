@@ -121,6 +121,11 @@ def redirect_target(host_header: str | None, request_path: str) -> str | None:
 
 
 class MediaHandler(SimpleHTTPRequestHandler):
+    def _client_disconnected(self, error: BrokenPipeError | ConnectionResetError) -> None:
+        # The browser may cancel media downloads when switching tracks.
+        if isinstance(error, ConnectionResetError) and error.errno != errno.ECONNRESET:
+            raise
+
     def end_headers(self) -> None:
         request_path = urlparse(self.path).path
 
@@ -151,10 +156,16 @@ class MediaHandler(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(body)
+            try:
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError) as error:
+                self._client_disconnected(error)
             return
 
-        super().do_GET()
+        try:
+            super().do_GET()
+        except (BrokenPipeError, ConnectionResetError) as error:
+            self._client_disconnected(error)
 
 
 def parse_args() -> argparse.Namespace:

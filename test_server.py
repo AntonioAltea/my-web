@@ -95,6 +95,21 @@ class MediaRequestTests(unittest.TestCase):
         self.assertEqual(cache_headers, ["Cache-Control: no-store, max-age=0\r\n"])
         end_headers_mock.assert_called_once_with(handler)
 
+    def test_do_get_ignores_client_disconnect_while_serving_file(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/assets/music/demo.flac"
+        handler.headers = {}
+
+        with mock.patch.object(
+            server.SimpleHTTPRequestHandler,
+            "do_GET",
+            autospec=True,
+            side_effect=ConnectionResetError(errno.ECONNRESET, "Connection reset by peer"),
+        ) as do_get_mock:
+            server.MediaHandler.do_GET(handler)
+
+        do_get_mock.assert_called_once_with(handler)
+
 
 class MediaPayloadTests(unittest.TestCase):
     def test_media_payload_uses_expected_prefixes(self) -> None:
