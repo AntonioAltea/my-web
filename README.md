@@ -66,7 +66,7 @@ fly apps create manturon
 3. Crea el volumen persistente:
 
 ```bash
-fly volumes create manturon_data --region mad --size 3 --app manturon
+fly volumes create manturon_data_2g --region cdg --size 2 --app manturon
 ```
 
 4. Despliega:
