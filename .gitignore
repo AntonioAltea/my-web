@@ -8,3 +8,5 @@ assets/music/*
 !assets/music/.gitkeep
 
 .env
+
+.vscode/settings.json

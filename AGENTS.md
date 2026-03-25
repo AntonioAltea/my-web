@@ -23,6 +23,7 @@ Guia breve para trabajar en este repo sin perder tiempo.
 - `/api/media` devuelve las claves `photos` y `music` con rutas web. Si cambias ese contrato, ajustar tambien `script.js`.
 - Si cambias comportamiento de `server.py`, añadir o actualizar tests en `test_server.py`.
 - Si cambias operativa, comandos o despliegue, actualizar `README.md`.
+- Si aparece un archivo local, de editor o generado que no deba versionarse, añadirlo a `.gitignore`.
 - No meter build steps, frameworks ni dependencias pesadas salvo que se pida expresamente.
 
 ## Comandos utiles
