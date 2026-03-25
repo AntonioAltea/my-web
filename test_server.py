@@ -95,6 +95,25 @@ class MediaRequestTests(unittest.TestCase):
         self.assertEqual(cache_headers, ["Cache-Control: no-store, max-age=0\r\n"])
         end_headers_mock.assert_called_once_with(handler)
 
+    def test_end_headers_disables_cache_for_favicon(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/favicon.ico?v=3"
+        handler._headers_buffer = []
+        handler.wfile = io.BytesIO()
+        handler.request_version = "HTTP/1.1"
+        handler.command = "GET"
+
+        with mock.patch.object(server.SimpleHTTPRequestHandler, "end_headers", autospec=True) as end_headers_mock:
+            server.MediaHandler.end_headers(handler)
+
+        cache_headers = [
+            header.decode("latin-1")
+            for header in handler._headers_buffer
+            if b"Cache-Control" in header
+        ]
+        self.assertEqual(cache_headers, ["Cache-Control: no-store, max-age=0\r\n"])
+        end_headers_mock.assert_called_once_with(handler)
+
     def test_do_get_ignores_client_disconnect_while_serving_file(self) -> None:
         handler = server.MediaHandler.__new__(server.MediaHandler)
         handler.path = "/assets/music/demo.flac"

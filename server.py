@@ -129,7 +129,11 @@ class MediaHandler(SimpleHTTPRequestHandler):
     def end_headers(self) -> None:
         request_path = urlparse(self.path).path
 
-        if request_path in {"/", "/index.html"} or request_path.endswith((".css", ".js")):
+        if (
+            request_path in {"/", "/index.html", "/favicon.ico"}
+            or request_path.endswith((".css", ".js"))
+            or request_path.startswith("/assets/icons/")
+        ):
             self.send_header("Cache-Control", "no-store, max-age=0")
 
         super().end_headers()
