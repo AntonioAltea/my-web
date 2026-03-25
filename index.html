@@ -77,7 +77,12 @@
       <div class="player-side">
         <div class="player-progress-row">
           <span id="current-time" class="timecode">0:00</span>
-          <input id="seek-bar" class="seek-bar" type="range" min="0" max="100" value="0" aria-label="Posicion de la cancion">
+          <div id="seek-bar-shell" class="seek-bar-shell">
+            <div class="seek-bar-fill">
+              <div class="seek-bar-wave"></div>
+            </div>
+            <input id="seek-bar" class="seek-bar" type="range" min="0" max="100" value="0" aria-label="Posicion de la cancion">
+          </div>
           <span id="total-time" class="timecode">0:00</span>
         </div>
         <a href="https://manturon.bandcamp.com" target="_blank" rel="noreferrer">bandcamp</a>

@@ -12,6 +12,7 @@ const nextTrackButton = document.querySelector("#next-track");
 const playToggleButton = document.querySelector("#play-toggle");
 const playToggleIcon = document.querySelector("#play-toggle-icon");
 const seekBar = document.querySelector("#seek-bar");
+const seekBarShell = document.querySelector("#seek-bar-shell");
 const currentTimeLabel = document.querySelector("#current-time");
 const totalTimeLabel = document.querySelector("#total-time");
 const playerBar = document.querySelector(".player-bar");
@@ -105,6 +106,7 @@ function currentTrackFile() {
 function updatePlayButton() {
   playToggleIcon.className = audioPlayer.paused ? "icon-play" : "icon-pause";
   playToggleButton.setAttribute("aria-label", audioPlayer.paused ? "Reproducir" : "Pausar");
+  seekBarShell.classList.toggle("seek-bar-shell-playing", !audioPlayer.paused);
   syncPlayerBarHeight();
 }
 
@@ -192,6 +194,7 @@ function updateProgress() {
   const currentTime = audioPlayer.currentTime || 0;
   const progress = duration ? (currentTime / duration) * 100 : 0;
   seekBar.value = String(progress);
+  seekBarShell.style.setProperty("--seek-progress", `${progress}%`);
   currentTimeLabel.textContent = formatTime(currentTime);
   totalTimeLabel.textContent = formatTime(duration);
 }
@@ -327,12 +330,14 @@ seekBar.addEventListener("input", () => {
   isSeeking = true;
   const duration = audioPlayer.duration || 0;
   const nextTime = (Number(seekBar.value) / 100) * duration;
+  seekBarShell.style.setProperty("--seek-progress", `${seekBar.value}%`);
   currentTimeLabel.textContent = formatTime(nextTime);
 });
 
 seekBar.addEventListener("change", () => {
   const duration = audioPlayer.duration || 0;
   audioPlayer.currentTime = (Number(seekBar.value) / 100) * duration;
+  seekBarShell.style.setProperty("--seek-progress", `${seekBar.value}%`);
   isSeeking = false;
 });
 

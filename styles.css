@@ -4,10 +4,24 @@
   --paper-strong: rgba(255, 255, 255, 1);
   --ink: #1a211d;
   --muted: #53655c;
+  --accent-rgb: 47, 95, 77;
+  --line-rgb: 63, 97, 81;
+  --line-strong-rgb: 45, 78, 63;
   --line: rgba(63, 97, 81, 0.22);
   --line-strong: rgba(45, 78, 63, 0.44);
   --accent: #2f5f4d;
   --accent-soft: rgba(47, 95, 77, 0.08);
+  --surface-soft: rgba(255, 255, 255, 0.92);
+  --surface-strong: rgba(255, 255, 255, 0.97);
+  --surface-accent: rgba(240, 247, 243, 0.96);
+  --control-line: rgba(var(--line-strong-rgb), 0.28);
+  --control-line-strong: rgba(var(--line-strong-rgb), 0.5);
+  --photo-frame: rgba(var(--line-strong-rgb), 0.14);
+  --seek-track: rgba(var(--line-rgb), 0.16);
+  --thumb-shadow: rgba(var(--line-strong-rgb), 0.28);
+  --thumb-active-ring: rgba(var(--accent-rgb), 0.14);
+  --thumb-focus-ring: rgba(var(--accent-rgb), 0.12);
+  --thumb-active-fill: rgba(247, 252, 249, 1);
   --player-bar-height: 88px;
 }
 
@@ -57,6 +71,7 @@ a {
 .site-header {
   display: grid;
   gap: 8px;
+  justify-items: center;
   margin-bottom: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--line);
@@ -115,8 +130,8 @@ a {
   letter-spacing: 0.12em;
   text-transform: lowercase;
   padding: 6px 10px;
-  border: 1px solid rgba(45, 78, 63, 0.28);
-  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--control-line);
+  background: var(--surface-soft);
   z-index: 2;
 }
 
@@ -131,7 +146,7 @@ a {
   justify-self: center;
   align-self: center;
   background: #fff;
-  border: 1px solid rgba(45, 78, 63, 0.14);
+  border: 1px solid var(--photo-frame);
 }
 
 .gallery-meta {
@@ -168,7 +183,7 @@ a {
 .gallery-nav {
   position: static;
   border: 0;
-  border-bottom: 1px solid rgba(45, 78, 63, 0.28);
+  border-bottom: 1px solid var(--control-line);
   background: transparent;
   color: var(--accent);
   cursor: pointer;
@@ -188,7 +203,7 @@ a {
 .player-button:hover,
 .player-button:focus-visible {
   background: transparent;
-  border-color: rgba(45, 78, 63, 0.5);
+  border-color: var(--control-line-strong);
   color: var(--ink);
   outline: none;
 }
@@ -204,7 +219,7 @@ a {
   inset: auto 0 0;
   z-index: 10;
   border-top: 1px solid var(--line-strong);
-  background: rgba(255, 255, 255, 0.97);
+  background: var(--surface-strong);
   backdrop-filter: blur(10px);
 }
 
@@ -244,7 +259,7 @@ a {
 
 .player-button {
   border: 1px solid var(--line-strong);
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--surface-soft);
   color: var(--accent);
   padding: 7px 10px;
   cursor: pointer;
@@ -256,7 +271,7 @@ a {
 
 .player-button-primary {
   min-width: 44px;
-  background: rgba(240, 247, 243, 0.96);
+  background: var(--surface-accent);
 }
 
 .player-side {
@@ -273,9 +288,164 @@ a {
   align-items: center;
 }
 
-.seek-bar {
+.seek-bar-shell {
+  --seek-progress: 0%;
+  position: relative;
   width: 100%;
-  accent-color: var(--accent);
+  height: 18px;
+  display: grid;
+  align-items: center;
+}
+
+.seek-bar-shell::before {
+  content: "";
+  position: absolute;
+  left: var(--seek-progress);
+  right: 0;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: var(--seek-track);
+}
+
+.seek-bar-fill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: var(--seek-progress);
+  height: 14px;
+  transform: translateY(-50%);
+  overflow: hidden;
+  z-index: 1;
+}
+
+.seek-bar-fill::before {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 3px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: var(--accent);
+  transition: opacity 180ms ease;
+}
+
+.seek-bar-wave {
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 14' preserveAspectRatio='none'%3E%3Cpath d='M0 7 Q8 1.1 16 7 T32 7 T48 7 T64 7' fill='none' stroke='rgb(47,95,77)' stroke-width='2.8' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-size: 64px 14px;
+  background-repeat: repeat-x;
+  background-position: 0 center;
+  transition: opacity 180ms ease;
+}
+
+.seek-bar-shell-playing .seek-bar-wave {
+  opacity: 1;
+  animation: seek-bar-wave 2.5s linear infinite;
+}
+
+.seek-bar-shell-playing .seek-bar-fill {
+  background: transparent;
+}
+
+.seek-bar-shell-playing .seek-bar-fill::before {
+  opacity: 0;
+}
+
+.seek-bar {
+  appearance: none;
+  background: transparent;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+}
+
+.seek-bar::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.seek-bar::-moz-range-track {
+  height: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.seek-bar::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.seek-bar::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border: 3px solid var(--accent);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--thumb-shadow);
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.seek-bar::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 3px solid var(--accent);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--thumb-shadow);
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.seek-bar:active::-webkit-slider-thumb {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 4px var(--thumb-active-ring);
+  background: var(--thumb-active-fill);
+}
+
+.seek-bar:active::-moz-range-thumb {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 4px var(--thumb-active-ring);
+  background: var(--thumb-active-fill);
+}
+
+.seek-bar:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 1px var(--thumb-shadow),
+    0 0 0 4px var(--thumb-focus-ring);
+}
+
+.seek-bar:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 0 0 1px var(--thumb-shadow),
+    0 0 0 4px var(--thumb-focus-ring);
+}
+
+@keyframes seek-bar-wave {
+  from {
+    background-position: 0 center;
+  }
+
+  to {
+    background-position: 64px center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seek-bar-shell-playing .seek-bar-wave {
+    animation: none;
+  }
 }
 
 .timecode {
