@@ -14,6 +14,7 @@ const playToggleIcon = document.querySelector("#play-toggle-icon");
 const seekBar = document.querySelector("#seek-bar");
 const currentTimeLabel = document.querySelector("#current-time");
 const totalTimeLabel = document.querySelector("#total-time");
+const playerBar = document.querySelector(".player-bar");
 
 let tracks = [];
 let photos = [];
@@ -22,6 +23,27 @@ let shuffledTrackOrder = [];
 let trackCursor = 0;
 let isSeeking = false;
 let mediaPollTimer = null;
+let photoControlsLocked = false;
+
+function syncPhotoControls() {
+  const hasPhotos = photos.length > 0;
+  const canNavigate = hasPhotos && photos.length > 1 && !photoControlsLocked;
+
+  prevPhotoButton.disabled = !canNavigate;
+  nextPhotoButton.disabled = !canNavigate;
+  photoRandomButton.disabled = !canNavigate;
+}
+
+function syncPlayerBarHeight() {
+  if (!playerBar) {
+    return;
+  }
+
+  document.documentElement.style.setProperty(
+    "--player-bar-height",
+    `${playerBar.offsetHeight}px`,
+  );
+}
 
 function fileNameToTitle(filePath) {
   const fileName = filePath.split("/").pop() || filePath;
@@ -83,6 +105,7 @@ function currentTrackFile() {
 function updatePlayButton() {
   playToggleIcon.className = audioPlayer.paused ? "icon-play" : "icon-pause";
   playToggleButton.setAttribute("aria-label", audioPlayer.paused ? "Reproducir" : "Pausar");
+  syncPlayerBarHeight();
 }
 
 function loadCurrentTrack({ autoplay = false } = {}) {
@@ -134,18 +157,15 @@ function updatePhoto() {
     mainPhoto.alt = "";
     photoCaption.textContent = "No hay fotos todavia.";
     photoCounter.textContent = "0 / 0";
-    prevPhotoButton.disabled = true;
-    nextPhotoButton.disabled = true;
-    photoRandomButton.disabled = true;
+    photoControlsLocked = false;
+    syncPhotoControls();
     photoLoader.hidden = true;
     return;
   }
 
-  prevPhotoButton.disabled = photos.length <= 1;
-  nextPhotoButton.disabled = photos.length <= 1;
-  photoRandomButton.disabled = photos.length <= 1;
-
   const photo = photos[currentPhotoIndex];
+  photoControlsLocked = true;
+  syncPhotoControls();
   photoLoader.hidden = false;
   mainPhoto.alt = photo.title;
   photoCaption.textContent = photo.title;
@@ -324,10 +344,15 @@ audioPlayer.addEventListener("ended", () => stepTrack(1, true));
 mainPhoto.addEventListener("load", () => {
   mainPhoto.hidden = false;
   photoLoader.hidden = true;
+  photoControlsLocked = false;
+  syncPhotoControls();
+  syncPlayerBarHeight();
 });
 mainPhoto.addEventListener("error", () => {
   photoLoader.hidden = true;
   photoCaption.textContent = "No se pudo cargar la foto.";
+  photoControlsLocked = false;
+  syncPhotoControls();
 });
 
 document.addEventListener("keydown", (event) => {
@@ -359,5 +384,11 @@ window.addEventListener("focus", () => {
   loadMedia();
 });
 
+window.addEventListener("resize", syncPlayerBarHeight);
+
+window.addEventListener("load", syncPlayerBarHeight);
+
 loadMedia();
 startMediaPolling();
+updatePlayButton();
+syncPlayerBarHeight();
