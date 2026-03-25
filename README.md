@@ -38,6 +38,8 @@ Y luego abre `http://127.0.0.1:8000`.
 
 El repositorio incluye un hook `pre-push` para ejecutar los tests antes de cada `git push`.
 
+`make test` ejecuta tanto los tests Python como los tests de comportamiento del frontend.
+
 Para activarlo en tu copia local:
 
 ```bash

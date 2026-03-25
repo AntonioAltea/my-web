@@ -1,5 +1,7 @@
 __pycache__/
 *.py[cod]
+.coverage
+.coverage.*
 .DS_Store
 
 assets/photos/*

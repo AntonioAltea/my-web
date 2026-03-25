@@ -1,12 +1,17 @@
-.PHONY: run test upload delete sync sync-all preparar-fotos-web limpiar-fotos limpiar-fotos-dry
+.PHONY: run test test-python test-front upload delete sync sync-all preparar-fotos-web limpiar-fotos limpiar-fotos-dry
 
 APP ?= manturon
 
 run:
 	python3 server.py
 
-test:
+test: test-python test-front
+
+test-python:
 	python3 -m unittest -v
+
+test-front:
+	node test_script.js
 
 upload:
 	@test -n "$(KIND)" || (echo "Usa: make upload KIND=photos|music SRC=ruta [APP=manturon]"; exit 1)
