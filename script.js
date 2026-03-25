@@ -38,6 +38,14 @@ function shuffleIndices(length) {
   return indices;
 }
 
+function randomIndex(length) {
+  if (length <= 0) {
+    return 0;
+  }
+
+  return Math.floor(Math.random() * length);
+}
+
 function arraysEqual(left, right) {
   if (left.length !== right.length) {
     return false;
@@ -220,7 +228,7 @@ async function loadMedia() {
     const matchingPhotoIndex = currentPhotoFile
       ? photos.findIndex((photo) => photo.file === currentPhotoFile)
       : -1;
-    currentPhotoIndex = matchingPhotoIndex >= 0 ? matchingPhotoIndex : 0;
+    currentPhotoIndex = matchingPhotoIndex >= 0 ? matchingPhotoIndex : randomIndex(photos.length);
     updatePhoto();
   }
 
@@ -242,7 +250,7 @@ async function loadMedia() {
       const shuffledIndex = shuffledTrackOrder.indexOf(matchingTrackIndex);
       trackCursor = shuffledIndex >= 0 ? shuffledIndex : 0;
     } else {
-      trackCursor = 0;
+      trackCursor = randomIndex(shuffledTrackOrder.length);
     }
 
     loadCurrentTrack();
