@@ -77,36 +77,33 @@ fly deploy
 
 ### Subir fotos o musica nuevas
 
-Fotos:
+Usa un solo comando y cambia `KIND=`:
 
 ```bash
-make fly-upload-photos APP=manturon SRC=assets/photos
-```
-
-Musica:
-
-```bash
-make fly-upload-music APP=manturon SRC=assets/music
+make upload KIND=photos SRC=assets/photos
+make upload KIND=music SRC=assets/music
 ```
 
 Tambien puedes subir una carpeta distinta o un fichero concreto cambiando `SRC=`.
+`APP=manturon` es ahora el valor por defecto, asi que solo hace falta si quieres otra app.
+Si `KIND=photos`, antes de subir se generan copias optimizadas para web y nunca se suben los originales gordos.
 
 ### Sincronizar con Fly
 
 Para que el volumen remoto quede igual que tus carpetas locales, borrando en Fly lo que ya no exista en local y subiendo lo nuevo o cambiado:
 
 ```bash
-make fly-sync-photos APP=manturon SRC=assets/photos
-make fly-sync-music APP=manturon SRC=assets/music
+make sync KIND=photos SRC=assets/photos
+make sync KIND=music SRC=assets/music
 ```
 
 O las dos cosas de una vez:
 
 ```bash
-make fly-sync-all APP=manturon
+make sync-all
 ```
 
-En el caso de las fotos, la sincronizacion genera antes copias optimizadas para web. Tus originales locales no se tocan, pero a Fly suben versiones mas pequeñas para que carguen mucho mejor.
+En el caso de las fotos, tanto `make upload` como `make sync` generan antes copias optimizadas para web. Tus originales locales no se tocan, pero a Fly suben versiones mas pequeñas para que carguen mucho mejor.
 
 Por defecto:
 
@@ -120,42 +117,21 @@ Si quieres generar esas copias a mano para inspeccionarlas:
 make preparar-fotos-web SRC=assets/photos OUT=/tmp/fotos-web
 ```
 
-Si quieres algo mas comodo, tienes atajos con la app `manturon` ya puesta:
-
-```bash
-make subir-fotos
-make subir-musica
-```
-
 Tambien puedes subir un fichero o carpeta concreta:
 
 ```bash
-make subir-fotos SRC=assets/photos/mi-foto.jpg
-make subir-musica SRC=assets/music/mi-tema.flac
+make upload KIND=photos SRC=assets/photos/mi-foto.jpg
+make upload KIND=music SRC=assets/music/mi-tema.flac
 ```
 
 ### Borrar archivos en Fly
 
-Borrar una foto:
+Usa un solo comando y cambia `KIND=`:
 
 ```bash
-make fly-delete-photo APP=manturon FILE=DSCF5123.JPG
+make delete KIND=photos FILE=DSCF5123.JPG
+make delete KIND=music FILE=parado-master.flac
 ```
-
-Borrar una pista:
-
-```bash
-make fly-delete-music APP=manturon FILE=parado-master.flac
-```
-
-Atajos:
-
-```bash
-make borrar-foto FILE=DSCF5123.JPG
-make borrar-musica FILE=parado-master.flac
-```
-
-Los scripts equivalentes estan en `scripts/subir-fotos.sh`, `scripts/subir-musica.sh`, `scripts/borrar-foto.sh` y `scripts/borrar-musica.sh`.
 
 ### Limpiar fotos rotas
 
