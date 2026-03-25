@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import errno
 import io
+import socket
 import tempfile
 import unittest
 from pathlib import Path
@@ -129,6 +130,106 @@ class MediaRequestTests(unittest.TestCase):
 
         do_get_mock.assert_called_once_with(handler)
 
+    def test_do_get_reraises_unexpected_connection_reset(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/assets/music/demo.flac"
+        handler.headers = {}
+
+        with mock.patch.object(
+            server.SimpleHTTPRequestHandler,
+            "do_GET",
+            autospec=True,
+            side_effect=ConnectionResetError(errno.EPIPE, "Unexpected reset"),
+        ):
+            with self.assertRaises(ConnectionResetError):
+                server.MediaHandler.do_GET(handler)
+
+    def test_translate_path_uses_asset_disk_path_for_media(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+
+        with mock.patch.object(server, "asset_disk_path", return_value=Path("/tmp/demo.jpg")):
+            translated = server.MediaHandler.translate_path(handler, "/assets/photos/demo.jpg")
+
+        self.assertEqual(translated, "/tmp/demo.jpg")
+
+    def test_translate_path_falls_back_to_super_for_non_media(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+
+        with mock.patch.object(server, "asset_disk_path", return_value=None):
+            with mock.patch.object(
+                server.SimpleHTTPRequestHandler,
+                "translate_path",
+                autospec=True,
+                return_value="/tmp/fallback",
+            ) as translate_mock:
+                translated = server.MediaHandler.translate_path(handler, "/index.html")
+
+        self.assertEqual(translated, "/tmp/fallback")
+        translate_mock.assert_called_once_with(handler, "/index.html")
+
+    def test_do_get_redirects_to_canonical_host(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/foto?a=1"
+        handler.headers = {"Host": "manturon.es"}
+        handler.wfile = io.BytesIO()
+
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+
+        with mock.patch.object(server, "redirect_target", return_value="https://www.manturon.es/foto?a=1"):
+            server.MediaHandler.do_GET(handler)
+
+        handler.send_response.assert_called_once_with(301)
+        handler.send_header.assert_called_once_with("Location", "https://www.manturon.es/foto?a=1")
+        handler.end_headers.assert_called_once_with()
+
+    def test_do_get_returns_media_payload_json(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/api/media"
+        handler.headers = {}
+        handler.wfile = io.BytesIO()
+
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+
+        payload = {"photos": ["/assets/photos/demo.jpg"], "music": ["/assets/music/demo.flac"]}
+
+        with mock.patch.object(server, "redirect_target", return_value=None):
+            with mock.patch.object(server, "media_payload", return_value=payload):
+                server.MediaHandler.do_GET(handler)
+
+        self.assertEqual(
+            handler.wfile.getvalue(),
+            b'{"photos": ["/assets/photos/demo.jpg"], "music": ["/assets/music/demo.flac"]}',
+        )
+        handler.send_response.assert_called_once_with(200)
+        handler.send_header.assert_any_call("Content-Type", "application/json; charset=utf-8")
+        handler.send_header.assert_any_call(
+            "Content-Length",
+            str(len(handler.wfile.getvalue())),
+        )
+        handler.end_headers.assert_called_once_with()
+
+    def test_do_get_handles_disconnect_while_writing_media_payload(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/api/media"
+        handler.headers = {}
+        handler.wfile = mock.Mock()
+        handler.wfile.write.side_effect = BrokenPipeError()
+
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+        handler._client_disconnected = mock.Mock()
+
+        with mock.patch.object(server, "redirect_target", return_value=None):
+            with mock.patch.object(server, "media_payload", return_value={"photos": [], "music": []}):
+                server.MediaHandler.do_GET(handler)
+
+        handler._client_disconnected.assert_called_once()
+
 
 class MediaPayloadTests(unittest.TestCase):
     def test_media_payload_uses_expected_prefixes(self) -> None:
@@ -200,8 +301,77 @@ class MediaPayloadTests(unittest.TestCase):
 
         self.assertEqual([path.name for path in deduped], ["cielo_edited.jpg", "mar.jpg"])
 
+    def test_dedupe_photo_paths_prefers_longer_name_when_variants_have_subtitle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            photos = Path(temp_dir)
+            plain = photos / "abcde.jpg"
+            first = photos / "abcde-sub.jpg"
+            second = photos / "abcde-subtitle.jpg"
+            plain.write_text("x")
+            first.write_text("x")
+            second.write_text("x")
+
+            deduped = server.dedupe_photo_paths([plain, first, second])
+
+        self.assertEqual([path.name for path in deduped], ["abcde-subtitle.jpg"])
+
 
 class MainTests(unittest.TestCase):
+    def test_parse_args_uses_defaults(self) -> None:
+        with mock.patch("sys.argv", ["server.py"]):
+            args = server.parse_args()
+
+        self.assertEqual(args.host, "127.0.0.1")
+        self.assertEqual(args.port, 8000)
+
+    def test_parse_args_accepts_custom_values(self) -> None:
+        with mock.patch("sys.argv", ["server.py", "--host", "0.0.0.0", "--port", "9000"]):
+            args = server.parse_args()
+
+        self.assertEqual(args.host, "0.0.0.0")
+        self.assertEqual(args.port, 9000)
+
+    def test_create_server_reraises_non_address_in_use_errors(self) -> None:
+        with mock.patch.object(
+            server,
+            "ThreadingHTTPServer",
+            side_effect=OSError(errno.EACCES, "Permission denied"),
+        ):
+            with self.assertRaises(OSError):
+                server.create_server("127.0.0.1", 8000)
+
+    def test_create_server_reraises_address_in_use_errors(self) -> None:
+        with mock.patch.object(
+            server,
+            "ThreadingHTTPServer",
+            side_effect=OSError(errno.EADDRINUSE, "Address already in use"),
+        ):
+            with self.assertRaises(OSError):
+                server.create_server("127.0.0.1", 8000)
+
+    def test_find_available_port_returns_first_bindable_port(self) -> None:
+        first_socket = mock.MagicMock()
+        first_socket.__enter__.return_value = first_socket
+        first_socket.bind.side_effect = OSError(errno.EADDRINUSE, "busy")
+
+        second_socket = mock.MagicMock()
+        second_socket.__enter__.return_value = second_socket
+        second_socket.bind.return_value = None
+
+        with mock.patch.object(server.socket, "socket", side_effect=[first_socket, second_socket]):
+            available = server.find_available_port("127.0.0.1", 8000, attempts=2)
+
+        self.assertEqual(available, 8001)
+
+    def test_find_available_port_raises_when_no_ports_are_free(self) -> None:
+        fake_socket = mock.MagicMock()
+        fake_socket.__enter__.return_value = fake_socket
+        fake_socket.bind.side_effect = OSError(errno.EADDRINUSE, "busy")
+
+        with mock.patch.object(server.socket, "socket", return_value=fake_socket):
+            with self.assertRaises(OSError):
+                server.find_available_port("127.0.0.1", 8000, attempts=2)
+
     def test_main_falls_back_to_next_free_port_when_default_is_busy(self) -> None:
         fake_server = mock.Mock()
         address_in_use = OSError(errno.EADDRINUSE, "Address already in use")
@@ -232,6 +402,14 @@ class MainTests(unittest.TestCase):
         self.assertEqual(result, 0)
         fake_server.serve_forever.assert_called_once()
         fake_server.server_close.assert_called_once()
+
+    def test_main_reraises_non_address_in_use_server_error(self) -> None:
+        permission_error = OSError(errno.EACCES, "Permission denied")
+
+        with mock.patch.object(server, "parse_args", return_value=SimpleNamespace(host="127.0.0.1", port=8000)):
+            with mock.patch.object(server, "create_server", side_effect=permission_error):
+                with self.assertRaises(OSError):
+                    server.main()
 
 
 if __name__ == "__main__":
