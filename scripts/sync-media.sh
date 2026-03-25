@@ -10,6 +10,11 @@ APP_NAME="${APP_NAME:-$1}"
 MEDIA_KIND="$2"
 LOCAL_PATH="$3"
 REMOTE_PATH="/data/${MEDIA_KIND}"
+MACHINE_ARGS=()
+
+if [[ -n "${MACHINE_ID:-}" ]]; then
+  MACHINE_ARGS=(--machine "$MACHINE_ID")
+fi
 
 if [[ "$MEDIA_KIND" != "photos" && "$MEDIA_KIND" != "music" ]]; then
   echo "El segundo argumento debe ser 'photos' o 'music'."
@@ -45,7 +50,7 @@ for path in sorted(p for p in root.iterdir() if p.is_file() and p.name != ".gitk
     print(f"{path.name}\t{path.stat().st_size}")
 PY
 
-fly ssh console -a "$APP_NAME" -C "python3 - <<'PY'
+fly ssh console -a "$APP_NAME" "${MACHINE_ARGS[@]}" -C "python3 - <<'PY'
 from pathlib import Path
 root = Path('$REMOTE_PATH')
 if root.exists():
@@ -95,7 +100,7 @@ if [[ -s "$to_delete" ]]; then
   for name in "${delete_names[@]}"; do
     delete_cmd+=" $(printf '%q' "$REMOTE_PATH/$name")"
   done
-  fly ssh console -a "$APP_NAME" -C "$delete_cmd" >/dev/null
+  fly ssh console -a "$APP_NAME" "${MACHINE_ARGS[@]}" -C "$delete_cmd" >/dev/null
 fi
 
 upload_count=0
@@ -108,7 +113,7 @@ if [[ -s "$to_upload" ]]; then
   for name in "${upload_names[@]}"; do
     replace_cmd+=" $(printf '%q' "$REMOTE_PATH/$name")"
   done
-  fly ssh console -a "$APP_NAME" -C "$replace_cmd" >/dev/null
+  fly ssh console -a "$APP_NAME" "${MACHINE_ARGS[@]}" -C "$replace_cmd" >/dev/null
 
   {
     for i in "${!upload_names[@]}"; do
@@ -116,7 +121,7 @@ if [[ -s "$to_upload" ]]; then
       printf '[%s/%s] %s\n' "$((i + 1))" "${upload_count}" "$name" >&2
       printf 'put %s %s/%s\n' "$upload_root/$name" "$REMOTE_PATH" "$name"
     done
-  } | fly ssh sftp shell -a "$APP_NAME" >/dev/null
+  } | fly ssh sftp shell -a "$APP_NAME" "${MACHINE_ARGS[@]}" >/dev/null
 fi
 
 echo "Sincronizacion de ${MEDIA_KIND}:"
