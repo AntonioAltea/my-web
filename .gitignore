@@ -10,5 +10,6 @@ assets/music/*
 !assets/music/.gitkeep
 
 .env
+.cache/
 
 .vscode/settings.json

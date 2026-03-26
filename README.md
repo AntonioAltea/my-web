@@ -118,6 +118,82 @@ make sync-all
 ```
 
 For photos, both `make upload` and `make sync` generate optimized web copies first. Your local originals are not touched, but smaller versions are uploaded to Fly so they load much better.
+Photo sync now keeps a persistent local cache of those web copies under `.cache/`, so repeated syncs only regenerate photos whose source or optimization settings changed.
+At the end of each real sync, the script re-reads the Fly volume and verifies that it matches the prepared local set; if it does not, the command fails.
+
+During a photo sync, the script prints the main phases so you can see where time is going:
+
+- refreshing the local photo cache
+- reading the remote volume index
+- deleting stale remote files
+- uploading changed files
+- verifying local prepared files vs remote volume
+
+### Asset Flow
+
+Photos on disk move through these stages:
+
+```text
+assets/photos originals
+        |
+        v
+.cache/photo-sync/files
+optimized web copies reused between syncs
+        |
+        v
+/data/photos on Fly
+files actually served in production
+        |
+        v
+/api/media
+list of public photo URLs
+```
+
+Music is simpler because it is not recompressed:
+
+```text
+assets/music
+    |
+    v
+/data/music on Fly
+    |
+    v
+/api/media
+```
+
+What `make sync KIND=photos SRC=assets/photos` does, step by step:
+
+```text
+1. Read assets/photos
+2. Reuse cached prepared copies when source file + settings are unchanged
+3. Regenerate only the photos that changed
+4. Read /data/photos from the Fly volume
+5. Delete remote files missing locally
+6. Upload only new or changed prepared files
+7. Read /data/photos again
+8. Compare prepared local set vs remote volume
+9. Exit with error if they differ
+```
+
+How to think about the local files:
+
+```text
+assets/photos
+- your originals
+- source of truth
+- may be large
+
+.cache/photo-sync/files
+- generated automatically
+- safe to delete, it will be rebuilt
+- not committed to git
+- used only to make syncs faster
+
+/data/photos
+- persistent Fly volume
+- production copy
+- should match the prepared cache after sync
+```
 
 By default:
 
