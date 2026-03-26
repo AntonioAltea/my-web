@@ -1,7 +1,23 @@
 @font-face {
-  font-family: "LetterpressText";
-  src: url("/fonts/letterpress-text-italic.ttf") format("truetype");
+  font-family: "IM FELL DW Pica";
+  src: url("/fonts/im-fell-dw-pica-regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IM FELL DW Pica";
+  src: url("/fonts/im-fell-dw-pica-italic.ttf") format("truetype");
   font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IM FELL DW Pica SC";
+  src: url("/fonts/im-fell-dw-pica-sc.ttf") format("truetype");
+  font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
@@ -48,7 +64,7 @@ body {
   min-height: 100%;
   height: 100vh;
   color: var(--ink);
-  font-family: "Courier Prime", monospace;
+  font-family: "IM FELL DW Pica", serif;
   line-height: 1.45;
   background: #fff;
   overflow: hidden;
@@ -88,19 +104,20 @@ a {
 .player-label {
   margin: 0;
   color: var(--accent);
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
+  font-family: "IM FELL DW Pica SC", serif;
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
   text-transform: lowercase;
 }
 
 .site-header h1 {
   margin: 0;
-  font-family: "LetterpressText", serif;
-  font-size: clamp(2.4rem, 6vw, 5rem);
+  font-family: "IM FELL DW Pica", serif;
+  font-size: clamp(2.55rem, 6.2vw, 5.2rem);
   font-style: italic;
   font-weight: 400;
   line-height: 0.94;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.026em;
   color: var(--accent);
 }
 
@@ -317,10 +334,10 @@ a {
   border: 1px solid var(--line-strong);
   background: var(--surface-soft);
   color: var(--accent);
-  padding: 7px 10px;
+  padding: 8px 11px;
   cursor: pointer;
-  min-width: 40px;
-  min-height: 36px;
+  min-width: 44px;
+  min-height: 40px;
   display: grid;
   place-items: center;
   transform: scale(1);
@@ -334,7 +351,7 @@ a {
 }
 
 .player-button-primary {
-  min-width: 44px;
+  min-width: 48px;
   background: var(--surface-accent);
 }
 
@@ -352,8 +369,8 @@ a {
 .play-toggle-icon {
   position: relative;
   display: block;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   transition: transform 140ms ease;
 }
 
@@ -369,9 +386,9 @@ a {
   top: 1px;
   width: 0;
   height: 0;
-  border-top: 7px solid transparent;
-  border-bottom: 7px solid transparent;
-  border-left: 10px solid currentColor;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 11px solid currentColor;
   transform-origin: 35% 50%;
   transition: opacity 180ms ease, transform 220ms ease;
 }
@@ -386,7 +403,7 @@ a {
 .play-toggle-pause span {
   top: 2px;
   width: 3px;
-  height: 12px;
+  height: 14px;
   border-radius: 999px;
   background: currentColor;
 }
@@ -758,8 +775,8 @@ a {
   }
 
   .player-button {
-    min-width: 36px;
-    min-height: 34px;
+    min-width: 40px;
+    min-height: 38px;
   }
 
   .player-side {
