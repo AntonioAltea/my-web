@@ -4,7 +4,7 @@ A simple music-and-photography site with a DIY feel.
 
 ## Structure
 
-- `src/`: app code and static files (`index.html`, `styles.css`, `script.js`, `server.py`)
+- `src/`: app code (`index.html`, `server.py`) and frontend assets in `src/static/`
 - `tests/`: Python and frontend tests
 - `Dockerfile`: deployment container
 - `fly.toml`: Fly.io configuration

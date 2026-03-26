@@ -356,9 +356,26 @@ async function loadApp(options = {}) {
     options,
   );
 
-  const scriptPath = path.join(__dirname, "..", "src", "script.js");
-  const code = fs.readFileSync(scriptPath, "utf8");
-  vm.runInNewContext(code, env.sandbox, { filename: "script.js" });
+  const scripts = [
+    "media-api.js",
+    "theme.js",
+    "gallery.js",
+    "player.js",
+    "main.js",
+  ];
+
+  for (const scriptName of scripts) {
+    const scriptPath = path.join(
+      __dirname,
+      "..",
+      "src",
+      "static",
+      "js",
+      scriptName,
+    );
+    const code = fs.readFileSync(scriptPath, "utf8");
+    vm.runInNewContext(code, env.sandbox, { filename: scriptName });
+  }
 
   for (let index = 0; index < 6; index += 1) {
     await Promise.resolve();

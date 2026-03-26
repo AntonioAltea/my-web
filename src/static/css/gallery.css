@@ -1,0 +1,105 @@
+.photo-loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--accent);
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  text-transform: lowercase;
+  padding: 6px 10px;
+  border: 1px solid var(--control-line);
+  background: var(--surface-soft);
+  z-index: 2;
+}
+
+.main-photo {
+  grid-area: photo;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  justify-self: center;
+  align-self: center;
+  background: var(--paper-strong);
+  border: 1px solid var(--panel-line);
+}
+
+.gallery-meta {
+  grid-area: meta;
+  width: auto;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0;
+  display: block;
+  justify-self: center;
+}
+
+.photo-caption {
+  position: absolute;
+  left: 14px;
+  bottom: 52px;
+  transform: none;
+  max-width: min(32ch, calc(100% - 32px));
+  padding: 6px 10px;
+  border: 1px solid var(--control-line);
+  background: var(--surface-soft);
+  color: var(--accent);
+  line-height: 1.2;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+  z-index: 1;
+}
+
+.photo-caption-visible {
+  opacity: 1;
+}
+
+.gallery-nav-row {
+  display: flex;
+  justify-content: center;
+  gap: 3.6rem;
+  align-items: center;
+}
+
+.gallery-nav {
+  position: static;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+  transition: color 120ms ease, border-color 120ms ease;
+  padding: 0;
+}
+
+.gallery-nav-mode {
+  font-size: 0.84rem;
+  letter-spacing: 0.1em;
+}
+
+.gallery-nav:focus-visible {
+  background: transparent;
+  border-color: var(--control-line-strong);
+  color: var(--ink);
+  outline: none;
+}
+
+.gallery-nav:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .gallery-nav:hover {
+    background: transparent;
+    border-color: var(--control-line-strong);
+    color: var(--ink);
+  }
+}

@@ -56,8 +56,8 @@ class MediaRequestTests(unittest.TestCase):
                 Path("/tmp/photos-test/callado-muñeco.JPG"),
             )
             self.assertEqual(
-                server.asset_disk_path("/styles.css"),
-                server.ROOT / "styles.css",
+                server.asset_disk_path("/static/css/styles.css"),
+                server.ROOT / "static" / "css" / "styles.css",
             )
         finally:
             server.PHOTOS_DIR = original_photos
@@ -81,7 +81,7 @@ class MediaRequestTests(unittest.TestCase):
 
     def test_end_headers_disables_cache_for_html_css_and_js(self) -> None:
         handler = server.MediaHandler.__new__(server.MediaHandler)
-        handler.path = "/styles.css"
+        handler.path = "/static/css/styles.css"
         handler._headers_buffer = []
         handler.wfile = io.BytesIO()
         handler.request_version = "HTTP/1.1"
@@ -167,9 +167,14 @@ class MediaRequestTests(unittest.TestCase):
     def test_translate_path_uses_src_files_for_non_media(self) -> None:
         handler = server.MediaHandler.__new__(server.MediaHandler)
 
-        translated = server.MediaHandler.translate_path(handler, "/index.html")
+        translated = server.MediaHandler.translate_path(
+            handler, "/static/css/styles.css"
+        )
 
-        self.assertEqual(translated, str(server.ROOT / "index.html"))
+        self.assertEqual(
+            translated,
+            str(server.ROOT / "static" / "css" / "styles.css"),
+        )
 
     def test_do_get_redirects_to_canonical_host(self) -> None:
         handler = server.MediaHandler.__new__(server.MediaHandler)

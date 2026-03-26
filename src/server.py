@@ -11,6 +11,7 @@ from urllib.parse import unquote, urlparse
 
 
 ROOT = Path(__file__).resolve().parent
+STATIC_ROOT = ROOT / "static"
 PROJECT_ROOT = ROOT.parent
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", PROJECT_ROOT / "assets")).resolve()
 PHOTOS_DIR = MEDIA_ROOT / "photos"
@@ -115,6 +116,9 @@ def asset_disk_path(request_path: str) -> Path | None:
     if parsed_path == "/favicon.ico":
         return PROJECT_ROOT / "favicon.ico"
 
+    if parsed_path.startswith("/static/"):
+        return ROOT / parsed_path.lstrip("/")
+
     if parsed_path == "/":
         return ROOT / "index.html"
 
@@ -176,7 +180,8 @@ class MediaHandler(SimpleHTTPRequestHandler):
 
         if (
             request_path in {"/", "/index.html", "/favicon.ico"}
-            or request_path.endswith((".css", ".js"))
+            or request_path.startswith("/static/css/")
+            or request_path.startswith("/static/js/")
             or request_path.startswith("/assets/icons/")
         ):
             self.send_header("Cache-Control", "no-store, max-age=0")
