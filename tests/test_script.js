@@ -137,7 +137,31 @@ class FakeAudioElement extends FakeElement {
   }
 }
 
+class FakeImage {
+  static created = [];
+
+  constructor() {
+    this._src = "";
+    this.onload = null;
+    this.onerror = null;
+    FakeImage.created.push(this);
+  }
+
+  set src(value) {
+    this._src = value;
+  }
+
+  get src() {
+    return this._src;
+  }
+
+  static reset() {
+    FakeImage.created = [];
+  }
+}
+
 function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
+  FakeImage.reset();
   const selectors = {
     "#audio-player": new FakeAudioElement(),
     "#now-playing": new FakeElement("now-playing"),
@@ -287,6 +311,7 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
     Date,
     Promise,
     HTMLInputElement: FakeInputElement,
+    Image: FakeImage,
     setTimeout: windowObject.setTimeout.bind(windowObject),
     clearTimeout: windowObject.clearTimeout.bind(windowObject),
     setInterval: windowObject.setInterval.bind(windowObject),
@@ -299,6 +324,19 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
   return {
     selectors,
     sandbox,
+    fakeImages: FakeImage.created,
+    triggerImageLoad(index = FakeImage.created.length - 1) {
+      const image = FakeImage.created[index];
+      if (image?.onload) {
+        image.onload();
+      }
+    },
+    triggerImageError(index = FakeImage.created.length - 1) {
+      const image = FakeImage.created[index];
+      if (image?.onerror) {
+        image.onerror();
+      }
+    },
     flushTimeouts() {
       const callbacks = Array.from(timeouts.values());
       timeouts.clear();
@@ -331,20 +369,21 @@ async function loadApp(options = {}) {
 
 async function testPhotoControlsLockWhileLoading() {
   const env = await loadApp();
-  const { selectors } = env;
+  const { selectors, fakeImages, triggerImageLoad } = env;
 
   assert.equal(selectors["#prev-photo"].disabled, true);
   assert.equal(selectors["#next-photo"].disabled, true);
   assert.equal(selectors["#photo-random"].disabled, true);
   assert.equal(selectors["#main-photo"].hidden, true);
-  assert.equal(selectors["#main-photo"].src.startsWith("/assets/photos/"), true);
+  assert.equal(fakeImages[0].src.startsWith("/assets/photos/"), true);
 
-  selectors["#main-photo"].dispatchEvent("load");
+  triggerImageLoad(0);
 
   assert.equal(selectors["#photo-loader"].hidden, true);
   assert.equal(selectors["#prev-photo"].disabled, false);
   assert.equal(selectors["#next-photo"].disabled, false);
   assert.equal(selectors["#photo-random"].disabled, false);
+  assert.equal(selectors["#main-photo"].src.startsWith("/assets/photos/"), true);
 }
 
 async function testTrackTitleAnimatesByDirection() {
@@ -375,14 +414,121 @@ async function testPlayButtonTogglesPlayingState() {
 
 async function testPhotoCaptionOnlyShowsOnHoverWhenLoaded() {
   const env = await loadApp();
-  const { selectors } = env;
+  const { selectors, triggerImageLoad } = env;
 
-  selectors["#main-photo"].dispatchEvent("load");
+  triggerImageLoad(0);
   selectors["#main-photo"].dispatchEvent("mouseenter");
   assert.equal(selectors["#photo-caption"].classList.contains("photo-caption-visible"), true);
 
   selectors["#main-photo"].dispatchEvent("mouseleave");
   assert.equal(selectors["#photo-caption"].classList.contains("photo-caption-visible"), false);
+}
+
+async function testPreloadsAdjacentAndRandomPhotos() {
+  const env = await loadApp({
+    mediaPayload: {
+      photos: [
+        "/assets/photos/uno.jpg",
+        "/assets/photos/dos.jpg",
+        "/assets/photos/tres.jpg",
+        "/assets/photos/cuatro.jpg",
+      ],
+      music: ["/assets/music/uno.mp3"],
+    },
+    randomValues: [0, 0, 0],
+  });
+  const { selectors, fakeImages, triggerImageLoad } = env;
+
+  assert.deepEqual(
+    fakeImages.map((image) => image.src),
+    [
+      "/assets/photos/uno.jpg",
+      "/assets/photos/cuatro.jpg",
+      "/assets/photos/dos.jpg",
+      "/assets/photos/tres.jpg",
+    ],
+  );
+
+  triggerImageLoad(0);
+  selectors["#next-photo"].click();
+
+  assert.deepEqual(
+    fakeImages.map((image) => image.src),
+    [
+      "/assets/photos/uno.jpg",
+      "/assets/photos/cuatro.jpg",
+      "/assets/photos/dos.jpg",
+      "/assets/photos/tres.jpg",
+    ],
+  );
+}
+
+async function testKeepsCurrentPhotoVisibleWhileNextLoads() {
+  const env = await loadApp({
+    mediaPayload: {
+      photos: ["/assets/photos/uno.jpg", "/assets/photos/dos.jpg"],
+      music: ["/assets/music/uno.mp3"],
+    },
+    randomValues: [0],
+  });
+  const { selectors, triggerImageLoad } = env;
+
+  triggerImageLoad(0);
+  assert.equal(selectors["#main-photo"].src, "/assets/photos/uno.jpg");
+
+  selectors["#next-photo"].click();
+
+  assert.equal(selectors["#main-photo"].hidden, false);
+  assert.equal(selectors["#main-photo"].src, "/assets/photos/uno.jpg");
+  assert.equal(selectors["#photo-loader"].hidden, false);
+
+  triggerImageLoad(1);
+
+  assert.equal(selectors["#main-photo"].src, "/assets/photos/dos.jpg");
+  assert.equal(selectors["#photo-loader"].hidden, true);
+}
+
+async function testShowsPreloadedPhotoImmediately() {
+  const env = await loadApp({
+    mediaPayload: {
+      photos: ["/assets/photos/uno.jpg", "/assets/photos/dos.jpg"],
+      music: ["/assets/music/uno.mp3"],
+    },
+    randomValues: [0],
+  });
+  const { selectors, triggerImageLoad } = env;
+
+  triggerImageLoad(0);
+  triggerImageLoad(1);
+  selectors["#next-photo"].click();
+
+  assert.equal(selectors["#main-photo"].src, "/assets/photos/dos.jpg");
+  assert.equal(selectors["#photo-loader"].hidden, true);
+  assert.equal(selectors["#next-photo"].disabled, false);
+}
+
+async function testRandomButtonUsesPreloadedRandomPhoto() {
+  const env = await loadApp({
+    mediaPayload: {
+      photos: [
+        "/assets/photos/uno.jpg",
+        "/assets/photos/dos.jpg",
+        "/assets/photos/tres.jpg",
+        "/assets/photos/cuatro.jpg",
+      ],
+      music: ["/assets/music/uno.mp3"],
+    },
+    randomValues: [0, 0, 0],
+  });
+  const { selectors, triggerImageLoad } = env;
+
+  triggerImageLoad(0);
+  triggerImageLoad(3);
+  selectors["#photo-random"].click();
+
+  assert.equal(selectors["#main-photo"].src, "/assets/photos/tres.jpg");
+  assert.equal(selectors["#photo-loader"].hidden, true);
+  assert.equal(selectors["#photo-random"].disabled, false);
 }
 
 async function run() {
@@ -391,6 +537,10 @@ async function run() {
     ["animates track title by direction", testTrackTitleAnimatesByDirection],
     ["toggles playing state from play button", testPlayButtonTogglesPlayingState],
     ["shows photo caption only on hover after load", testPhotoCaptionOnlyShowsOnHoverWhenLoaded],
+    ["preloads previous next and random photos", testPreloadsAdjacentAndRandomPhotos],
+    ["keeps the current photo visible while the next one loads", testKeepsCurrentPhotoVisibleWhileNextLoads],
+    ["shows a preloaded photo immediately", testShowsPreloadedPhotoImmediately],
+    ["uses the preloaded random photo on random navigation", testRandomButtonUsesPreloadedRandomPhoto],
   ];
 
   for (const [name, testFn] of tests) {

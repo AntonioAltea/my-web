@@ -27,6 +27,9 @@ let isSeeking = false;
 let mediaPollTimer = null;
 let photoControlsLocked = false;
 let nowPlayingAnimationTimer = null;
+let photoLoadRequestId = 0;
+let preloadedRandomPhotoIndex = null;
+const photoCache = new Map();
 const themePreference = window.matchMedia("(prefers-color-scheme: dark)");
 const THEME_STORAGE_KEY = "manturon-theme";
 
@@ -124,6 +127,156 @@ function randomIndex(length) {
   }
 
   return Math.floor(Math.random() * length);
+}
+
+function ensurePhotoResource(file) {
+  if (!file) {
+    return null;
+  }
+
+  const existingResource = photoCache.get(file);
+  if (existingResource) {
+    return existingResource;
+  }
+
+  const image = new Image();
+  const resource = {
+    image,
+    listeners: new Set(),
+    status: "loading",
+  };
+
+  image.onload = () => {
+    resource.status = "loaded";
+    for (const listener of resource.listeners) {
+      listener("loaded");
+    }
+    resource.listeners.clear();
+  };
+  image.onerror = () => {
+    resource.status = "error";
+    for (const listener of resource.listeners) {
+      listener("error");
+    }
+    resource.listeners.clear();
+  };
+  image.src = file;
+  photoCache.set(file, resource);
+  return resource;
+}
+
+function watchPhotoResource(resource, onLoad, onError) {
+  if (!resource) {
+    onError();
+    return;
+  }
+
+  if (resource.status === "loaded") {
+    onLoad();
+    return;
+  }
+
+  if (resource.status === "error") {
+    onError();
+    return;
+  }
+
+  resource.listeners.add((status) => {
+    if (status === "loaded") {
+      onLoad();
+      return;
+    }
+
+    onError();
+  });
+}
+
+function preloadPhoto(file) {
+  ensurePhotoResource(file);
+}
+
+function selectableRandomPhotoIndices() {
+  return photos
+    .map((_, index) => index)
+    .filter((index) => index !== currentPhotoIndex);
+}
+
+function chooseRandomPhotoIndex(candidates = selectableRandomPhotoIndices()) {
+  if (!candidates.length) {
+    return currentPhotoIndex;
+  }
+
+  return candidates[randomIndex(candidates.length)];
+}
+
+function preloadNearbyPhotos() {
+  if (photos.length <= 1) {
+    preloadedRandomPhotoIndex = null;
+    return;
+  }
+
+  const nextIndices = new Set([
+    (currentPhotoIndex - 1 + photos.length) % photos.length,
+    (currentPhotoIndex + 1) % photos.length,
+  ]);
+  const randomCandidates = photos
+    .map((_, index) => index)
+    .filter((index) => index !== currentPhotoIndex && !nextIndices.has(index));
+
+  if (randomCandidates.length) {
+    const randomCandidateIndex = chooseRandomPhotoIndex(randomCandidates);
+    preloadedRandomPhotoIndex = randomCandidateIndex;
+    nextIndices.add(randomCandidateIndex);
+  } else {
+    preloadedRandomPhotoIndex = null;
+  }
+
+  for (const index of nextIndices) {
+    preloadPhoto(photos[index]?.file);
+  }
+}
+
+function finishPhotoUpdate(requestId, photo) {
+  if (requestId !== photoLoadRequestId) {
+    return;
+  }
+
+  mainPhoto.alt = photo.title;
+  photoCaption.textContent = photo.title;
+  mainPhoto.src = photo.file;
+  mainPhoto.hidden = false;
+  photoLoader.hidden = true;
+  photoControlsLocked = false;
+  syncPhotoControls();
+  syncPlayerBarHeight();
+}
+
+function prunePhotoCache() {
+  const activeFiles = new Set(photos.map((photo) => photo.file));
+  for (const file of photoCache.keys()) {
+    if (!activeFiles.has(file)) {
+      photoCache.delete(file);
+    }
+  }
+
+  if (
+    preloadedRandomPhotoIndex !== null
+    && (preloadedRandomPhotoIndex < 0 || preloadedRandomPhotoIndex >= photos.length)
+  ) {
+    preloadedRandomPhotoIndex = null;
+  }
+}
+
+function failPhotoUpdate(requestId) {
+  if (requestId !== photoLoadRequestId) {
+    return;
+  }
+
+  photoLoader.hidden = true;
+  photoCaption.textContent = "No se pudo cargar la foto.";
+  photoCaption.classList.remove("photo-caption-visible");
+  photoControlsLocked = false;
+  syncPhotoControls();
 }
 
 function arraysEqual(left, right) {
@@ -243,14 +396,25 @@ function updatePhoto() {
   }
 
   const photo = photos[currentPhotoIndex];
+  const hasDisplayedPhoto = !mainPhoto.hidden && Boolean(mainPhoto.src);
+  const requestId = photoLoadRequestId + 1;
+  const resource = ensurePhotoResource(photo.file);
+
+  photoLoadRequestId = requestId;
   photoControlsLocked = true;
   syncPhotoControls();
   photoLoader.hidden = false;
   photoCaption.classList.remove("photo-caption-visible");
-  mainPhoto.alt = photo.title;
-  photoCaption.textContent = photo.title;
-  mainPhoto.hidden = true;
-  mainPhoto.src = photo.file;
+  if (!hasDisplayedPhoto) {
+    mainPhoto.hidden = true;
+  }
+
+  watchPhotoResource(resource, () => {
+    finishPhotoUpdate(requestId, photo);
+  }, () => {
+    failPhotoUpdate(requestId);
+  });
+  preloadNearbyPhotos();
 }
 
 function movePhoto(step) {
@@ -325,6 +489,7 @@ async function loadMedia() {
 
   if (photosChanged) {
     photos = nextPhotos;
+    prunePhotoCache();
     const matchingPhotoIndex = currentPhotoFile
       ? photos.findIndex((photo) => photo.file === currentPhotoFile)
       : -1;
@@ -374,12 +539,11 @@ photoRandomButton.addEventListener("click", () => {
     return;
   }
 
-  let nextIndex = currentPhotoIndex;
-  while (nextIndex === currentPhotoIndex) {
-    nextIndex = Math.floor(Math.random() * photos.length);
-  }
-
-  currentPhotoIndex = nextIndex;
+  const randomCandidates = selectableRandomPhotoIndices();
+  currentPhotoIndex = randomCandidates.includes(preloadedRandomPhotoIndex)
+    ? preloadedRandomPhotoIndex
+    : chooseRandomPhotoIndex(randomCandidates);
+  preloadedRandomPhotoIndex = null;
   updatePhoto();
 });
 prevTrackButton.addEventListener("click", () => stepTrack(-1));
@@ -433,20 +597,6 @@ audioPlayer.addEventListener("timeupdate", updateProgress);
 audioPlayer.addEventListener("play", updatePlayButton);
 audioPlayer.addEventListener("pause", updatePlayButton);
 audioPlayer.addEventListener("ended", () => stepTrack(1, true));
-mainPhoto.addEventListener("load", () => {
-  mainPhoto.hidden = false;
-  photoLoader.hidden = true;
-  photoControlsLocked = false;
-  syncPhotoControls();
-  syncPlayerBarHeight();
-});
-mainPhoto.addEventListener("error", () => {
-  photoLoader.hidden = true;
-  photoCaption.textContent = "No se pudo cargar la foto.";
-  photoCaption.classList.remove("photo-caption-visible");
-  photoControlsLocked = false;
-  syncPhotoControls();
-});
 
 mainPhoto.addEventListener("mouseenter", () => {
   if (!mainPhoto.hidden && photos.length) {
