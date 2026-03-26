@@ -16,7 +16,14 @@ UPLOAD_SCRIPT = ROOT / "scripts" / "upload-media.sh"
 
 
 class UploadMediaScriptTests(unittest.TestCase):
-    def make_fake_fly(self, bin_dir: Path, uploads_dir: Path, args_path: Path, stdin_path: Path, sources_path: Path) -> None:
+    def make_fake_fly(
+        self,
+        bin_dir: Path,
+        uploads_dir: Path,
+        args_path: Path,
+        stdin_path: Path,
+        sources_path: Path,
+    ) -> None:
         fly_path = bin_dir / "fly"
         fly_path.write_text(
             textwrap.dedent(
@@ -40,7 +47,9 @@ class UploadMediaScriptTests(unittest.TestCase):
         )
         fly_path.chmod(fly_path.stat().st_mode | stat.S_IXUSR)
 
-    def run_upload(self, kind: str, local_path: Path) -> tuple[subprocess.CompletedProcess[str], Path, Path]:
+    def run_upload(
+        self, kind: str, local_path: Path
+    ) -> tuple[subprocess.CompletedProcess[str], Path, Path]:
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
         temp_root = Path(temp_dir.name)
@@ -71,7 +80,9 @@ class UploadMediaScriptTests(unittest.TestCase):
     def test_upload_media_optimizes_single_photo_before_uploading(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             photo_path = Path(temp_dir) / "foto.jpg"
-            Image.new("RGB", (5000, 3200), color=(120, 40, 20)).save(photo_path, quality=100)
+            Image.new("RGB", (5000, 3200), color=(120, 40, 20)).save(
+                photo_path, quality=100
+            )
             original_size = photo_path.stat().st_size
 
             result, uploads_dir, sources_path = self.run_upload("photos", photo_path)
@@ -98,7 +109,9 @@ class UploadMediaScriptTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((uploads_dir / "tema.mp3").read_bytes(), b"fake mp3 data")
-        self.assertEqual(sources_path.read_text(encoding="utf-8").strip(), str(track_path))
+        self.assertEqual(
+            sources_path.read_text(encoding="utf-8").strip(), str(track_path)
+        )
 
 
 if __name__ == "__main__":

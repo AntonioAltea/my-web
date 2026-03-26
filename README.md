@@ -42,10 +42,12 @@ make deploy
 
 The repository includes:
 
-- a `pre-commit` hook that blocks commits when Python coverage drops below the configured threshold
+- a `pre-commit` hook that formats Python with `ruff`, lints it, and blocks commits when Python coverage drops below the configured threshold
 - a `pre-push` hook that runs the full test suite before each `git push`
 
 `make test` runs both the Python tests and the frontend behavior tests.
+`make format-python` reformats Python files in `scripts/`, `src/`, and `tests/`.
+`make lint-python` runs `ruff check` on the Python code.
 `make check-python-coverage` runs the Python test suite with coverage and fails if the total drops below `COVERAGE_MIN` (default: `90`).
 
 To enable it in your local clone:

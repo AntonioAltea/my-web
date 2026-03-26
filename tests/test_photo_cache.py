@@ -47,25 +47,35 @@ class PhotoCacheTests(unittest.TestCase):
         self.assertEqual(args.jpeg_quality, 70)
         self.assertEqual(args.webp_quality, 65)
 
-    def test_load_manifest_returns_empty_payload_for_missing_invalid_and_wrong_shape(self) -> None:
+    def test_load_manifest_returns_empty_payload_for_missing_invalid_and_wrong_shape(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             missing = root / "missing.json"
-            self.assertEqual(photo_cache.load_manifest(missing), {"settings": {}, "files": {}})
+            self.assertEqual(
+                photo_cache.load_manifest(missing), {"settings": {}, "files": {}}
+            )
 
             broken = root / "broken.json"
             broken.write_text("{not json", encoding="utf-8")
-            self.assertEqual(photo_cache.load_manifest(broken), {"settings": {}, "files": {}})
+            self.assertEqual(
+                photo_cache.load_manifest(broken), {"settings": {}, "files": {}}
+            )
 
             wrong_shape = root / "wrong-shape.json"
             wrong_shape.write_text('{"settings": [], "files": "bad"}', encoding="utf-8")
-            self.assertEqual(photo_cache.load_manifest(wrong_shape), {"settings": {}, "files": {}})
+            self.assertEqual(
+                photo_cache.load_manifest(wrong_shape), {"settings": {}, "files": {}}
+            )
 
     def test_save_manifest_writes_pretty_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "nested" / "manifest.json"
 
-            photo_cache.save_manifest(path, {"settings": {"b": 2}, "files": {"a.jpg": {"size": 1}}})
+            photo_cache.save_manifest(
+                path, {"settings": {"b": 2}, "files": {"a.jpg": {"size": 1}}}
+            )
 
             saved = path.read_text(encoding="utf-8")
 
@@ -106,7 +116,9 @@ class PhotoCacheTests(unittest.TestCase):
             with mock.patch.object(
                 photo_cache,
                 "optimize_photo",
-                side_effect=lambda src, target, **_: Path(target).write_bytes(b"prepared"),
+                side_effect=lambda src, target, **_: Path(target).write_bytes(
+                    b"prepared"
+                ),
             ) as optimize_mock:
                 index, stats = photo_cache.build_photo_cache(args)
 
@@ -135,7 +147,9 @@ class PhotoCacheTests(unittest.TestCase):
             with mock.patch.object(
                 photo_cache,
                 "optimize_photo",
-                side_effect=lambda src, target, **_: Path(target).write_bytes(b"prepared"),
+                side_effect=lambda src, target, **_: Path(target).write_bytes(
+                    b"prepared"
+                ),
             ):
                 photo_cache.build_photo_cache(args)
 
@@ -163,7 +177,9 @@ class PhotoCacheTests(unittest.TestCase):
                 Path(target).write_bytes(b"temp")
                 raise RuntimeError("boom")
 
-            with mock.patch.object(photo_cache, "optimize_photo", side_effect=fail_and_leave_temp):
+            with mock.patch.object(
+                photo_cache, "optimize_photo", side_effect=fail_and_leave_temp
+            ):
                 with self.assertRaises(RuntimeError):
                     photo_cache.build_photo_cache(args)
 
@@ -176,13 +192,18 @@ class PhotoCacheTests(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), "Alpha.jpg\t1\nbeta.jpg\t2\nzeta.jpg\t3\n")
 
     def test_main_prints_summary_and_index(self) -> None:
-        args = SimpleNamespace(source="photos", cache_dir="cache", manifest="manifest.json")
+        args = SimpleNamespace(
+            source="photos", cache_dir="cache", manifest="manifest.json"
+        )
 
         with mock.patch.object(photo_cache, "parse_args", return_value=args):
             with mock.patch.object(
                 photo_cache,
                 "build_photo_cache",
-                return_value=({"frame.jpg": 4}, {"reused": 1, "regenerated": 2, "removed": 3}),
+                return_value=(
+                    {"frame.jpg": 4},
+                    {"reused": 1, "regenerated": 2, "removed": 3},
+                ),
             ) as build_mock:
                 with mock.patch.object(photo_cache, "write_index") as write_index_mock:
                     with mock.patch("builtins.print") as print_mock:
@@ -191,7 +212,10 @@ class PhotoCacheTests(unittest.TestCase):
         self.assertEqual(result, 0)
         build_mock.assert_called_once_with(args)
         write_index_mock.assert_called_once_with({"frame.jpg": 4})
-        self.assertIn("Photo cache ready: reused 1, regenerated 2, removed 3.", print_mock.call_args_list[0].args[0])
+        self.assertIn(
+            "Photo cache ready: reused 1, regenerated 2, removed 3.",
+            print_mock.call_args_list[0].args[0],
+        )
 
 
 if __name__ == "__main__":

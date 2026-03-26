@@ -32,7 +32,9 @@ class PhotoPrepareTests(unittest.TestCase):
             target = root / "copy.gif"
             source.write_bytes(b"GIF89a test")
 
-            photo_prepare.optimize_photo(source, target, max_dim=2200, jpeg_quality=82, webp_quality=80)
+            photo_prepare.optimize_photo(
+                source, target, max_dim=2200, jpeg_quality=82, webp_quality=80
+            )
 
             self.assertEqual(target.read_bytes(), b"GIF89a test")
 
@@ -43,7 +45,9 @@ class PhotoPrepareTests(unittest.TestCase):
             target = root / "output.jpg"
             Image.new("RGB", (120, 80), color=(220, 50, 30)).save(source, format="JPEG")
 
-            photo_prepare.optimize_photo(source, target, max_dim=2200, jpeg_quality=82, webp_quality=80)
+            photo_prepare.optimize_photo(
+                source, target, max_dim=2200, jpeg_quality=82, webp_quality=80
+            )
 
             with Image.open(target) as saved:
                 self.assertEqual(saved.mode, "RGB")
@@ -55,7 +59,9 @@ class PhotoPrepareTests(unittest.TestCase):
             target = root / "output.webp"
             Image.new("RGB", (120, 80), color=(10, 90, 160)).save(source, format="WEBP")
 
-            photo_prepare.optimize_photo(source, target, max_dim=2200, jpeg_quality=82, webp_quality=80)
+            photo_prepare.optimize_photo(
+                source, target, max_dim=2200, jpeg_quality=82, webp_quality=80
+            )
 
             with Image.open(target) as saved:
                 self.assertEqual(saved.format, "WEBP")
@@ -67,7 +73,9 @@ class PhotoPrepareTests(unittest.TestCase):
             target = root / "output.png"
             Image.new("RGBA", (120, 80), color=(10, 90, 160, 180)).save(source)
 
-            photo_prepare.optimize_photo(source, target, max_dim=2200, jpeg_quality=82, webp_quality=80)
+            photo_prepare.optimize_photo(
+                source, target, max_dim=2200, jpeg_quality=82, webp_quality=80
+            )
 
             with Image.open(target) as saved:
                 self.assertEqual(saved.format, "PNG")
@@ -80,7 +88,9 @@ class PhotoPrepareTests(unittest.TestCase):
             source.write_bytes(b"not an image")
 
             with mock.patch("scripts.photo_prepare.Image.open", side_effect=OSError):
-                photo_prepare.optimize_photo(source, target, max_dim=2200, jpeg_quality=82, webp_quality=80)
+                photo_prepare.optimize_photo(
+                    source, target, max_dim=2200, jpeg_quality=82, webp_quality=80
+                )
 
             self.assertEqual(target.read_bytes(), b"not an image")
 
@@ -93,7 +103,9 @@ class PhotoPrepareTests(unittest.TestCase):
             Image.new("RGB", (80, 80), color=(1, 2, 3)).save(real_source)
             source.write_bytes(real_source.read_bytes())
 
-            photo_prepare.optimize_photo(source, target, max_dim=2200, jpeg_quality=82, webp_quality=80)
+            photo_prepare.optimize_photo(
+                source, target, max_dim=2200, jpeg_quality=82, webp_quality=80
+            )
 
             self.assertEqual(target.read_bytes(), source.read_bytes())
 

@@ -55,7 +55,9 @@ class MediaSyncIndexTests(unittest.TestCase):
             "old-file.jpg": 5,
         }
 
-        upload_names, delete_names = media_sync_index.sync_plan(local_files, remote_files)
+        upload_names, delete_names = media_sync_index.sync_plan(
+            local_files, remote_files
+        )
 
         self.assertEqual(upload_names, ["new-file.jpg", "replace-size.jpg"])
         self.assertEqual(delete_names, ["old-file.jpg"])
@@ -69,11 +71,15 @@ class MediaSyncIndexTests(unittest.TestCase):
 
             with mock.patch("builtins.print") as print_mock:
                 result = media_sync_index.cmd_verify(
-                    SimpleNamespace(local_index=str(local_index), remote_index=str(remote_index))
+                    SimpleNamespace(
+                        local_index=str(local_index), remote_index=str(remote_index)
+                    )
                 )
 
         self.assertEqual(result, 1)
-        printed = "\n".join(str(call.args[0]) for call in print_mock.call_args_list if call.args)
+        printed = "\n".join(
+            str(call.args[0]) for call in print_mock.call_args_list if call.args
+        )
         self.assertIn("Sync verification failed.", printed)
         self.assertIn("a.jpg", printed)
         self.assertIn("b.jpg", printed)
@@ -86,7 +92,9 @@ class MediaSyncIndexTests(unittest.TestCase):
     def test_write_index_sorts_case_insensitively(self) -> None:
         out = StringIO()
 
-        media_sync_index.write_index({"zeta.jpg": 3, "Alpha.jpg": 1, "beta.jpg": 2}, out=out)
+        media_sync_index.write_index(
+            {"zeta.jpg": 3, "Alpha.jpg": 1, "beta.jpg": 2}, out=out
+        )
 
         self.assertEqual(
             out.getvalue(),
@@ -125,8 +133,12 @@ class MediaSyncIndexTests(unittest.TestCase):
             remote_index = root / "remote.tsv"
             to_upload = root / "to-upload.txt"
             to_delete = root / "to-delete.txt"
-            local_index.write_text("same.jpg\t1\nnew.jpg\t4\nreplace.jpg\t7\n", encoding="utf-8")
-            remote_index.write_text("same.jpg\t1\nreplace.jpg\t9\nold.jpg\t3\n", encoding="utf-8")
+            local_index.write_text(
+                "same.jpg\t1\nnew.jpg\t4\nreplace.jpg\t7\n", encoding="utf-8"
+            )
+            remote_index.write_text(
+                "same.jpg\t1\nreplace.jpg\t9\nold.jpg\t3\n", encoding="utf-8"
+            )
 
             result = media_sync_index.cmd_plan(
                 SimpleNamespace(
@@ -138,7 +150,9 @@ class MediaSyncIndexTests(unittest.TestCase):
             )
 
             self.assertEqual(result, 0)
-            self.assertEqual(to_upload.read_text(encoding="utf-8"), "new.jpg\nreplace.jpg")
+            self.assertEqual(
+                to_upload.read_text(encoding="utf-8"), "new.jpg\nreplace.jpg"
+            )
             self.assertEqual(to_delete.read_text(encoding="utf-8"), "old.jpg")
 
     def test_verify_returns_success_when_indexes_match(self) -> None:
@@ -150,11 +164,16 @@ class MediaSyncIndexTests(unittest.TestCase):
 
             with mock.patch("builtins.print") as print_mock:
                 result = media_sync_index.cmd_verify(
-                    SimpleNamespace(local_index=str(local_index), remote_index=str(remote_index))
+                    SimpleNamespace(
+                        local_index=str(local_index), remote_index=str(remote_index)
+                    )
                 )
 
         self.assertEqual(result, 0)
-        self.assertEqual(print_mock.call_args_list[0].args[0], "Sync verification OK: local prepared files match the remote volume.")
+        self.assertEqual(
+            print_mock.call_args_list[0].args[0],
+            "Sync verification OK: local prepared files match the remote volume.",
+        )
 
     def test_verify_truncates_long_difference_lists(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -171,15 +190,21 @@ class MediaSyncIndexTests(unittest.TestCase):
 
             with mock.patch("builtins.print") as print_mock:
                 result = media_sync_index.cmd_verify(
-                    SimpleNamespace(local_index=str(local_index), remote_index=str(remote_index))
+                    SimpleNamespace(
+                        local_index=str(local_index), remote_index=str(remote_index)
+                    )
                 )
 
         self.assertEqual(result, 1)
-        printed = "\n".join(str(call.args[0]) for call in print_mock.call_args_list if call.args)
+        printed = "\n".join(
+            str(call.args[0]) for call in print_mock.call_args_list if call.args
+        )
         self.assertIn("... (25 total)", printed)
 
     def test_parse_args_accepts_build_index_command(self) -> None:
-        with mock.patch("sys.argv", ["media_sync_index.py", "build-index", "/tmp/photos"]):
+        with mock.patch(
+            "sys.argv", ["media_sync_index.py", "build-index", "/tmp/photos"]
+        ):
             args = media_sync_index.parse_args()
 
         self.assertEqual(args.command, "build-index")
@@ -189,7 +214,9 @@ class MediaSyncIndexTests(unittest.TestCase):
     def test_main_dispatches_to_selected_command(self) -> None:
         expected_args = SimpleNamespace(func=mock.Mock(return_value=7))
 
-        with mock.patch.object(media_sync_index, "parse_args", return_value=expected_args):
+        with mock.patch.object(
+            media_sync_index, "parse_args", return_value=expected_args
+        ):
             result = media_sync_index.main()
 
         self.assertEqual(result, 7)

@@ -25,7 +25,9 @@ PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"}
 MUSIC_EXTENSIONS = {".mp3", ".wav", ".ogg", ".m4a", ".flac"}
 
 
-def public_files(directory: Path, allowed_extensions: set[str], url_prefix: str) -> list[str]:
+def public_files(
+    directory: Path, allowed_extensions: set[str], url_prefix: str
+) -> list[str]:
     if not directory.exists():
         return []
 
@@ -46,11 +48,11 @@ def dedupe_photo_paths(paths: list[Path]) -> list[Path]:
         group_key = stem.lower()
 
         for separator in ("_", "-"):
-          if separator in stem:
-              base_stem = stem.split(separator, 1)[0]
-              if base_stem.lower() in plain_names:
-                  group_key = base_stem.lower()
-                  break
+            if separator in stem:
+                base_stem = stem.split(separator, 1)[0]
+                if base_stem.lower() in plain_names:
+                    group_key = base_stem.lower()
+                    break
 
         current = preferred.get(group_key)
         if current is None:
@@ -72,11 +74,15 @@ def is_media_request(path: str) -> bool:
 
 
 def media_payload() -> dict[str, list[str]]:
-    photo_paths = [
-        path
-        for path in sorted(PHOTOS_DIR.iterdir(), key=lambda item: item.name.lower())
-        if path.is_file() and path.suffix.lower() in PHOTO_EXTENSIONS
-    ] if PHOTOS_DIR.exists() else []
+    photo_paths = (
+        [
+            path
+            for path in sorted(PHOTOS_DIR.iterdir(), key=lambda item: item.name.lower())
+            if path.is_file() and path.suffix.lower() in PHOTO_EXTENSIONS
+        ]
+        if PHOTOS_DIR.exists()
+        else []
+    )
 
     photo_paths = dedupe_photo_paths(photo_paths)
 
@@ -158,7 +164,9 @@ def redirect_target(host_header: str | None, request_path: str) -> str | None:
 
 
 class MediaHandler(SimpleHTTPRequestHandler):
-    def _client_disconnected(self, error: BrokenPipeError | ConnectionResetError) -> None:
+    def _client_disconnected(
+        self, error: BrokenPipeError | ConnectionResetError
+    ) -> None:
         # The browser may cancel media downloads when switching tracks.
         if isinstance(error, ConnectionResetError) and error.errno != errno.ECONNRESET:
             raise

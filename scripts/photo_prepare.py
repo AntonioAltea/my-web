@@ -23,7 +23,9 @@ def resize_image(image: Image.Image, max_dim: int) -> Image.Image:
     return image.resize(next_size, RESAMPLE_LANCZOS)
 
 
-def optimize_photo(source: Path, target: Path, max_dim: int, jpeg_quality: int, webp_quality: int) -> None:
+def optimize_photo(
+    source: Path, target: Path, max_dim: int, jpeg_quality: int, webp_quality: int
+) -> None:
     suffix = source.suffix.lower()
 
     if suffix in {".gif", ".avif"}:

@@ -61,7 +61,9 @@ class PrepareWebPhotosTests(unittest.TestCase):
                     result = prepare_web_photos.main()
 
         self.assertEqual(result, 1)
-        self.assertIn("Source directory does not exist", print_mock.call_args_list[0].args[0])
+        self.assertIn(
+            "Source directory does not exist", print_mock.call_args_list[0].args[0]
+        )
 
     def test_main_returns_zero_when_no_photos_exist(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -103,12 +105,28 @@ class PrepareWebPhotosTests(unittest.TestCase):
 
             calls: list[tuple[str, str, int, int, int]] = []
 
-            def fake_optimize(source_path: Path, target_path: Path, max_dim: int, jpeg_quality: int, webp_quality: int) -> None:
-                calls.append((source_path.name, target_path.name, max_dim, jpeg_quality, webp_quality))
+            def fake_optimize(
+                source_path: Path,
+                target_path: Path,
+                max_dim: int,
+                jpeg_quality: int,
+                webp_quality: int,
+            ) -> None:
+                calls.append(
+                    (
+                        source_path.name,
+                        target_path.name,
+                        max_dim,
+                        jpeg_quality,
+                        webp_quality,
+                    )
+                )
                 target_path.write_bytes(b"prepared")
 
             with mock.patch.object(prepare_web_photos, "parse_args", return_value=args):
-                with mock.patch.object(prepare_web_photos, "optimize_photo", side_effect=fake_optimize):
+                with mock.patch.object(
+                    prepare_web_photos, "optimize_photo", side_effect=fake_optimize
+                ):
                     result = prepare_web_photos.main()
 
             self.assertEqual(result, 0)

@@ -61,7 +61,8 @@ def main() -> int:
         return 1
 
     photo_paths = sorted(
-        path for path in directory.iterdir()
+        path
+        for path in directory.iterdir()
         if path.is_file() and path.suffix.lower() in PHOTO_EXTENSIONS
     )
 

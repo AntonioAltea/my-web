@@ -1,4 +1,4 @@
-.PHONY: run test test-python test-python-coverage check-python-coverage test-front deploy upload delete sync sync-all prepare-web-photos clean-photos clean-photos-dry
+.PHONY: run test test-python format-python lint-python test-python-coverage check-python-coverage test-front deploy upload delete sync sync-all prepare-web-photos clean-photos clean-photos-dry
 
 APP ?= manturon
 COVERAGE_MIN ?= 90
@@ -10,6 +10,12 @@ test: test-python test-front
 
 test-python:
 	python3 -m unittest discover -s tests -v
+
+format-python:
+	ruff format scripts src tests
+
+lint-python:
+	ruff check scripts src tests
 
 test-python-coverage:
 	python3 -m coverage erase

@@ -36,7 +36,9 @@ def main() -> int:
     photo_sources = [
         source
         for source in sorted(source_dir.iterdir())
-        if source.is_file() and source.name != ".gitkeep" and source.suffix.lower() in PHOTO_EXTENSIONS
+        if source.is_file()
+        and source.name != ".gitkeep"
+        and source.suffix.lower() in PHOTO_EXTENSIONS
     ]
 
     total = len(photo_sources)
@@ -45,7 +47,6 @@ def main() -> int:
         return 0
 
     for index, source in enumerate(photo_sources, start=1):
-
         target = target_dir / source.name
         optimize_photo(
             source,

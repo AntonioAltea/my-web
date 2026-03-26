@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "Formatting Python before commit..."
+make format-python
+git add scripts src tests
+
+echo "Linting Python before commit..."
+make lint-python
+
 echo "Checking Python coverage before commit..."
 make check-python-coverage COVERAGE_MIN="${COVERAGE_MIN:-90}"

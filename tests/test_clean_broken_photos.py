@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -28,7 +27,9 @@ class CleanBrokenPhotosTests(unittest.TestCase):
         self.assertEqual(args.dry_run, False)
 
     def test_parse_args_accepts_directory_and_dry_run(self) -> None:
-        with mock.patch("sys.argv", ["clean-broken-photos.py", "/tmp/photos", "--dry-run"]):
+        with mock.patch(
+            "sys.argv", ["clean-broken-photos.py", "/tmp/photos", "--dry-run"]
+        ):
             args = clean_broken_photos.parse_args()
 
         self.assertEqual(args.directory, "/tmp/photos")
@@ -49,23 +50,41 @@ class CleanBrokenPhotosTests(unittest.TestCase):
             self.assertEqual(clean_broken_photos.pillow_loads(path), False)
 
     def test_identify_loads_checks_subprocess_result(self) -> None:
-        with mock.patch.object(clean_broken_photos.subprocess, "run", return_value=SimpleNamespace(returncode=0)):
-            self.assertEqual(clean_broken_photos.identify_loads(Path("/tmp/photo.jpg")), True)
+        with mock.patch.object(
+            clean_broken_photos.subprocess,
+            "run",
+            return_value=SimpleNamespace(returncode=0),
+        ):
+            self.assertEqual(
+                clean_broken_photos.identify_loads(Path("/tmp/photo.jpg")), True
+            )
 
-        with mock.patch.object(clean_broken_photos.subprocess, "run", return_value=SimpleNamespace(returncode=1)):
-            self.assertEqual(clean_broken_photos.identify_loads(Path("/tmp/photo.jpg")), False)
+        with mock.patch.object(
+            clean_broken_photos.subprocess,
+            "run",
+            return_value=SimpleNamespace(returncode=1),
+        ):
+            self.assertEqual(
+                clean_broken_photos.identify_loads(Path("/tmp/photo.jpg")), False
+            )
 
     def test_can_load_uses_identify_when_pillow_fails(self) -> None:
         with mock.patch.object(clean_broken_photos, "pillow_loads", return_value=False):
-            with mock.patch.object(clean_broken_photos, "identify_loads", return_value=True):
-                self.assertEqual(clean_broken_photos.can_load(Path("/tmp/photo.jpg")), True)
+            with mock.patch.object(
+                clean_broken_photos, "identify_loads", return_value=True
+            ):
+                self.assertEqual(
+                    clean_broken_photos.can_load(Path("/tmp/photo.jpg")), True
+                )
 
     def test_main_returns_error_when_directory_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             missing = Path(temp_dir) / "missing"
             args = SimpleNamespace(directory=str(missing), dry_run=False)
 
-            with mock.patch.object(clean_broken_photos, "parse_args", return_value=args):
+            with mock.patch.object(
+                clean_broken_photos, "parse_args", return_value=args
+            ):
                 with mock.patch("builtins.print") as print_mock:
                     result = clean_broken_photos.main()
 
@@ -78,7 +97,9 @@ class CleanBrokenPhotosTests(unittest.TestCase):
             (root / "notes.txt").write_text("skip", encoding="utf-8")
             args = SimpleNamespace(directory=str(root), dry_run=False)
 
-            with mock.patch.object(clean_broken_photos, "parse_args", return_value=args):
+            with mock.patch.object(
+                clean_broken_photos, "parse_args", return_value=args
+            ):
                 with mock.patch("builtins.print") as print_mock:
                     result = clean_broken_photos.main()
 
@@ -94,13 +115,19 @@ class CleanBrokenPhotosTests(unittest.TestCase):
             also_good.write_bytes(b"b")
             args = SimpleNamespace(directory=str(root), dry_run=False)
 
-            with mock.patch.object(clean_broken_photos, "parse_args", return_value=args):
-                with mock.patch.object(clean_broken_photos, "can_load", return_value=True):
+            with mock.patch.object(
+                clean_broken_photos, "parse_args", return_value=args
+            ):
+                with mock.patch.object(
+                    clean_broken_photos, "can_load", return_value=True
+                ):
                     with mock.patch("builtins.print") as print_mock:
                         result = clean_broken_photos.main()
 
         self.assertEqual(result, 0)
-        printed = "\n".join(str(call.args[0]) for call in print_mock.call_args_list if call.args)
+        printed = "\n".join(
+            str(call.args[0]) for call in print_mock.call_args_list if call.args
+        )
         self.assertIn("OK     a.jpg", printed)
         self.assertIn("OK     b.png", printed)
         self.assertIn("All good. Checked: 2", printed)
@@ -112,14 +139,20 @@ class CleanBrokenPhotosTests(unittest.TestCase):
             broken.write_bytes(b"broken")
             args = SimpleNamespace(directory=str(root), dry_run=True)
 
-            with mock.patch.object(clean_broken_photos, "parse_args", return_value=args):
-                with mock.patch.object(clean_broken_photos, "can_load", return_value=False):
+            with mock.patch.object(
+                clean_broken_photos, "parse_args", return_value=args
+            ):
+                with mock.patch.object(
+                    clean_broken_photos, "can_load", return_value=False
+                ):
                     with mock.patch("builtins.print") as print_mock:
                         result = clean_broken_photos.main()
 
             self.assertEqual(result, 0)
             self.assertTrue(broken.exists())
-            printed = "\n".join(str(call.args[0]) for call in print_mock.call_args_list if call.args)
+            printed = "\n".join(
+                str(call.args[0]) for call in print_mock.call_args_list if call.args
+            )
             self.assertIn("DELETE broken.jpg", printed)
             self.assertIn("Detected 1 broken photos. Nothing was deleted.", printed)
 
@@ -130,14 +163,21 @@ class CleanBrokenPhotosTests(unittest.TestCase):
             broken.write_bytes(b"broken")
             args = SimpleNamespace(directory=str(root), dry_run=False)
 
-            with mock.patch.object(clean_broken_photos, "parse_args", return_value=args):
-                with mock.patch.object(clean_broken_photos, "can_load", return_value=False):
+            with mock.patch.object(
+                clean_broken_photos, "parse_args", return_value=args
+            ):
+                with mock.patch.object(
+                    clean_broken_photos, "can_load", return_value=False
+                ):
                     with mock.patch("builtins.print") as print_mock:
                         result = clean_broken_photos.main()
 
         self.assertEqual(result, 0)
         self.assertFalse(broken.exists())
-        self.assertIn("Deleted 1 broken photos out of 1 checked.", print_mock.call_args_list[-1].args[0])
+        self.assertIn(
+            "Deleted 1 broken photos out of 1 checked.",
+            print_mock.call_args_list[-1].args[0],
+        )
 
 
 if __name__ == "__main__":

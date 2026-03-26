@@ -39,15 +39,13 @@ def write_index(index: dict[str, int], out: object = sys.stdout) -> None:
         print(f"{name}\t{size}", file=out)
 
 
-def sync_plan(local_files: dict[str, int], remote_files: dict[str, int]) -> tuple[list[str], list[str]]:
+def sync_plan(
+    local_files: dict[str, int], remote_files: dict[str, int]
+) -> tuple[list[str], list[str]]:
     upload_names = sorted(
-        name for name, size in local_files.items()
-        if remote_files.get(name) != size
+        name for name, size in local_files.items() if remote_files.get(name) != size
     )
-    delete_names = sorted(
-        name for name in remote_files
-        if name not in local_files
-    )
+    delete_names = sorted(name for name in remote_files if name not in local_files)
     return upload_names, delete_names
 
 
@@ -75,7 +73,9 @@ def cmd_verify(args: argparse.Namespace) -> int:
     local_files = read_index(Path(args.local_index))
     remote_files = read_index(Path(args.remote_index))
 
-    missing_remote = sorted(name for name in local_files if remote_files.get(name) != local_files[name])
+    missing_remote = sorted(
+        name for name in local_files if remote_files.get(name) != local_files[name]
+    )
     extra_remote = sorted(name for name in remote_files if name not in local_files)
 
     if not missing_remote and not extra_remote:
@@ -101,7 +101,9 @@ def cmd_verify(args: argparse.Namespace) -> int:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Helpers for media sync index generation and comparison.")
+    parser = argparse.ArgumentParser(
+        description="Helpers for media sync index generation and comparison."
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     build_index_parser = subparsers.add_parser("build-index")

@@ -14,7 +14,9 @@ except ImportError:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build and reuse a persistent cache of web-ready photos.")
+    parser = argparse.ArgumentParser(
+        description="Build and reuse a persistent cache of web-ready photos."
+    )
     parser.add_argument("source")
     parser.add_argument("cache_dir")
     parser.add_argument("manifest")
@@ -65,7 +67,9 @@ def current_settings(args: argparse.Namespace) -> dict[str, int]:
     }
 
 
-def build_photo_cache(args: argparse.Namespace) -> tuple[dict[str, int], dict[str, int]]:
+def build_photo_cache(
+    args: argparse.Namespace,
+) -> tuple[dict[str, int], dict[str, int]]:
     source_dir = Path(args.source).resolve()
     cache_dir = Path(args.cache_dir).resolve()
     manifest_path = Path(args.manifest).resolve()
@@ -74,7 +78,9 @@ def build_photo_cache(args: argparse.Namespace) -> tuple[dict[str, int], dict[st
     photo_sources = [
         source
         for source in sorted(source_dir.iterdir(), key=lambda item: item.name.lower())
-        if source.is_file() and source.name != ".gitkeep" and source.suffix.lower() in PHOTO_EXTENSIONS
+        if source.is_file()
+        and source.name != ".gitkeep"
+        and source.suffix.lower() in PHOTO_EXTENSIONS
     ]
 
     manifest = load_manifest(manifest_path)
@@ -107,7 +113,9 @@ def build_photo_cache(args: argparse.Namespace) -> tuple[dict[str, int], dict[st
         if can_reuse:
             stats["reused"] += 1
         else:
-            fd, temp_path_str = tempfile.mkstemp(prefix=f"{source.stem}-", suffix=source.suffix, dir=cache_dir)
+            fd, temp_path_str = tempfile.mkstemp(
+                prefix=f"{source.stem}-", suffix=source.suffix, dir=cache_dir
+            )
             os.close(fd)
             temp_path = Path(temp_path_str)
             try:
