@@ -42,6 +42,7 @@ Short guide to work in this repo without wasting time.
 - `make test`
 - `make check-python-coverage`
 - `make test-front`
+- `make deploy`
 - `make prepare-web-photos SRC=assets/photos OUT=/tmp/fotos-web`
 - `make sync-all`
 - `make clean-photos`

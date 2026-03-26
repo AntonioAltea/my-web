@@ -32,6 +32,12 @@ python3 -m src.server
 
 Then open `http://127.0.0.1:8000`.
 
+Deploy to Fly with:
+
+```bash
+make deploy
+```
+
 ## Git hooks
 
 The repository includes:
@@ -83,13 +89,19 @@ fly volumes create manturon_data_2g --region cdg --size 2 --app manturon
 4. Deploy:
 
 ```bash
-fly deploy
+make deploy
 ```
 
 If the deploy runs from CI or another non-interactive integration, use automatic confirmation:
 
 ```bash
 fly deploy --yes
+```
+
+If you want to deploy another Fly app name, override `APP`:
+
+```bash
+make deploy APP=other-app
 ```
 
 Otherwise Fly may stop with an error such as `yes flag must be specified when not running interactively`, especially when the app already has a mounted volume and deployment needs to confirm that setup is preserved.

@@ -1,4 +1,4 @@
-.PHONY: run test test-python test-python-coverage check-python-coverage test-front upload delete sync sync-all prepare-web-photos clean-photos clean-photos-dry
+.PHONY: run test test-python test-python-coverage check-python-coverage test-front deploy upload delete sync sync-all prepare-web-photos clean-photos clean-photos-dry
 
 APP ?= manturon
 COVERAGE_MIN ?= 90
@@ -23,6 +23,9 @@ check-python-coverage:
 
 test-front:
 	node tests/test_script.js
+
+deploy:
+	fly deploy -a "$(APP)"
 
 upload:
 	@test -n "$(KIND)" || (echo "Usage: make upload KIND=photos|music SRC=path [APP=manturon]"; exit 1)
