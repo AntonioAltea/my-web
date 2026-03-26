@@ -207,7 +207,6 @@ a {
   display: none;
 }
 
-.theme-toggle:hover,
 .theme-toggle:focus-visible {
   border-color: var(--control-line-strong);
   color: var(--ink);
@@ -349,9 +348,7 @@ a {
   letter-spacing: 0.1em;
 }
 
-.gallery-nav:hover,
 .gallery-nav:focus-visible,
-.player-button:hover,
 .player-button:focus-visible {
   background: transparent;
   border-color: var(--control-line-strong);
@@ -472,7 +469,6 @@ a {
   background: var(--surface-accent);
 }
 
-.player-button:hover,
 .player-button:focus-visible {
   transform: scale(1.01);
   box-shadow: 0 6px 12px rgba(var(--line-strong-rgb), 0.06);
@@ -561,6 +557,27 @@ a {
 .player-button:not(.player-button-primary):active .icon-step-forward {
   transform: translateX(0.75px);
   transition: transform 120ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .theme-toggle:hover {
+    border-color: var(--control-line-strong);
+    color: var(--ink);
+    outline: none;
+    transform: translateY(-1px);
+  }
+
+  .gallery-nav:hover,
+  .player-button:hover {
+    background: transparent;
+    border-color: var(--control-line-strong);
+    color: var(--ink);
+  }
+
+  .player-button:hover {
+    transform: scale(1.01);
+    box-shadow: 0 6px 12px rgba(var(--line-strong-rgb), 0.06);
+  }
 }
 
 .player-side {
