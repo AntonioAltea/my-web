@@ -232,7 +232,7 @@ async function loadMedia() {
 
     media = await response.json();
   } catch (error) {
-    setNowPlayingText("Arranca la web con python3 server.py");
+    setNowPlayingText("Arranca la web con python3 -m src.server");
     photoCaption.textContent = "No se pudieron cargar las fotos.";
     photoCaption.classList.remove("photo-caption-visible");
     prevPhotoButton.disabled = true;

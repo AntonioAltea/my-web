@@ -11,7 +11,8 @@ from urllib.parse import unquote, urlparse
 
 
 ROOT = Path(__file__).resolve().parent
-MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", ROOT / "assets")).resolve()
+PROJECT_ROOT = ROOT.parent
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", PROJECT_ROOT / "assets")).resolve()
 PHOTOS_DIR = MEDIA_ROOT / "photos"
 MUSIC_DIR = MEDIA_ROOT / "music"
 CANONICAL_HOST = os.environ.get("CANONICAL_HOST", "").strip()
@@ -101,7 +102,43 @@ def asset_disk_path(request_path: str) -> Path | None:
         file_name = Path(parsed_path).name
         return MUSIC_DIR / file_name
 
-    return None
+    if parsed_path.startswith("/assets/icons/"):
+        file_name = Path(parsed_path).name
+        return PROJECT_ROOT / "assets" / "icons" / file_name
+
+    if parsed_path == "/favicon.ico":
+        return PROJECT_ROOT / "favicon.ico"
+
+    if parsed_path == "/":
+        return ROOT / "index.html"
+
+    relative_path = parsed_path.lstrip("/")
+    if not relative_path:
+        return ROOT / "index.html"
+
+    return ROOT / relative_path
+
+
+def static_disk_path(request_path: str) -> Path:
+    disk_path = asset_disk_path(request_path)
+    if disk_path is None:
+        return ROOT / "index.html"
+    return disk_path
+
+
+def guess_directory_path(request_path: str) -> Path:
+    parsed_path = unquote(urlparse(request_path).path)
+    relative_path = parsed_path.lstrip("/")
+    return ROOT / relative_path
+
+
+def should_serve_index(request_path: str) -> bool:
+    parsed_path = unquote(urlparse(request_path).path)
+    if parsed_path in {"", "/"}:
+        return True
+
+    disk_path = guess_directory_path(request_path)
+    return parsed_path.endswith("/") and disk_path.is_dir()
 
 
 def redirect_target(host_header: str | None, request_path: str) -> str | None:
@@ -139,11 +176,9 @@ class MediaHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def translate_path(self, path: str) -> str:
-        asset_path = asset_disk_path(path)
-        if asset_path is not None:
-            return str(asset_path)
-
-        return super().translate_path(path)
+        if should_serve_index(path):
+            return str(ROOT / "index.html")
+        return str(static_disk_path(path))
 
     def do_GET(self) -> None:
         location = redirect_target(self.headers.get("Host"), self.path)

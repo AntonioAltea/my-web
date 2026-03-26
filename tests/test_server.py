@@ -9,7 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-import server
+from src import server
 
 
 class PublicFilesTests(unittest.TestCase):
@@ -56,7 +56,10 @@ class MediaRequestTests(unittest.TestCase):
                 server.asset_disk_path("/assets/photos/callado-mu%C3%B1eco.JPG"),
                 Path("/tmp/photos-test/callado-muñeco.JPG"),
             )
-            self.assertIsNone(server.asset_disk_path("/styles.css"))
+            self.assertEqual(
+                server.asset_disk_path("/styles.css"),
+                server.ROOT / "styles.css",
+            )
         finally:
             server.PHOTOS_DIR = original_photos
             server.MUSIC_DIR = original_music
@@ -152,20 +155,12 @@ class MediaRequestTests(unittest.TestCase):
 
         self.assertEqual(translated, "/tmp/demo.jpg")
 
-    def test_translate_path_falls_back_to_super_for_non_media(self) -> None:
+    def test_translate_path_uses_src_files_for_non_media(self) -> None:
         handler = server.MediaHandler.__new__(server.MediaHandler)
 
-        with mock.patch.object(server, "asset_disk_path", return_value=None):
-            with mock.patch.object(
-                server.SimpleHTTPRequestHandler,
-                "translate_path",
-                autospec=True,
-                return_value="/tmp/fallback",
-            ) as translate_mock:
-                translated = server.MediaHandler.translate_path(handler, "/index.html")
+        translated = server.MediaHandler.translate_path(handler, "/index.html")
 
-        self.assertEqual(translated, "/tmp/fallback")
-        translate_mock.assert_called_once_with(handler, "/index.html")
+        self.assertEqual(translated, str(server.ROOT / "index.html"))
 
     def test_do_get_redirects_to_canonical_host(self) -> None:
         handler = server.MediaHandler.__new__(server.MediaHandler)
@@ -318,14 +313,14 @@ class MediaPayloadTests(unittest.TestCase):
 
 class MainTests(unittest.TestCase):
     def test_parse_args_uses_defaults(self) -> None:
-        with mock.patch("sys.argv", ["server.py"]):
+        with mock.patch("sys.argv", ["src.server"]):
             args = server.parse_args()
 
         self.assertEqual(args.host, "127.0.0.1")
         self.assertEqual(args.port, 8000)
 
     def test_parse_args_accepts_custom_values(self) -> None:
-        with mock.patch("sys.argv", ["server.py", "--host", "0.0.0.0", "--port", "9000"]):
+        with mock.patch("sys.argv", ["src.server", "--host", "0.0.0.0", "--port", "9000"]):
             args = server.parse_args()
 
         self.assertEqual(args.host, "0.0.0.0")

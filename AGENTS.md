@@ -5,17 +5,16 @@ Short guide to work in this repo without wasting time.
 ## Workflow
 
 - Change and test locally first; deploy afterwards.
-- If testing requires running the site, ask the user to run `python3 server.py` or `make run`; do not start it automatically.
+- If testing requires running the site, ask the user to run `python3 -m src.server` or `make run`; do not start it automatically.
 - If a task reveals a convention or warning that will save time later, update this file.
 - If the user asks for commits and there are logically separate changes, make one commit per block instead of mixing everything together.
 - Respond concisely by default; do not be verbose unless the user asks for more detail.
 
 ## Quick Map
 
-- `index.html`, `styles.css`, `script.js`: frontend without a build step.
-- `server.py`: serves the site and exposes `/api/media`.
-- `test_server.py`: server tests.
-- `test_script.js`: frontend behavior tests without external dependencies.
+- `src/`: app code and static files.
+- `src/server.py`: serves the site and exposes `/api/media`.
+- `tests/`: backend and frontend tests.
 - `Makefile`: common commands.
 - `scripts/prepare-web-photos.py`: optimizes photos for the web.
 - `scripts/sync-media.sh`: syncs media with Fly; for photos it generates web copies first.
@@ -27,10 +26,10 @@ Short guide to work in this repo without wasting time.
 - Photo sync keeps a persistent local cache in `.cache/`; unchanged photos should not be regenerated on every run.
 - A real `make sync` must finish by verifying that the prepared local set and the remote volume match; if they do not, treat it as a failed sync.
 - `/api/media` returns the `photos` and `music` keys with web paths. If you change that contract, update `script.js` too.
-- If you change `server.py` behavior, add or update tests in `test_server.py`.
+- If you change `src/server.py` behavior, add or update tests in `tests/`.
 - Keep Python test coverage high; if it drops, bring it back up with useful tests before closing the task.
 - If new behavior is added, try to leave tests covering it whenever reasonable.
-- If the change touches `script.js` or relevant client interactions, consider adding or updating tests in `test_script.js` whenever reasonable.
+- If the change touches `script.js` or relevant client interactions, consider adding or updating tests in `tests/` whenever reasonable.
 - If you change operations, commands, or deployment, update `README.md`.
 - If a local, editor, or generated file appears and should not be versioned, add it to `.gitignore`.
 - Do not add build steps, frameworks, or heavy dependencies unless explicitly requested.
@@ -40,10 +39,10 @@ Short guide to work in this repo without wasting time.
 
 - `make test`
 - `make test-front`
-- `make preparar-fotos-web SRC=assets/photos OUT=/tmp/fotos-web`
+- `make prepare-web-photos SRC=assets/photos OUT=/tmp/fotos-web`
 - `make sync-all`
-- `make limpiar-fotos`
-- `make limpiar-fotos-dry`
+- `make clean-photos`
+- `make clean-photos-dry`
 
 ## Before Closing
 

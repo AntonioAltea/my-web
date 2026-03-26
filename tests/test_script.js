@@ -274,7 +274,7 @@ async function loadApp(options = {}) {
     options,
   );
 
-  const scriptPath = path.join(__dirname, "script.js");
+  const scriptPath = path.join(__dirname, "..", "src", "script.js");
   const code = fs.readFileSync(scriptPath, "utf8");
   vm.runInNewContext(code, env.sandbox, { filename: "script.js" });
 

@@ -1,17 +1,17 @@
-.PHONY: run test test-python test-front upload delete sync sync-all preparar-fotos-web limpiar-fotos limpiar-fotos-dry
+.PHONY: run test test-python test-front upload delete sync sync-all prepare-web-photos clean-photos clean-photos-dry
 
 APP ?= manturon
 
 run:
-	python3 server.py
+	python3 -m src.server
 
 test: test-python test-front
 
 test-python:
-	python3 -m unittest -v
+	python3 -m unittest discover -s tests -v
 
 test-front:
-	node test_script.js
+	node tests/test_script.js
 
 upload:
 	@test -n "$(KIND)" || (echo "Usage: make upload KIND=photos|music SRC=path [APP=manturon]"; exit 1)
@@ -32,13 +32,13 @@ sync-all:
 	bash scripts/sync-media.sh "$(APP)" photos assets/photos
 	bash scripts/sync-media.sh "$(APP)" music assets/music
 
-preparar-fotos-web:
-	@test -n "$(SRC)" || (echo "Usage: make preparar-fotos-web SRC=source-folder OUT=target-folder"; exit 1)
-	@test -n "$(OUT)" || (echo "Usage: make preparar-fotos-web SRC=source-folder OUT=target-folder"; exit 1)
+prepare-web-photos:
+	@test -n "$(SRC)" || (echo "Usage: make prepare-web-photos SRC=source-folder OUT=target-folder"; exit 1)
+	@test -n "$(OUT)" || (echo "Usage: make prepare-web-photos SRC=source-folder OUT=target-folder"; exit 1)
 	python3 scripts/prepare-web-photos.py "$(SRC)" "$(OUT)"
 
-limpiar-fotos:
+clean-photos:
 	python3 scripts/clean-broken-photos.py $(if $(SRC),"$(SRC)",)
 
-limpiar-fotos-dry:
+clean-photos-dry:
 	python3 scripts/clean-broken-photos.py $(if $(SRC),"$(SRC)",) --dry-run

@@ -4,10 +4,8 @@ A simple music-and-photography site with a DIY feel.
 
 ## Structure
 
-- `index.html`: main structure
-- `styles.css`: visual styling
-- `script.js`: automatic photo and track loading, viewer, and player
-- `server.py`: Python server that lists files
+- `src/`: app code and static files (`index.html`, `styles.css`, `script.js`, `server.py`)
+- `tests/`: Python and frontend tests
 - `Dockerfile`: deployment container
 - `fly.toml`: Fly.io configuration
 - `assets/photos/`: put your images here
@@ -29,7 +27,7 @@ Each photo or track title is derived from the file name:
 Start it with:
 
 ```bash
-python3 server.py
+python3 -m src.server
 ```
 
 Then open `http://127.0.0.1:8000`.
@@ -204,7 +202,7 @@ By default:
 If you want to generate those copies manually to inspect them:
 
 ```bash
-make preparar-fotos-web SRC=assets/photos OUT=/tmp/fotos-web
+make prepare-web-photos SRC=assets/photos OUT=/tmp/fotos-web
 ```
 
 You can also upload a specific file or folder:
@@ -228,17 +226,17 @@ make delete KIND=music FILE=parado-master.flac
 To inspect `assets/photos` and automatically delete the ones that cannot be loaded:
 
 ```bash
-make limpiar-fotos
+make clean-photos
 ```
 
 To only check without deleting anything:
 
 ```bash
-make limpiar-fotos-dry
+make clean-photos-dry
 ```
 
 You can also pass another folder:
 
 ```bash
-make limpiar-fotos SRC=otra/carpeta
+make clean-photos SRC=another/folder
 ```
