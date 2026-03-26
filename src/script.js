@@ -28,11 +28,17 @@ let mediaPollTimer = null;
 let photoControlsLocked = false;
 let nowPlayingAnimationTimer = null;
 const themePreference = window.matchMedia("(prefers-color-scheme: dark)");
+const THEME_STORAGE_KEY = "manturon-theme";
+
+function storedThemePreference() {
+  const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  return savedTheme === "light" || savedTheme === "dark" ? savedTheme : "auto";
+}
 
 function effectiveTheme() {
-  const explicitTheme = document.documentElement.dataset.theme;
-  if (explicitTheme === "light" || explicitTheme === "dark") {
-    return explicitTheme;
+  const storedTheme = storedThemePreference();
+  if (storedTheme === "light" || storedTheme === "dark") {
+    return storedTheme;
   }
 
   return themePreference.matches ? "dark" : "light";
@@ -43,16 +49,37 @@ function syncThemeToggle() {
     return;
   }
 
-  const nextTheme = effectiveTheme() === "dark" ? "light" : "dark";
-  const nextLabel = nextTheme === "dark" ? "modo oscuro" : "modo claro";
-  themeToggleLabel.textContent = nextLabel;
-  themeToggleButton.setAttribute("aria-label", `Cambiar a ${nextLabel}`);
+  const storedTheme = storedThemePreference();
+  const nextTheme = storedTheme === "auto"
+    ? "dark"
+    : storedTheme === "dark"
+      ? "light"
+      : "auto";
+  const nextLabel = nextTheme === "auto"
+    ? "tema automatico"
+    : nextTheme === "dark"
+      ? "oscuro"
+      : "claro";
+  const currentLabel = storedTheme === "auto"
+    ? "automatico"
+    : storedTheme === "dark"
+      ? "oscuro"
+      : "claro";
+
+  themeToggleLabel.textContent = storedTheme === "auto" ? "auto" : currentLabel;
+  themeToggleButton.setAttribute("aria-label", `Tema ${currentLabel}. Cambiar a ${nextLabel}`);
   themeToggleButton.setAttribute("aria-pressed", String(effectiveTheme() === "dark"));
+  themeToggleButton.dataset.themeMode = storedTheme;
 }
 
 function setTheme(theme) {
-  document.documentElement.dataset.theme = theme;
-  window.localStorage.setItem("manturon-theme", theme);
+  if (theme === "light" || theme === "dark") {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } else {
+    delete document.documentElement.dataset.theme;
+    window.localStorage.removeItem(THEME_STORAGE_KEY);
+  }
   syncThemeToggle();
 }
 
@@ -359,7 +386,12 @@ prevTrackButton.addEventListener("click", () => stepTrack(-1));
 nextTrackButton.addEventListener("click", () => stepTrack(1));
 
 themeToggleButton?.addEventListener("click", () => {
-  const nextTheme = effectiveTheme() === "dark" ? "light" : "dark";
+  const storedTheme = storedThemePreference();
+  const nextTheme = storedTheme === "auto"
+    ? "dark"
+    : storedTheme === "dark"
+      ? "light"
+      : "auto";
   setTheme(nextTheme);
 });
 
