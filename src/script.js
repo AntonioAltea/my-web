@@ -24,7 +24,6 @@ let currentPhotoIndex = 0;
 let shuffledTrackOrder = [];
 let trackCursor = 0;
 let isSeeking = false;
-let mediaPollTimer = null;
 let photoControlsLocked = false;
 let nowPlayingAnimationTimer = null;
 let photoLoadRequestId = 0;
@@ -522,16 +521,6 @@ async function loadMedia() {
   }
 }
 
-function startMediaPolling() {
-  if (mediaPollTimer !== null) {
-    window.clearInterval(mediaPollTimer);
-  }
-
-  mediaPollTimer = window.setInterval(() => {
-    loadMedia();
-  }, 15000);
-}
-
 prevPhotoButton.addEventListener("click", () => movePhoto(-1));
 nextPhotoButton.addEventListener("click", () => movePhoto(1));
 photoRandomButton.addEventListener("click", () => {
@@ -643,7 +632,6 @@ window.addEventListener("load", syncPlayerBarHeight);
 themePreference.addEventListener("change", syncThemeToggle);
 
 loadMedia();
-startMediaPolling();
 updatePlayButton();
 syncPlayerBarHeight();
 syncThemeToggle();
