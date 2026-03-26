@@ -44,6 +44,7 @@
   --control-line-strong: rgba(var(--line-strong-rgb), 0.5);
   --photo-frame: rgba(var(--line-strong-rgb), 0.14);
   --seek-track: rgba(var(--line-rgb), 0.16);
+  --seek-wave: #2f5f4d;
   --thumb-shadow: rgba(var(--line-strong-rgb), 0.28);
   --thumb-active-ring: rgba(var(--accent-rgb), 0.14);
   --thumb-focus-ring: rgba(var(--accent-rgb), 0.12);
@@ -73,6 +74,7 @@
   --control-line-strong: rgba(var(--line-strong-rgb), 0.58);
   --photo-frame: rgba(var(--line-strong-rgb), 0.2);
   --seek-track: rgba(var(--line-rgb), 0.28);
+  --seek-wave: #88b5a0;
   --thumb-shadow: rgba(5, 8, 7, 0.58);
   --thumb-active-ring: rgba(var(--accent-rgb), 0.22);
   --thumb-focus-ring: rgba(var(--accent-rgb), 0.18);
@@ -102,6 +104,7 @@
     --control-line-strong: rgba(var(--line-strong-rgb), 0.58);
     --photo-frame: rgba(var(--line-strong-rgb), 0.2);
     --seek-track: rgba(var(--line-rgb), 0.28);
+    --seek-wave: #88b5a0;
     --thumb-shadow: rgba(5, 8, 7, 0.58);
     --thumb-active-ring: rgba(var(--accent-rgb), 0.22);
     --thumb-focus-ring: rgba(var(--accent-rgb), 0.18);
@@ -621,10 +624,15 @@ a {
   width: 100%;
   height: 100%;
   opacity: 0;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 14' preserveAspectRatio='none'%3E%3Cpath d='M0 7 Q8 1.1 16 7 T32 7 T48 7 T64 7' fill='none' stroke='rgb(47,95,77)' stroke-width='2.8' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-size: 64px 14px;
-  background-repeat: repeat-x;
-  background-position: 0 center;
+  background-color: var(--seek-wave);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 14' preserveAspectRatio='none'%3E%3Cpath d='M0 7 Q8 1.1 16 7 T32 7 T48 7 T64 7' fill='none' stroke='white' stroke-width='2.8' stroke-linecap='round'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 14' preserveAspectRatio='none'%3E%3Cpath d='M0 7 Q8 1.1 16 7 T32 7 T48 7 T64 7' fill='none' stroke='white' stroke-width='2.8' stroke-linecap='round'/%3E%3C/svg%3E");
+  -webkit-mask-size: 64px 14px;
+  mask-size: 64px 14px;
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
+  -webkit-mask-position: 0 center;
+  mask-position: 0 center;
   transition: opacity 180ms ease;
 }
 
@@ -673,58 +681,54 @@ a {
 
 .seek-bar::-webkit-slider-thumb {
   appearance: none;
-  width: 16px;
-  height: 16px;
-  margin-top: -6px;
-  border: 3px solid var(--accent);
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 0;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 0 1px var(--thumb-shadow);
+  background: var(--accent);
   transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
 }
 
 .seek-bar::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   padding: 0;
-  border: 3px solid var(--accent);
+  border: 0;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 0 1px var(--thumb-shadow);
+  background: var(--accent);
   transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
 }
 
 .seek-bar:active::-webkit-slider-thumb {
   transform: scale(1.08);
-  box-shadow: 0 0 0 4px var(--thumb-active-ring);
-  background: var(--thumb-active-fill);
+  box-shadow: none;
+  background: var(--accent);
 }
 
 .seek-bar:active::-moz-range-thumb {
   transform: scale(1.08);
-  box-shadow: 0 0 0 4px var(--thumb-active-ring);
-  background: var(--thumb-active-fill);
+  box-shadow: none;
+  background: var(--accent);
 }
 
 .seek-bar:focus-visible::-webkit-slider-thumb {
-  box-shadow:
-    0 0 0 1px var(--thumb-shadow),
-    0 0 0 4px var(--thumb-focus-ring);
+  box-shadow: none;
 }
 
 .seek-bar:focus-visible::-moz-range-thumb {
-  box-shadow:
-    0 0 0 1px var(--thumb-shadow),
-    0 0 0 4px var(--thumb-focus-ring);
+  box-shadow: none;
 }
 
 @keyframes seek-bar-wave {
   from {
-    background-position: 0 center;
+    -webkit-mask-position: 0 center;
+    mask-position: 0 center;
   }
 
   to {
-    background-position: 64px center;
+    -webkit-mask-position: 64px center;
+    mask-position: 64px center;
   }
 }
 
