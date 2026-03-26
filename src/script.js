@@ -6,6 +6,8 @@ const photoCaption = document.querySelector("#photo-caption");
 const prevPhotoButton = document.querySelector("#prev-photo");
 const nextPhotoButton = document.querySelector("#next-photo");
 const photoRandomButton = document.querySelector("#photo-random");
+const themeToggleButton = document.querySelector("#theme-toggle");
+const themeToggleLabel = document.querySelector("#theme-toggle-label");
 const prevTrackButton = document.querySelector("#prev-track");
 const nextTrackButton = document.querySelector("#next-track");
 const playToggleButton = document.querySelector("#play-toggle");
@@ -25,6 +27,34 @@ let isSeeking = false;
 let mediaPollTimer = null;
 let photoControlsLocked = false;
 let nowPlayingAnimationTimer = null;
+const themePreference = window.matchMedia("(prefers-color-scheme: dark)");
+
+function effectiveTheme() {
+  const explicitTheme = document.documentElement.dataset.theme;
+  if (explicitTheme === "light" || explicitTheme === "dark") {
+    return explicitTheme;
+  }
+
+  return themePreference.matches ? "dark" : "light";
+}
+
+function syncThemeToggle() {
+  if (!themeToggleButton || !themeToggleLabel) {
+    return;
+  }
+
+  const nextTheme = effectiveTheme() === "dark" ? "light" : "dark";
+  const nextLabel = nextTheme === "dark" ? "modo oscuro" : "modo claro";
+  themeToggleLabel.textContent = nextLabel;
+  themeToggleButton.setAttribute("aria-label", `Cambiar a ${nextLabel}`);
+  themeToggleButton.setAttribute("aria-pressed", String(effectiveTheme() === "dark"));
+}
+
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  window.localStorage.setItem("manturon-theme", theme);
+  syncThemeToggle();
+}
 
 function syncPhotoControls() {
   const hasPhotos = photos.length > 0;
@@ -328,6 +358,11 @@ photoRandomButton.addEventListener("click", () => {
 prevTrackButton.addEventListener("click", () => stepTrack(-1));
 nextTrackButton.addEventListener("click", () => stepTrack(1));
 
+themeToggleButton?.addEventListener("click", () => {
+  const nextTheme = effectiveTheme() === "dark" ? "light" : "dark";
+  setTheme(nextTheme);
+});
+
 playToggleButton.addEventListener("click", async () => {
   if (!tracks.length) {
     return;
@@ -423,8 +458,10 @@ window.addEventListener("focus", () => {
 window.addEventListener("resize", syncPlayerBarHeight);
 
 window.addEventListener("load", syncPlayerBarHeight);
+themePreference.addEventListener("change", syncThemeToggle);
 
 loadMedia();
 startMediaPolling();
 updatePlayButton();
 syncPlayerBarHeight();
+syncThemeToggle();

@@ -19,11 +19,28 @@
     href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400&display=swap"
     rel="stylesheet"
   >
+  <script>
+    (() => {
+      const savedTheme = window.localStorage.getItem("manturon-theme");
+      if (savedTheme === "light" || savedTheme === "dark") {
+        document.documentElement.dataset.theme = savedTheme;
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="page">
     <header class="site-header">
+      <button
+        id="theme-toggle"
+        class="theme-toggle"
+        type="button"
+        aria-label="Cambiar a modo oscuro"
+        aria-pressed="false"
+      >
+        <span id="theme-toggle-label">modo oscuro</span>
+      </button>
       <h1>manturón</h1>
     </header>
 
