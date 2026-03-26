@@ -1,6 +1,7 @@
-.PHONY: run test test-python test-front upload delete sync sync-all prepare-web-photos clean-photos clean-photos-dry
+.PHONY: run test test-python test-python-coverage check-python-coverage test-front upload delete sync sync-all prepare-web-photos clean-photos clean-photos-dry
 
 APP ?= manturon
+COVERAGE_MIN ?= 90
 
 run:
 	python3 -m src.server
@@ -9,6 +10,16 @@ test: test-python test-front
 
 test-python:
 	python3 -m unittest discover -s tests -v
+
+test-python-coverage:
+	python3 -m coverage erase
+	python3 -m coverage run --source=src,scripts -m unittest discover -s tests -v
+	COVERAGE_FILE=.coverage python3 -m coverage report -m
+
+check-python-coverage:
+	python3 -m coverage erase
+	python3 -m coverage run --source=src,scripts -m unittest discover -s tests
+	COVERAGE_FILE=.coverage python3 -m coverage report --fail-under=$(COVERAGE_MIN)
 
 test-front:
 	node tests/test_script.js

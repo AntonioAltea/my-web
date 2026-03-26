@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "Checking Python coverage before commit..."
+make check-python-coverage COVERAGE_MIN="${COVERAGE_MIN:-90}"

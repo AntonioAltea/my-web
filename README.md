@@ -34,15 +34,26 @@ Then open `http://127.0.0.1:8000`.
 
 ## Git hooks
 
-The repository includes a `pre-push` hook that runs tests before each `git push`.
+The repository includes:
+
+- a `pre-commit` hook that blocks commits when Python coverage drops below the configured threshold
+- a `pre-push` hook that runs the full test suite before each `git push`
 
 `make test` runs both the Python tests and the frontend behavior tests.
+`make check-python-coverage` runs the Python test suite with coverage and fails if the total drops below `COVERAGE_MIN` (default: `90`).
 
 To enable it in your local clone:
 
 ```bash
 git config core.hooksPath .githooks
+chmod +x .githooks/pre-commit
 chmod +x .githooks/pre-push
+```
+
+You can override the coverage threshold for one commit if needed:
+
+```bash
+COVERAGE_MIN=95 git commit
 ```
 
 ## Bandcamp

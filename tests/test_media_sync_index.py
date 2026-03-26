@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -76,6 +77,123 @@ class MediaSyncIndexTests(unittest.TestCase):
         self.assertIn("Sync verification failed.", printed)
         self.assertIn("a.jpg", printed)
         self.assertIn("b.jpg", printed)
+
+    def test_read_index_returns_empty_when_file_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing = Path(temp_dir) / "missing.tsv"
+            self.assertEqual(media_sync_index.read_index(missing), {})
+
+    def test_write_index_sorts_case_insensitively(self) -> None:
+        out = StringIO()
+
+        media_sync_index.write_index({"zeta.jpg": 3, "Alpha.jpg": 1, "beta.jpg": 2}, out=out)
+
+        self.assertEqual(
+            out.getvalue(),
+            "Alpha.jpg\t1\nbeta.jpg\t2\nzeta.jpg\t3\n",
+        )
+
+    def test_cmd_build_index_prints_directory_index(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "b.jpg").write_bytes(b"12")
+            (root / "A.jpg").write_bytes(b"1")
+            args = SimpleNamespace(directory=str(root))
+
+            with mock.patch.object(media_sync_index, "write_index") as write_index_mock:
+                result = media_sync_index.cmd_build_index(args)
+
+        self.assertEqual(result, 0)
+        write_index_mock.assert_called_once_with({"A.jpg": 1, "b.jpg": 2})
+
+    def test_cmd_normalize_index_prints_sorted_normalized_index(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            index_file = Path(temp_dir) / "remote.tsv"
+            index_file.write_text("b.jpg\t2\nbad\nA.jpg\t1\n", encoding="utf-8")
+            args = SimpleNamespace(index_file=str(index_file))
+
+            with mock.patch.object(media_sync_index, "write_index") as write_index_mock:
+                result = media_sync_index.cmd_normalize_index(args)
+
+        self.assertEqual(result, 0)
+        write_index_mock.assert_called_once_with({"A.jpg": 1, "b.jpg": 2})
+
+    def test_cmd_plan_writes_upload_and_delete_lists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_index = root / "local.tsv"
+            remote_index = root / "remote.tsv"
+            to_upload = root / "to-upload.txt"
+            to_delete = root / "to-delete.txt"
+            local_index.write_text("same.jpg\t1\nnew.jpg\t4\nreplace.jpg\t7\n", encoding="utf-8")
+            remote_index.write_text("same.jpg\t1\nreplace.jpg\t9\nold.jpg\t3\n", encoding="utf-8")
+
+            result = media_sync_index.cmd_plan(
+                SimpleNamespace(
+                    local_index=str(local_index),
+                    remote_index=str(remote_index),
+                    to_upload=str(to_upload),
+                    to_delete=str(to_delete),
+                )
+            )
+
+            self.assertEqual(result, 0)
+            self.assertEqual(to_upload.read_text(encoding="utf-8"), "new.jpg\nreplace.jpg")
+            self.assertEqual(to_delete.read_text(encoding="utf-8"), "old.jpg")
+
+    def test_verify_returns_success_when_indexes_match(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_index = Path(temp_dir) / "local.tsv"
+            remote_index = Path(temp_dir) / "remote.tsv"
+            local_index.write_text("a.jpg\t10\n", encoding="utf-8")
+            remote_index.write_text("a.jpg\t10\n", encoding="utf-8")
+
+            with mock.patch("builtins.print") as print_mock:
+                result = media_sync_index.cmd_verify(
+                    SimpleNamespace(local_index=str(local_index), remote_index=str(remote_index))
+                )
+
+        self.assertEqual(result, 0)
+        self.assertEqual(print_mock.call_args_list[0].args[0], "Sync verification OK: local prepared files match the remote volume.")
+
+    def test_verify_truncates_long_difference_lists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_index = Path(temp_dir) / "local.tsv"
+            remote_index = Path(temp_dir) / "remote.tsv"
+            local_index.write_text(
+                "\n".join(f"local-{index:02d}.jpg\t1" for index in range(25)) + "\n",
+                encoding="utf-8",
+            )
+            remote_index.write_text(
+                "\n".join(f"remote-{index:02d}.jpg\t2" for index in range(25)) + "\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch("builtins.print") as print_mock:
+                result = media_sync_index.cmd_verify(
+                    SimpleNamespace(local_index=str(local_index), remote_index=str(remote_index))
+                )
+
+        self.assertEqual(result, 1)
+        printed = "\n".join(str(call.args[0]) for call in print_mock.call_args_list if call.args)
+        self.assertIn("... (25 total)", printed)
+
+    def test_parse_args_accepts_build_index_command(self) -> None:
+        with mock.patch("sys.argv", ["media_sync_index.py", "build-index", "/tmp/photos"]):
+            args = media_sync_index.parse_args()
+
+        self.assertEqual(args.command, "build-index")
+        self.assertEqual(args.directory, "/tmp/photos")
+        self.assertIs(args.func, media_sync_index.cmd_build_index)
+
+    def test_main_dispatches_to_selected_command(self) -> None:
+        expected_args = SimpleNamespace(func=mock.Mock(return_value=7))
+
+        with mock.patch.object(media_sync_index, "parse_args", return_value=expected_args):
+            result = media_sync_index.main()
+
+        self.assertEqual(result, 7)
+        expected_args.func.assert_called_once_with(expected_args)
 
 
 if __name__ == "__main__":

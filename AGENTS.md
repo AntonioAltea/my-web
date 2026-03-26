@@ -40,6 +40,7 @@ Short guide to work in this repo without wasting time.
 ## Useful Commands
 
 - `make test`
+- `make check-python-coverage`
 - `make test-front`
 - `make prepare-web-photos SRC=assets/photos OUT=/tmp/fotos-web`
 - `make sync-all`
@@ -49,6 +50,7 @@ Short guide to work in this repo without wasting time.
 ## Before Closing
 
 - Run `make test` if Python or the media flow changed.
+- The `pre-commit` hook enforces Python coverage with `make check-python-coverage` and `COVERAGE_MIN=90` by default.
 - Remember that the `pre-push` hook runs `make test`, so backend and frontend tests must be green before pushing.
 - If frontend or client-server integration changed, tell the user to test it locally by starting the server themselves.
 - Review `README.md` and this `AGENTS.md` if the change altered useful flows or decisions.
