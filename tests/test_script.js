@@ -147,6 +147,8 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
     "#prev-photo": new FakeElement("prev-photo"),
     "#next-photo": new FakeElement("next-photo"),
     "#photo-random": new FakeElement("photo-random"),
+    "#theme-toggle": new FakeElement("theme-toggle"),
+    "#theme-toggle-label": new FakeElement("theme-toggle-label"),
     "#prev-track": new FakeElement("prev-track"),
     "#next-track": new FakeElement("next-track"),
     "#play-toggle": new FakeElement("play-toggle"),
@@ -159,6 +161,7 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
   };
 
   selectors["#play-toggle"].dataset = {};
+  selectors["#theme-toggle"].dataset = {};
   selectors["#seek-bar"].value = "0";
   selectors["#main-photo"].hidden = true;
   selectors["#photo-loader"].hidden = true;
@@ -168,10 +171,12 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
   let intervalId = 0;
   let timeoutId = 0;
   const timeouts = new Map();
+  const mediaQueryListeners = new Map();
+  const localStorageStore = new Map();
 
   const document = {
     hidden: false,
-    documentElement: { style: new FakeStyle() },
+    documentElement: { style: new FakeStyle(), dataset: {} },
     querySelector(selector) {
       return selectors[selector] || null;
     },
@@ -190,6 +195,45 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
   };
 
   const windowObject = {
+    localStorage: {
+      getItem(key) {
+        return localStorageStore.has(key) ? localStorageStore.get(key) : null;
+      },
+      setItem(key, value) {
+        localStorageStore.set(key, String(value));
+      },
+      removeItem(key) {
+        localStorageStore.delete(key);
+      },
+    },
+    matchMedia(query) {
+      const mediaQuery = {
+        media: query,
+        matches: false,
+        addEventListener(type, listener) {
+          if (type !== "change") {
+            return;
+          }
+
+          const listeners = mediaQueryListeners.get(query) || [];
+          listeners.push(listener);
+          mediaQueryListeners.set(query, listeners);
+        },
+        removeEventListener(type, listener) {
+          if (type !== "change") {
+            return;
+          }
+
+          const listeners = mediaQueryListeners.get(query) || [];
+          mediaQueryListeners.set(
+            query,
+            listeners.filter((candidate) => candidate !== listener),
+          );
+        },
+      };
+
+      return mediaQuery;
+    },
     setInterval(fn) {
       intervalId += 1;
       return intervalId;

@@ -8,6 +8,7 @@ Short guide to work in this repo without wasting time.
 - If testing requires running the site, ask the user to run `python3 -m src.server` or `make run`; do not start it automatically.
 - If a task reveals a convention or warning that will save time later, update this file.
 - If the user asks for commits and there are logically separate changes, make one commit per block instead of mixing everything together.
+- When fixing errors or regressions, prefer the structural root cause over local patches or test-only workarounds, even if the proper fix takes more effort.
 - Respond concisely by default; do not be verbose unless the user asks for more detail.
 
 ## Quick Map
@@ -30,6 +31,7 @@ Short guide to work in this repo without wasting time.
 - Keep Python test coverage high; if it drops, bring it back up with useful tests before closing the task.
 - If new behavior is added, try to leave tests covering it whenever reasonable.
 - If the change touches `script.js` or relevant client interactions, consider adding or updating tests in `tests/` whenever reasonable.
+- Keep code, tests, comments, commit messages, docs, and internal text in English unless that text is user-facing in the app; visible app copy can stay in Spanish.
 - If you change operations, commands, or deployment, update `README.md`.
 - If a local, editor, or generated file appears and should not be versioned, add it to `.gitignore`.
 - Do not add build steps, frameworks, or heavy dependencies unless explicitly requested.
