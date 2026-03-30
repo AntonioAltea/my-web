@@ -150,23 +150,20 @@
     padding: 5px 0;
   }
 
-  .track-list::before,
-  .track-list::after {
-    position: absolute;
+  .track-list-shell::before,
+  .track-list-shell::after {
     right: 0;
     width: 12px;
     height: 14px;
     font-size: 0.72rem;
   }
 
-  .track-list::before {
+  .track-list-shell::before {
     top: 0;
-    margin-bottom: 0;
   }
 
-  .track-list::after {
+  .track-list-shell::after {
     bottom: 0;
-    margin-top: 0;
   }
 
   .album-summary .player-label {

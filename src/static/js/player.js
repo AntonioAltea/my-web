@@ -24,6 +24,7 @@
     trackPosition,
     trackListToggle,
     albumDrawer,
+    trackListShell,
     trackList,
     seekBar,
     seekBarShell,
@@ -64,9 +65,9 @@
       const canScroll = trackList.scrollHeight > trackList.clientHeight + 1;
       const atTop = trackList.scrollTop <= 1;
       const atBottom = trackList.scrollTop + trackList.clientHeight >= trackList.scrollHeight - 1;
-      trackList.classList.toggle("track-list-scrollable", canScroll);
-      trackList.classList.toggle("track-list-scroll-up", canScroll && !atTop);
-      trackList.classList.toggle("track-list-scroll-down", canScroll && !atBottom);
+      trackListShell.classList.toggle("track-list-scrollable", canScroll);
+      trackListShell.classList.toggle("track-list-scroll-up", canScroll && !atTop);
+      trackListShell.classList.toggle("track-list-scroll-down", canScroll && !atBottom);
     }
 
     function scheduleLayoutSync() {

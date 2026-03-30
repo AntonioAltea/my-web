@@ -149,10 +149,13 @@
   color: var(--ink);
 }
 
-.track-list {
+.track-list-shell {
   position: relative;
   align-self: stretch;
   width: 100%;
+}
+
+.track-list {
   margin: 0;
   padding: 0 10px 0 0;
   list-style: none;
@@ -163,42 +166,40 @@
   overflow-x: hidden;
 }
 
-.track-list::before,
-.track-list::after {
-  position: sticky;
+.track-list-shell::before,
+.track-list-shell::after {
+  position: absolute;
   right: 0;
   display: block;
-  width: 100%;
+  width: 12px;
   height: 16px;
   font-size: 0.8rem;
   line-height: 1;
-  text-align: right;
+  text-align: center;
   color: var(--muted);
   opacity: 0;
   pointer-events: none;
   transition: opacity 180ms ease, transform 180ms ease;
 }
 
-.track-list::before {
+.track-list-shell::before {
   content: "↑";
   top: 0;
-  margin-bottom: -16px;
   transform: translateY(3px);
 }
 
-.track-list::after {
+.track-list-shell::after {
   content: "↓";
   bottom: 0;
-  margin-top: -16px;
   transform: translateY(-3px);
 }
 
-.track-list.track-list-scroll-up::before {
+.track-list-shell.track-list-scroll-up::before {
   opacity: 0.9;
   transform: translateY(0);
 }
 
-.track-list.track-list-scroll-down::after {
+.track-list-shell.track-list-scroll-down::after {
   opacity: 0.9;
   transform: translateY(0);
 }
@@ -225,11 +226,11 @@
   }
 }
 
-.track-list.track-list-scroll-up::before {
+.track-list-shell.track-list-scroll-up::before {
   animation: track-scroll-cue-up 1.5s ease-in-out infinite;
 }
 
-.track-list.track-list-scroll-down::after {
+.track-list-shell.track-list-scroll-down::after {
   animation: track-scroll-cue-down 1.5s ease-in-out infinite;
 }
 
@@ -349,8 +350,8 @@
     transition: none;
   }
 
-  .track-list.track-list-scroll-up::before,
-  .track-list.track-list-scroll-down::after {
+  .track-list-shell.track-list-scroll-up::before,
+  .track-list-shell.track-list-scroll-down::after {
     animation: none;
   }
 }

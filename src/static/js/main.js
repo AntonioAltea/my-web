@@ -19,6 +19,7 @@ const playToggleButton = document.querySelector("#play-toggle");
 const trackPosition = document.querySelector("#track-position");
 const trackListToggle = document.querySelector("#track-list-toggle");
 const albumDrawer = document.querySelector("#album-drawer");
+const trackListShell = document.querySelector("#track-list-shell");
 const trackList = document.querySelector("#track-list");
 const seekBar = document.querySelector("#seek-bar");
 const seekBarShell = document.querySelector("#seek-bar-shell");
@@ -63,6 +64,7 @@ const player = playerModule.createPlayer({
   trackPosition,
   trackListToggle,
   albumDrawer,
+  trackListShell,
   trackList,
   seekBar,
   seekBarShell,

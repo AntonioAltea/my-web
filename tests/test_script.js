@@ -249,6 +249,7 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
     "#track-position": new FakeElement("track-position"),
     "#track-list-toggle": new FakeElement("track-list-toggle"),
     "#album-drawer": new FakeElement("album-drawer"),
+    "#track-list-shell": new FakeElement("track-list-shell"),
     "#track-list": new FakeElement("track-list"),
     "#seek-bar": new FakeInputElement("seek-bar"),
     "#seek-bar-shell": new FakeElement("seek-bar-shell"),
