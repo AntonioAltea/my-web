@@ -16,6 +16,10 @@ const themeToggleLabel = document.querySelector("#theme-toggle-label");
 const prevTrackButton = document.querySelector("#prev-track");
 const nextTrackButton = document.querySelector("#next-track");
 const playToggleButton = document.querySelector("#play-toggle");
+const trackPosition = document.querySelector("#track-position");
+const trackListToggle = document.querySelector("#track-list-toggle");
+const albumDrawer = document.querySelector("#album-drawer");
+const trackList = document.querySelector("#track-list");
 const seekBar = document.querySelector("#seek-bar");
 const seekBarShell = document.querySelector("#seek-bar-shell");
 const currentTimeLabel = document.querySelector("#current-time");
@@ -31,6 +35,13 @@ function syncPlayerBarHeight() {
     "--player-bar-height",
     `${playerBar.offsetHeight}px`,
   );
+}
+
+if (playerBar && typeof ResizeObserver === "function") {
+  const playerBarResizeObserver = new ResizeObserver(() => {
+    syncPlayerBarHeight();
+  });
+  playerBarResizeObserver.observe(playerBar);
 }
 
 const gallery = galleryModule.createGallery({
@@ -49,6 +60,10 @@ const player = playerModule.createPlayer({
   prevButton: prevTrackButton,
   nextButton: nextTrackButton,
   playButton: playToggleButton,
+  trackPosition,
+  trackListToggle,
+  albumDrawer,
+  trackList,
   seekBar,
   seekBarShell,
   currentTimeLabel,

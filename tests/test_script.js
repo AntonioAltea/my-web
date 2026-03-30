@@ -74,6 +74,10 @@ class FakeElement {
     this.listeners = new Map();
     this.offsetHeight = 88;
     this.offsetWidth = 120;
+    this.children = [];
+    this.parentNode = null;
+    this.type = "";
+    this._className = "";
   }
 
   addEventListener(type, listener) {
@@ -95,6 +99,45 @@ class FakeElement {
     this.dispatchEvent({ type: "click", preventDefault() {} });
   }
 
+  append(...nodes) {
+    for (const node of nodes) {
+      if (typeof node === "string") {
+        const textNode = new FakeElement("text");
+        textNode.textContent = node;
+        textNode.parentNode = this;
+        this.children.push(textNode);
+        continue;
+      }
+
+      node.parentNode = this;
+      this.children.push(node);
+    }
+  }
+
+  appendChild(node) {
+    this.append(node);
+    return node;
+  }
+
+  replaceChildren(...nodes) {
+    this.children = [];
+    this.append(...nodes);
+  }
+
+  querySelectorAll(selector) {
+    const matches = [];
+    const visit = (node) => {
+      for (const child of node.children) {
+        if (selector === child.name || selector === child.tagName) {
+          matches.push(child);
+        }
+        visit(child);
+      }
+    };
+    visit(this);
+    return matches;
+  }
+
   setAttribute(name, value) {
     this.attributes.set(name, String(value));
   }
@@ -112,6 +155,18 @@ class FakeElement {
 
   getBoundingClientRect() {
     return { width: 320, height: 180 };
+  }
+
+  set className(value) {
+    this._className = value;
+    this.classList = new FakeClassList();
+    for (const token of String(value).split(/\s+/).filter(Boolean)) {
+      this.classList.add(token);
+    }
+  }
+
+  get className() {
+    return this._className;
   }
 }
 
@@ -160,6 +215,20 @@ class FakeImage {
   }
 }
 
+class FakeResizeObserver {
+  constructor(listener) {
+    this.listener = listener;
+  }
+
+  observe(target) {
+    this.listener([{ target }]);
+  }
+
+  unobserve() {}
+
+  disconnect() {}
+}
+
 function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
   FakeImage.reset();
   const selectors = {
@@ -177,6 +246,10 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
     "#next-track": new FakeElement("next-track"),
     "#play-toggle": new FakeElement("play-toggle"),
     "#play-toggle-icon": new FakeElement("play-toggle-icon"),
+    "#track-position": new FakeElement("track-position"),
+    "#track-list-toggle": new FakeElement("track-list-toggle"),
+    "#album-drawer": new FakeElement("album-drawer"),
+    "#track-list": new FakeElement("track-list"),
     "#seek-bar": new FakeInputElement("seek-bar"),
     "#seek-bar-shell": new FakeElement("seek-bar-shell"),
     "#current-time": new FakeElement("current-time"),
@@ -203,6 +276,11 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
     documentElement: { style: new FakeStyle(), dataset: {} },
     querySelector(selector) {
       return selectors[selector] || null;
+    },
+    createElement(tagName) {
+      const element = new FakeElement(tagName);
+      element.tagName = tagName;
+      return element;
     },
     addEventListener(type, listener) {
       const listeners = documentListeners.get(type) || [];
@@ -312,6 +390,7 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
     Promise,
     HTMLInputElement: FakeInputElement,
     Image: FakeImage,
+    ResizeObserver: FakeResizeObserver,
     setTimeout: windowObject.setTimeout.bind(windowObject),
     clearTimeout: windowObject.clearTimeout.bind(windowObject),
     setInterval: windowObject.setInterval.bind(windowObject),
@@ -404,7 +483,7 @@ async function testPhotoControlsLockWhileLoading() {
 }
 
 async function testTrackTitleAnimatesByDirection() {
-  const env = await loadApp({ randomValues: [0, 0] });
+  const env = await loadApp();
   const { selectors, flushTimeouts } = env;
 
   selectors["#next-track"].click();
@@ -427,6 +506,55 @@ async function testPlayButtonTogglesPlayingState() {
   await selectors["#play-toggle"].listeners.get("click")[0]({ type: "click" });
   assert.equal(selectors["#play-toggle"].dataset.state, "paused");
   assert.equal(selectors["#seek-bar-shell"].classList.contains("seek-bar-shell-playing"), false);
+}
+
+async function testAlbumTrackListShowsOrderedTracks() {
+  const env = await loadApp();
+  const { selectors } = env;
+  const trackButtons = selectors["#track-list"].querySelectorAll("button");
+
+  assert.equal(selectors["#track-position"].textContent, "tema 01");
+  assert.equal(selectors["#now-playing"].textContent, "uno");
+  assert.equal(selectors["#album-drawer"].hidden, false);
+  assert.equal(selectors["#album-drawer"].dataset.state, "closed");
+  assert.equal(selectors["#album-drawer"].getAttribute("aria-hidden"), "true");
+  assert.equal(selectors["#track-list-toggle"].textContent, "ver canciones");
+  assert.equal(selectors["#track-list-toggle"].getAttribute("aria-expanded"), "false");
+  assert.equal(trackButtons.length, 2);
+  assert.equal(trackButtons[0].textContent, "");
+  assert.equal(trackButtons[0].getAttribute("aria-current"), "true");
+  assert.equal(trackButtons[1].getAttribute("aria-current"), "false");
+}
+
+async function testTrackListToggleShowsAndHidesAlbumTracks() {
+  const env = await loadApp();
+  const { selectors } = env;
+
+  selectors["#track-list-toggle"].click();
+  assert.equal(selectors["#album-drawer"].hidden, false);
+  assert.equal(selectors["#album-drawer"].dataset.state, "open");
+  assert.equal(selectors["#album-drawer"].getAttribute("aria-hidden"), "false");
+  assert.equal(selectors["#track-list-toggle"].textContent, "ocultar canciones");
+  assert.equal(selectors["#track-list-toggle"].getAttribute("aria-expanded"), "true");
+
+  selectors["#track-list-toggle"].click();
+  assert.equal(selectors["#album-drawer"].hidden, false);
+  assert.equal(selectors["#album-drawer"].dataset.state, "closed");
+  assert.equal(selectors["#album-drawer"].getAttribute("aria-hidden"), "true");
+  assert.equal(selectors["#track-list-toggle"].textContent, "ver canciones");
+  assert.equal(selectors["#track-list-toggle"].getAttribute("aria-expanded"), "false");
+}
+
+async function testTrackListCanSelectTrack() {
+  const env = await loadApp();
+  const { selectors } = env;
+  const trackButtons = selectors["#track-list"].querySelectorAll("button");
+
+  trackButtons[1].click();
+
+  assert.equal(selectors["#track-position"].textContent, "tema 02");
+  assert.equal(selectors["#now-playing"].textContent, "dos");
+  assert.equal(trackButtons[1].getAttribute("aria-current"), "true");
 }
 
 async function testPhotoCaptionOnlyShowsOnHoverWhenLoaded() {
@@ -553,6 +681,9 @@ async function run() {
     ["locks photo controls while loading", testPhotoControlsLockWhileLoading],
     ["animates track title by direction", testTrackTitleAnimatesByDirection],
     ["toggles playing state from play button", testPlayButtonTogglesPlayingState],
+    ["shows the album track list in order", testAlbumTrackListShowsOrderedTracks],
+    ["toggles the album track list open and closed", testTrackListToggleShowsAndHidesAlbumTracks],
+    ["lets you select a track from the album list", testTrackListCanSelectTrack],
     ["shows photo caption only on hover after load", testPhotoCaptionOnlyShowsOnHoverWhenLoaded],
     ["preloads previous next and random photos", testPreloadsAdjacentAndRandomPhotos],
     ["keeps the current photo visible while the next one loads", testKeepsCurrentPhotoVisibleWhileNextLoads],

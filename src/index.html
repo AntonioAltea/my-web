@@ -70,43 +70,77 @@
 
   <footer class="player-bar">
     <div class="player-bar-inner">
-      <div class="player-main">
-        <div class="track-copy">
-          <p class="player-label">sonando</p>
-          <p id="now-playing" class="now-playing">Cargando musica...</p>
-        </div>
-
-        <div class="player-controls">
-          <button id="prev-track" class="player-button" type="button" aria-label="Cancion anterior">
-            <span class="icon-step icon-step-back" aria-hidden="true"></span>
-          </button>
-          <button id="play-toggle" class="player-button player-button-primary" type="button" aria-label="Reproducir o pausar">
-            <span id="play-toggle-icon" class="play-toggle-icon" aria-hidden="true">
-              <span class="play-toggle-play"></span>
-              <span class="play-toggle-pause">
-                <span></span>
-                <span></span>
-              </span>
-            </span>
-          </button>
-          <button id="next-track" class="player-button" type="button" aria-label="Siguiente cancion">
-            <span class="icon-step icon-step-forward" aria-hidden="true"></span>
+      <section class="album-card" aria-label="Álbum en reproducción">
+        <div class="album-summary">
+          <p class="player-label">álbum</p>
+          <p class="album-title">ola de incendios</p>
+          <button
+            id="track-list-toggle"
+            class="track-list-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="album-drawer"
+          >
+            ver canciones
           </button>
         </div>
-      </div>
+        <div id="album-drawer" class="album-drawer" hidden>
+          <a
+            class="album-cover-link"
+            href="https://manturon.bandcamp.com"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Abrir el álbum en Bandcamp"
+          >
+            <img
+              class="album-cover"
+              src="/assets/icons/ola-de-incendios-portada.JPG"
+              alt="Portada del álbum ola de incendios"
+            >
+          </a>
+          <ol id="track-list" class="track-list" aria-label="Lista de canciones"></ol>
+        </div>
+      </section>
 
-      <div class="player-side">
-        <div class="player-progress-row">
-          <span id="current-time" class="timecode">0:00</span>
-          <div id="seek-bar-shell" class="seek-bar-shell">
-            <div class="seek-bar-fill">
-              <div class="seek-bar-wave"></div>
-            </div>
-            <input id="seek-bar" class="seek-bar" type="range" min="0" max="100" value="0" aria-label="Posicion de la cancion">
+      <div class="player-panel">
+        <div class="player-main">
+          <div class="track-copy">
+            <p id="track-position" class="track-position">tema --</p>
+            <p id="now-playing" class="now-playing">Cargando musica...</p>
           </div>
-          <span id="total-time" class="timecode">0:00</span>
+
+          <div class="player-controls">
+            <button id="prev-track" class="player-button" type="button" aria-label="Cancion anterior">
+              <span class="icon-step icon-step-back" aria-hidden="true"></span>
+            </button>
+            <button id="play-toggle" class="player-button player-button-primary" type="button" aria-label="Reproducir o pausar">
+              <span id="play-toggle-icon" class="play-toggle-icon" aria-hidden="true">
+                <span class="play-toggle-play"></span>
+                <span class="play-toggle-pause">
+                  <span></span>
+                  <span></span>
+                </span>
+              </span>
+            </button>
+            <button id="next-track" class="player-button" type="button" aria-label="Siguiente cancion">
+              <span class="icon-step icon-step-forward" aria-hidden="true"></span>
+            </button>
+          </div>
         </div>
-        <a href="https://manturon.bandcamp.com" target="_blank" rel="noreferrer">bandcamp</a>
+
+        <div class="player-side">
+          <div class="player-progress-row">
+            <span id="current-time" class="timecode">0:00</span>
+            <div id="seek-bar-shell" class="seek-bar-shell">
+              <div class="seek-bar-fill">
+                <div class="seek-bar-wave"></div>
+              </div>
+              <input id="seek-bar" class="seek-bar" type="range" min="0" max="100" value="0" aria-label="Posicion de la cancion">
+            </div>
+            <span id="total-time" class="timecode">0:00</span>
+          </div>
+          <a href="https://manturon.bandcamp.com" target="_blank" rel="noreferrer">bandcamp</a>
+        </div>
       </div>
     </div>
 

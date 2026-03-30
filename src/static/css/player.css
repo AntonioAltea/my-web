@@ -13,17 +13,278 @@
   z-index: 10;
   border-top: 1px solid var(--line-strong);
   background: var(--surface-strong);
-  backdrop-filter: blur(10px);
+  box-shadow: 0 -18px 36px rgba(var(--line-strong-rgb), 0.08);
 }
 
 .player-bar-inner {
   width: min(1280px, calc(100% - 28px));
   margin: 0 auto;
-  padding: 8px 0 9px;
+  padding: 6px 0 8px;
   display: grid;
-  grid-template-columns: minmax(260px, 1.1fr) minmax(280px, 0.9fr);
+  grid-template-columns: 1fr;
+  gap: 6px;
+  align-items: center;
+}
+
+.album-card,
+.player-panel {
+  border: 1px solid rgba(var(--line-strong-rgb), 0.75);
+  background: var(--paper);
+}
+
+.album-card {
+  display: grid;
+  gap: 6px;
+  padding: 6px 10px;
+}
+
+.album-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
+}
+
+.album-summary .player-label {
+  white-space: nowrap;
+  font-size: 0.72rem;
+}
+
+.album-drawer {
+  display: grid;
+  grid-template-columns: 156px minmax(0, 1fr);
+  gap: 24px;
+  justify-content: stretch;
+  align-items: stretch;
+  max-height: 0;
+  padding-top: 0;
+  border-top: 0 solid rgba(var(--line-strong-rgb), 0.35);
+  opacity: 0;
+  overflow: hidden;
+  overflow-x: hidden;
+  transform: translateY(-4px);
+  transition:
+    max-height 220ms ease,
+    padding-top 220ms ease,
+    border-top-width 220ms ease,
+    opacity 180ms ease,
+    transform 220ms ease;
+}
+
+.album-drawer[hidden] {
+  display: none;
+}
+
+.album-drawer[data-state="open"] {
+  max-height: 260px;
+  padding-top: 6px;
+  border-top-width: 1px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.album-cover {
+  width: 156px;
+  aspect-ratio: 1;
+  display: block;
+  align-self: center;
+  object-fit: cover;
+  object-position: center center;
+  border: 1px solid var(--line-strong);
+}
+
+.album-cover-link {
+  display: block;
+  align-self: center;
+  line-height: 0;
+}
+
+.album-cover-link:focus-visible {
+  outline: none;
+}
+
+.album-copy {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.album-title {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.94rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-position {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.track-list-toggle {
+  justify-self: start;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--accent);
+  padding: 3px 8px 4px;
+  cursor: pointer;
+  font-size: 0.92rem;
+  transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
+}
+
+.track-list-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.track-list-toggle:focus-visible {
+  outline: none;
+  border-color: var(--control-line-strong);
+  color: var(--ink);
+}
+
+.track-list {
+  position: relative;
+  align-self: stretch;
+  width: 100%;
+  margin: 0;
+  padding: 0 10px 0 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.track-list::before,
+.track-list::after {
+  position: sticky;
+  right: 0;
+  display: block;
+  width: 100%;
+  height: 16px;
+  font-size: 0.8rem;
+  line-height: 1;
+  text-align: right;
+  color: var(--muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.track-list::before {
+  content: "↑";
+  top: 0;
+  margin-bottom: -16px;
+  transform: translateY(3px);
+}
+
+.track-list::after {
+  content: "↓";
+  bottom: 0;
+  margin-top: -16px;
+  transform: translateY(-3px);
+}
+
+.track-list.track-list-scroll-up::before {
+  opacity: 0.9;
+  transform: translateY(0);
+}
+
+.track-list.track-list-scroll-down::after {
+  opacity: 0.9;
+  transform: translateY(0);
+}
+
+@keyframes track-scroll-cue-up {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes track-scroll-cue-down {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(2px);
+  }
+}
+
+.track-list.track-list-scroll-up::before {
+  animation: track-scroll-cue-up 1.5s ease-in-out infinite;
+}
+
+.track-list.track-list-scroll-down::after {
+  animation: track-scroll-cue-down 1.5s ease-in-out infinite;
+}
+
+.track-list-item {
+  margin: 0;
+}
+
+.track-list-button {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(var(--line-strong-rgb), 0.5);
+  background: transparent;
+  padding: 8px 0;
+  color: inherit;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  text-align: left;
+  cursor: pointer;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.track-list-button:last-child {
+  border-bottom: 0;
+}
+
+.track-list-number {
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+}
+
+.track-list-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.track-list-button-current {
+  color: var(--accent);
+  transform: translateX(4px);
+}
+
+.track-list-button:focus-visible {
+  outline: none;
+  color: var(--ink);
+}
+
+.player-panel {
+  padding: 8px 12px;
+  display: grid;
+  gap: 8px;
 }
 
 .player-main {
@@ -39,6 +300,7 @@
 
 .now-playing {
   margin: 0;
+  font-size: clamp(1.15rem, 1.8vw, 1.45rem);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -80,6 +342,15 @@
 @media (prefers-reduced-motion: reduce) {
   .now-playing-enter-next,
   .now-playing-enter-prev {
+    animation: none;
+  }
+
+  .album-drawer {
+    transition: none;
+  }
+
+  .track-list.track-list-scroll-up::before,
+  .track-list.track-list-scroll-down::after {
     animation: none;
   }
 }
@@ -228,12 +499,17 @@
     transform: scale(1.01);
     box-shadow: 0 6px 12px rgba(var(--line-strong-rgb), 0.06);
   }
+
+  .track-list-toggle:hover {
+    border-color: var(--control-line-strong);
+    color: var(--ink);
+  }
 }
 
 .player-side {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
@@ -413,6 +689,13 @@
 .player-side a {
   justify-self: end;
   white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .track-list-button:hover {
+    color: var(--ink);
+    transform: translateX(4px);
+  }
 }
 
 .icon-step {

@@ -66,7 +66,7 @@ COVERAGE_MIN=95 git commit
 
 ## Bandcamp
 
-Music currently appears in a fixed bottom bar in random order, with a link to `https://manturon.bandcamp.com`.
+Music appears as an album-style player fixed at the bottom, with cover art, a visible track list, sequential playback order, and a link to `https://manturon.bandcamp.com`.
 
 ## Fly.io
 

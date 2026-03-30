@@ -14,8 +14,7 @@
   }
 
   .player-bar-inner {
-    grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 10px;
   }
 
   .player-main {
@@ -112,8 +111,75 @@
     display: none;
   }
 
-  .player-controls {
-    width: auto;
+  .album-card {
+    gap: 4px;
+    padding: 5px 8px;
+  }
+
+  .album-summary {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 5px;
+  }
+
+  .album-drawer {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .album-drawer[data-state="open"] {
+    max-height: 192px;
+    padding-top: 3px;
+  }
+
+  .album-cover {
+    width: 72px;
+  }
+
+  .album-cover-link {
+    padding: 0 4px 0 0;
+  }
+
+  .track-list {
+    max-height: 114px;
+    padding-right: 4px;
+    gap: 5px;
+  }
+
+  .track-list-button {
+    padding: 5px 0;
+  }
+
+  .track-list::before,
+  .track-list::after {
+    position: absolute;
+    right: 0;
+    width: 12px;
+    height: 14px;
+    font-size: 0.72rem;
+  }
+
+  .track-list::before {
+    top: 0;
+    margin-bottom: 0;
+  }
+
+  .track-list::after {
+    bottom: 0;
+    margin-top: 0;
+  }
+
+  .album-summary .player-label {
+    font-size: 0.68rem;
+  }
+
+  .album-title {
+    font-size: 0.88rem;
+  }
+
+  .track-list-toggle {
+    padding: 2px 7px 3px;
+    font-size: 0.82rem;
   }
 
   .player-button {
@@ -122,12 +188,17 @@
   }
 
   .player-side {
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 10px;
   }
 
   .player-progress-row {
     grid-template-columns: auto minmax(72px, 1fr) auto;
     gap: 6px;
+  }
+
+  .player-side a {
+    justify-self: end;
   }
 
   .timecode {

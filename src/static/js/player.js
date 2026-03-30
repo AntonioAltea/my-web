@@ -1,19 +1,6 @@
 (function (global) {
-  function shuffleIndices(length) {
-    const indices = Array.from({ length }, (_, index) => index);
-    for (let i = indices.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [indices[i], indices[j]] = [indices[j], indices[i]];
-    }
-    return indices;
-  }
-
-  function randomIndex(length) {
-    if (length <= 0) {
-      return 0;
-    }
-
-    return Math.floor(Math.random() * length);
+  function formatTrackNumber(index) {
+    return String(index + 1).padStart(2, "0");
   }
 
   function formatTime(seconds) {
@@ -34,6 +21,10 @@
     prevButton,
     nextButton,
     playButton,
+    trackPosition,
+    trackListToggle,
+    albumDrawer,
+    trackList,
     seekBar,
     seekBarShell,
     currentTimeLabel,
@@ -41,22 +32,106 @@
     onLayoutChange,
   }) {
     let tracks = [];
-    let shuffledTrackOrder = [];
     let trackCursor = 0;
     let isSeeking = false;
     let nowPlayingAnimationTimer = null;
+    let isTrackListOpen = false;
+    let layoutSyncTimer = null;
 
     function currentTrack() {
-      if (!tracks.length || !shuffledTrackOrder.length) {
+      if (!tracks.length) {
         return null;
       }
 
-      return tracks[shuffledTrackOrder[trackCursor]];
+      return tracks[trackCursor];
     }
 
     function currentTrackFile() {
       const track = currentTrack();
       return track ? track.file : null;
+    }
+
+    function updateTrackListSelection() {
+      const buttons = trackList.querySelectorAll("button");
+      buttons.forEach((button, index) => {
+        const isCurrent = index === trackCursor;
+        button.classList.toggle("track-list-button-current", isCurrent);
+        button.setAttribute("aria-current", isCurrent ? "true" : "false");
+      });
+    }
+
+    function updateTrackListScrollCue() {
+      const canScroll = trackList.scrollHeight > trackList.clientHeight + 1;
+      const atTop = trackList.scrollTop <= 1;
+      const atBottom = trackList.scrollTop + trackList.clientHeight >= trackList.scrollHeight - 1;
+      trackList.classList.toggle("track-list-scrollable", canScroll);
+      trackList.classList.toggle("track-list-scroll-up", canScroll && !atTop);
+      trackList.classList.toggle("track-list-scroll-down", canScroll && !atBottom);
+    }
+
+    function scheduleLayoutSync() {
+      onLayoutChange();
+      updateTrackListScrollCue();
+
+      if (layoutSyncTimer !== null) {
+        global.window.clearTimeout(layoutSyncTimer);
+      }
+
+      layoutSyncTimer = global.window.setTimeout(() => {
+        onLayoutChange();
+        updateTrackListScrollCue();
+        layoutSyncTimer = null;
+      }, 240);
+    }
+
+    function syncTrackListVisibility() {
+      const hasTracks = tracks.length > 0;
+      albumDrawer.hidden = !hasTracks;
+      albumDrawer.dataset.state = isTrackListOpen ? "open" : "closed";
+      albumDrawer.setAttribute("aria-hidden", isTrackListOpen ? "false" : "true");
+      if (isTrackListOpen) {
+        trackList.scrollTop = 0;
+      }
+      trackListToggle.disabled = !hasTracks;
+      trackListToggle.textContent = isTrackListOpen ? "ocultar canciones" : "ver canciones";
+      trackListToggle.setAttribute("aria-expanded", isTrackListOpen ? "true" : "false");
+      scheduleLayoutSync();
+    }
+
+    function renderTrackList() {
+      trackList.replaceChildren();
+
+      tracks.forEach((track, index) => {
+        const item = document.createElement("li");
+        item.className = "track-list-item";
+
+        const button = document.createElement("button");
+        button.className = "track-list-button";
+        button.type = "button";
+        button.setAttribute("aria-label", `Reproducir ${track.title}`);
+        button.dataset.index = String(index);
+
+        const number = document.createElement("span");
+        number.className = "track-list-number";
+        number.textContent = formatTrackNumber(index);
+
+        const title = document.createElement("span");
+        title.className = "track-list-title";
+        title.textContent = track.title;
+
+        button.append(number, title);
+        button.addEventListener("click", () => {
+          trackCursor = index;
+          loadCurrentTrack({ autoplay: true });
+        });
+
+        item.append(button);
+        trackList.append(item);
+      });
+
+      updateTrackListSelection();
+      updateTrackListScrollCue();
+      syncTrackListVisibility();
     }
 
     function updatePlayButton() {
@@ -90,6 +165,7 @@
       const track = currentTrack();
       if (!track) {
         setNowPlayingText("No hay canciones en assets/music");
+        trackPosition.textContent = "tema --";
         audioPlayer.removeAttribute("src");
         playButton.disabled = true;
         prevButton.disabled = true;
@@ -97,18 +173,25 @@
         seekBar.value = "0";
         currentTimeLabel.textContent = "0:00";
         totalTimeLabel.textContent = "0:00";
+        seekBarShell.style.setProperty("--seek-progress", "0%");
+        trackList.replaceChildren();
+        isTrackListOpen = false;
+        syncTrackListVisibility();
         updatePlayButton();
         return;
       }
 
       audioPlayer.src = track.file;
+      trackPosition.textContent = `tema ${formatTrackNumber(trackCursor)}`;
       setNowPlayingText(track.title, direction);
       playButton.disabled = false;
-      prevButton.disabled = tracks.length <= 1;
-      nextButton.disabled = tracks.length <= 1;
+      prevButton.disabled = false;
+      nextButton.disabled = false;
       seekBar.value = "0";
       currentTimeLabel.textContent = "0:00";
       totalTimeLabel.textContent = "0:00";
+      seekBarShell.style.setProperty("--seek-progress", "0%");
+      updateTrackListSelection();
 
       if (autoplay) {
         audioPlayer.play().catch(() => {
@@ -124,7 +207,7 @@
         return;
       }
 
-      trackCursor = (trackCursor + step + shuffledTrackOrder.length) % shuffledTrackOrder.length;
+      trackCursor = (trackCursor + step + tracks.length) % tracks.length;
       loadCurrentTrack({ autoplay, direction: step > 0 ? "next" : "prev" });
     }
 
@@ -150,7 +233,7 @@
       const currentTrackPath = currentTrackFile();
 
       tracks = nextTracks;
-      shuffledTrackOrder = shuffleIndices(tracks.length);
+      renderTrackList();
 
       if (!tracks.length) {
         trackCursor = 0;
@@ -163,20 +246,24 @@
         : -1;
 
       if (matchingTrackIndex >= 0) {
-        const shuffledIndex = shuffledTrackOrder.indexOf(matchingTrackIndex);
-        trackCursor = shuffledIndex >= 0 ? shuffledIndex : 0;
+        trackCursor = matchingTrackIndex;
       } else {
-        trackCursor = randomIndex(shuffledTrackOrder.length);
+        trackCursor = 0;
       }
 
+      syncTrackListVisibility();
       loadCurrentTrack();
     }
 
     function showLoadError() {
       setNowPlayingText("Arranca la web con python3 -m src.server");
+      trackPosition.textContent = "tema --";
       playButton.disabled = true;
       prevButton.disabled = true;
       nextButton.disabled = true;
+      trackListToggle.disabled = true;
+      isTrackListOpen = false;
+      syncTrackListVisibility();
     }
 
     function handleKey(event) {
@@ -189,6 +276,15 @@
     function init() {
       prevButton.addEventListener("click", () => stepTrack(-1));
       nextButton.addEventListener("click", () => stepTrack(1));
+      trackListToggle.addEventListener("click", () => {
+        if (!tracks.length) {
+          return;
+        }
+
+        isTrackListOpen = !isTrackListOpen;
+        syncTrackListVisibility();
+      });
+      trackList.addEventListener("scroll", updateTrackListScrollCue);
 
       playButton.addEventListener("click", async () => {
         if (!tracks.length) {
@@ -228,8 +324,17 @@
       audioPlayer.addEventListener("play", updatePlayButton);
       audioPlayer.addEventListener("pause", updatePlayButton);
       audioPlayer.addEventListener("ended", () => stepTrack(1, true));
+      albumDrawer.addEventListener("transitionend", (event) => {
+        if (event.target !== albumDrawer) {
+          return;
+        }
+
+        onLayoutChange();
+        updateTrackListScrollCue();
+      });
 
       updatePlayButton();
+      syncTrackListVisibility();
     }
 
     return {
