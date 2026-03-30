@@ -142,7 +142,7 @@
 
   .track-list {
     max-height: 114px;
-    padding-right: 4px;
+    padding-right: 16px;
     gap: 5px;
   }
 
@@ -152,10 +152,10 @@
 
   .track-list-shell::before,
   .track-list-shell::after {
-    right: 0;
+    right: 4px;
     width: 12px;
     height: 14px;
-    font-size: 0.72rem;
+    font-size: 0.82rem;
   }
 
   .track-list-shell::before {
