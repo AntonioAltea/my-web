@@ -3,3 +3,6 @@ set -euo pipefail
 
 echo "Ejecutando tests antes del push..."
 make test
+
+echo "Checking Python coverage before push..."
+make check-python-coverage COVERAGE_MIN="${COVERAGE_MIN:-90}"

@@ -7,6 +7,3 @@ git add scripts src tests
 
 echo "Linting Python before commit..."
 make lint-python
-
-echo "Checking Python coverage before commit..."
-make check-python-coverage COVERAGE_MIN="${COVERAGE_MIN:-90}"

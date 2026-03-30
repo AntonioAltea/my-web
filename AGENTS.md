@@ -53,7 +53,7 @@ Short guide to work in this repo without wasting time.
 ## Before Closing
 
 - Run `make test` if Python or the media flow changed.
-- The `pre-commit` hook reformats Python with `ruff`, runs `ruff check`, and enforces Python coverage with `make check-python-coverage` and `COVERAGE_MIN=90` by default.
-- Remember that the `pre-push` hook runs `make test`, so backend and frontend tests must be green before pushing.
+- The `pre-commit` hook reformats Python with `ruff` and runs `ruff check`.
+- The `pre-push` hook runs `make test` and enforces Python coverage with `make check-python-coverage` and `COVERAGE_MIN=90` by default, so backend and frontend tests must be green before pushing.
 - If frontend or client-server integration changed, tell the user to test it locally by starting the server themselves.
 - Review `README.md` and this `AGENTS.md` if the change altered useful flows or decisions.

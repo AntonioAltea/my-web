@@ -42,8 +42,8 @@ make deploy
 
 The repository includes:
 
-- a `pre-commit` hook that formats Python with `ruff`, lints it, and blocks commits when Python coverage drops below the configured threshold
-- a `pre-push` hook that runs the full test suite before each `git push`
+- a `pre-commit` hook that formats Python with `ruff` and lints it
+- a `pre-push` hook that runs the full test suite and enforces the configured Python coverage threshold before each `git push`
 
 `make test` runs both the Python tests and the frontend behavior tests.
 `make format-python` reformats Python files in `scripts/`, `src/`, and `tests/`.
@@ -58,10 +58,10 @@ chmod +x .githooks/pre-commit
 chmod +x .githooks/pre-push
 ```
 
-You can override the coverage threshold for one commit if needed:
+You can override the coverage threshold for one push if needed:
 
 ```bash
-COVERAGE_MIN=95 git commit
+COVERAGE_MIN=95 git push
 ```
 
 ## Bandcamp
