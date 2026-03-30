@@ -554,6 +554,29 @@ async function testTrackTitleAnimatesByDirection() {
   assert.equal(selectors["#now-playing"].classList.contains("now-playing-enter-prev"), true);
 }
 
+async function testLongTrackTitleScrollsInsteadOfTruncating() {
+  const env = await loadApp({
+    mediaPayload: {
+      photos: ["/assets/photos/uno.jpg"],
+      music: ["/assets/music/una-cancion-increiblemente-larga-para-probar-el-desplazamiento.mp3"],
+    },
+  });
+  const { selectors } = env;
+  const nowPlayingText = selectors["#now-playing"].children[0];
+
+  assert.equal(selectors["#now-playing"].classList.contains("now-playing-marquee"), true);
+  assert.equal(nowPlayingText.classList.contains("now-playing-text-marquee"), true);
+}
+
+async function testShortTrackTitleDoesNotScroll() {
+  const env = await loadApp();
+  const { selectors } = env;
+  const nowPlayingText = selectors["#now-playing"].children[0];
+
+  assert.equal(selectors["#now-playing"].classList.contains("now-playing-marquee"), false);
+  assert.equal(nowPlayingText.classList.contains("now-playing-text-marquee"), false);
+}
+
 async function testRandomTrackButtonPlaysAnotherTrack() {
   const env = await loadApp({ randomValues: [0] });
   const { selectors } = env;
@@ -782,6 +805,8 @@ async function run() {
   const tests = [
     ["locks photo controls while loading", testPhotoControlsLockWhileLoading],
     ["animates track title by direction", testTrackTitleAnimatesByDirection],
+    ["scrolls long track titles instead of truncating", testLongTrackTitleScrollsInsteadOfTruncating],
+    ["keeps short track titles static", testShortTrackTitleDoesNotScroll],
     ["plays another track from the random button", testRandomTrackButtonPlaysAnotherTrack],
     ["toggles playing state from play button", testPlayButtonTogglesPlayingState],
     ["shows the album track list in order", testAlbumTrackListShowsOrderedTracks],

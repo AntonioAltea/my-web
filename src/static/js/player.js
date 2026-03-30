@@ -41,6 +41,99 @@
     let isTrackListOpen = false;
     let layoutSyncTimer = null;
     let lastTrackedPlayFile = null;
+    let nowPlayingTextElement = null;
+    let nowPlayingResizeObserver = null;
+    let nowPlayingMarqueeStartTimer = null;
+    let nowPlayingMarqueeResetTimer = null;
+
+    const NOW_PLAYING_PIXELS_PER_SECOND = 18;
+    const NOW_PLAYING_START_DELAY_MS = 900;
+    const NOW_PLAYING_END_HOLD_MS = 900;
+
+    function clearNowPlayingMarqueeTimers() {
+      if (nowPlayingMarqueeStartTimer !== null) {
+        global.window.clearTimeout(nowPlayingMarqueeStartTimer);
+        nowPlayingMarqueeStartTimer = null;
+      }
+
+      if (nowPlayingMarqueeResetTimer !== null) {
+        global.window.clearTimeout(nowPlayingMarqueeResetTimer);
+        nowPlayingMarqueeResetTimer = null;
+      }
+    }
+
+    function resetNowPlayingMarquee() {
+      const textElement = ensureNowPlayingTextElement();
+      clearNowPlayingMarqueeTimers();
+      nowPlaying.classList.remove("now-playing-marquee");
+      textElement.classList.remove(
+        "now-playing-text-marquee",
+        "now-playing-text-marquee-active",
+        "now-playing-text-marquee-end",
+      );
+      nowPlaying.style.setProperty("--now-playing-marquee-distance", "0px");
+      nowPlaying.style.setProperty("--now-playing-marquee-duration", "0s");
+    }
+
+    function ensureNowPlayingTextElement() {
+      if (nowPlayingTextElement) {
+        return nowPlayingTextElement;
+      }
+
+      nowPlayingTextElement = document.createElement("span");
+      nowPlayingTextElement.className = "now-playing-text";
+      nowPlayingTextElement.addEventListener("animationend", () => {
+        if (!nowPlaying.classList.contains("now-playing-marquee")) {
+          return;
+        }
+
+        nowPlayingTextElement.classList.remove("now-playing-text-marquee-active");
+        nowPlayingTextElement.classList.add("now-playing-text-marquee-end");
+        nowPlayingMarqueeResetTimer = global.window.setTimeout(() => {
+          nowPlayingTextElement.classList.remove("now-playing-text-marquee-end");
+          void nowPlayingTextElement.offsetWidth;
+          nowPlayingMarqueeStartTimer = global.window.setTimeout(() => {
+            nowPlayingTextElement.classList.add("now-playing-text-marquee-active");
+            nowPlayingMarqueeStartTimer = null;
+          }, NOW_PLAYING_START_DELAY_MS);
+          nowPlayingMarqueeResetTimer = null;
+        }, NOW_PLAYING_END_HOLD_MS);
+      });
+      nowPlaying.replaceChildren(nowPlayingTextElement);
+      return nowPlayingTextElement;
+    }
+
+    function measureNowPlayingOverflow(text) {
+      const visibleWidth = nowPlaying.clientWidth || nowPlaying.offsetWidth || 0;
+      const measuredWidth = typeof nowPlayingTextElement?.scrollWidth === "number"
+        ? nowPlayingTextElement.scrollWidth
+        : Math.ceil(String(text).length * 9.2);
+      return Math.max(0, measuredWidth - visibleWidth);
+    }
+
+    function syncNowPlayingOverflow() {
+      const textElement = ensureNowPlayingTextElement();
+      const title = textElement.textContent || "";
+      const overflow = measureNowPlayingOverflow(title);
+      const shouldMarquee = overflow > 12;
+      const duration = overflow / NOW_PLAYING_PIXELS_PER_SECOND;
+
+      if (!shouldMarquee) {
+        resetNowPlayingMarquee();
+        return;
+      }
+
+      clearNowPlayingMarqueeTimers();
+      nowPlaying.classList.add("now-playing-marquee");
+      textElement.classList.add("now-playing-text-marquee");
+      textElement.classList.remove("now-playing-text-marquee-active", "now-playing-text-marquee-end");
+      nowPlaying.style.setProperty("--now-playing-marquee-distance", `${overflow}px`);
+      nowPlaying.style.setProperty("--now-playing-marquee-duration", `${duration}s`);
+      nowPlayingMarqueeStartTimer = global.window.setTimeout(() => {
+        textElement.classList.add("now-playing-text-marquee-active");
+        nowPlayingMarqueeStartTimer = null;
+      }, NOW_PLAYING_START_DELAY_MS);
+    }
 
     function currentTrack() {
       if (!tracks.length) {
@@ -151,8 +244,13 @@
         nowPlayingAnimationTimer = null;
       }
 
+      const textElement = ensureNowPlayingTextElement();
+      clearNowPlayingMarqueeTimers();
       nowPlaying.classList.remove("now-playing-enter-next", "now-playing-enter-prev");
       nowPlaying.textContent = nextTitle;
+      textElement.textContent = nextTitle;
+      nowPlaying.replaceChildren(textElement);
+      syncNowPlayingOverflow();
 
       if (direction === "next" || direction === "prev") {
         const className = direction === "next" ? "now-playing-enter-next" : "now-playing-enter-prev";
@@ -362,6 +460,13 @@
         onLayoutChange();
         updateTrackListScrollCue();
       });
+
+      if (typeof global.ResizeObserver === "function") {
+        nowPlayingResizeObserver = new global.ResizeObserver(() => {
+          syncNowPlayingOverflow();
+        });
+        nowPlayingResizeObserver.observe(nowPlaying);
+      }
 
       updatePlayButton();
       syncTrackListVisibility();
