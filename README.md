@@ -68,10 +68,28 @@ COVERAGE_MIN=95 git push
 
 Music appears as an album-style player fixed at the bottom, with cover art, a visible track list, sequential playback order, and a link to `https://manturon.bandcamp.com`.
 
+## Basic Analytics
+
+The site now records a small first-party analytics summary in `analytics.json` alongside the media root.
+
+- One `visit` is counted once per browser session.
+- One `play start` is counted when a visitor starts a track from the beginning or changes to another track.
+- `multi-track sessions` counts sessions that played at least two different songs.
+
+To view the summary locally or on Fly, open:
+
+```text
+/stats
+```
+
+The stats page reads from `/api/analytics/summary`.
+The event collector endpoint is `/api/analytics/event`.
+
 ## Fly.io
 
 The app is set up for deployment on Fly.io using a persistent volume at `/data`.
 On Fly, photos live in `/data/photos` and music lives in `/data/music`.
+The analytics file also lives on that same volume as `/data/analytics.json`, so deploys keep the counts unless you remove the volume file.
 
 ### First Deploy
 

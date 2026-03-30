@@ -6,6 +6,7 @@ __pycache__/
 
 assets/photos/*
 assets/music/*
+assets/analytics.json
 !assets/photos/.gitkeep
 !assets/music/.gitkeep
 

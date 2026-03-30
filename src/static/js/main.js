@@ -1,4 +1,5 @@
 const mediaApi = globalThis.ManturonMediaApi;
+const analyticsModule = globalThis.ManturonAnalytics;
 const theme = globalThis.ManturonTheme;
 const galleryModule = globalThis.ManturonGallery;
 const playerModule = globalThis.ManturonPlayer;
@@ -45,6 +46,8 @@ if (playerBar && typeof ResizeObserver === "function") {
   playerBarResizeObserver.observe(playerBar);
 }
 
+const analytics = analyticsModule.createAnalyticsController({ fetchImpl: fetch });
+
 const gallery = galleryModule.createGallery({
   mainPhoto,
   photoLoader,
@@ -71,6 +74,7 @@ const player = playerModule.createPlayer({
   currentTimeLabel,
   totalTimeLabel,
   onLayoutChange: syncPlayerBarHeight,
+  onTrackPlay: analytics.trackTrackPlay,
 });
 
 const themeController = theme.createThemeController({
@@ -110,6 +114,7 @@ async function loadMedia() {
 gallery.init();
 player.init();
 themeController.init();
+analytics.trackVisit();
 
 document.addEventListener("keydown", (event) => {
   if (event.target instanceof HTMLInputElement) {

@@ -23,10 +23,12 @@ Short guide to work in this repo without wasting time.
 ## Things That Actually Matter
 
 - Locally, assets come from `assets/`; on Fly, they come from `/data`. If a change touches paths, do not assume production reads from the repo.
+- Basic analytics now persist in `analytics.json` under the media root as well; locally that means `assets/analytics.json`, and on Fly it means `/data/analytics.json`.
 - For photos, `make sync KIND=photos SRC=assets/photos` already generates optimized web copies before uploading; do not run `prepare-web-photos` separately and do not repeat the sync unless it was interrupted or failed.
 - Photo sync keeps a persistent local cache in `.cache/`; unchanged photos should not be regenerated on every run.
 - A real `make sync` must finish by verifying that the prepared local set and the remote volume match; if they do not, treat it as a failed sync.
 - `/api/media` returns the `photos` and `music` keys with web paths. If you change that contract, update `script.js` too.
+- `/stats` reads from `/api/analytics/summary`, and playback events post to `/api/analytics/event`; keep those in sync if analytics changes.
 - If you change `src/server.py` behavior, add or update tests in `tests/`.
 - Keep Python test coverage high; if it drops, bring it back up with useful tests before closing the task.
 - If new behavior is added, try to leave tests covering it whenever reasonable.

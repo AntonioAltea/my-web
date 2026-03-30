@@ -31,6 +31,7 @@
     currentTimeLabel,
     totalTimeLabel,
     onLayoutChange,
+    onTrackPlay = () => {},
   }) {
     let tracks = [];
     let trackCursor = 0;
@@ -38,6 +39,7 @@
     let nowPlayingAnimationTimer = null;
     let isTrackListOpen = false;
     let layoutSyncTimer = null;
+    let lastTrackedPlayFile = null;
 
     function currentTrack() {
       if (!tracks.length) {
@@ -322,7 +324,16 @@
 
       audioPlayer.addEventListener("loadedmetadata", updateProgress);
       audioPlayer.addEventListener("timeupdate", updateProgress);
-      audioPlayer.addEventListener("play", updatePlayButton);
+      audioPlayer.addEventListener("play", () => {
+        const track = currentTrack();
+        const currentTime = audioPlayer.currentTime || 0;
+        if (track && (lastTrackedPlayFile !== track.file || currentTime < 1)) {
+          lastTrackedPlayFile = track.file;
+          onTrackPlay(track);
+        }
+
+        updatePlayButton();
+      });
       audioPlayer.addEventListener("pause", updatePlayButton);
       audioPlayer.addEventListener("ended", () => stepTrack(1, true));
       albumDrawer.addEventListener("transitionend", (event) => {

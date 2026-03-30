@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import errno
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -35,6 +36,14 @@ class MediaRequestTests(unittest.TestCase):
 
     def test_is_media_request_rejects_other_paths(self) -> None:
         self.assertFalse(server.is_media_request("/api/other"))
+
+    def test_is_analytics_event_request_accepts_exact_path(self) -> None:
+        self.assertTrue(server.is_analytics_event_request("/api/analytics/event"))
+        self.assertTrue(server.is_analytics_event_request("/api/activity"))
+
+    def test_is_analytics_summary_request_accepts_exact_path(self) -> None:
+        self.assertTrue(server.is_analytics_summary_request("/api/analytics/summary"))
+        self.assertTrue(server.is_analytics_summary_request("/api/activity/summary"))
 
     def test_asset_disk_path_maps_media_urls(self) -> None:
         original_photos = server.PHOTOS_DIR
@@ -224,11 +233,76 @@ class MediaRequestTests(unittest.TestCase):
         handler.send_header.assert_any_call(
             "Content-Type", "application/json; charset=utf-8"
         )
+        handler.send_header.assert_any_call("Cache-Control", "no-store, max-age=0")
+        handler.send_header.assert_any_call("Pragma", "no-cache")
         handler.send_header.assert_any_call(
             "Content-Length",
             str(len(handler.wfile.getvalue())),
         )
         handler.end_headers.assert_called_once_with()
+
+    def test_do_get_returns_analytics_summary_json(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/api/analytics/summary"
+        handler.headers = {}
+        handler.wfile = io.BytesIO()
+
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_analytics_file = server.ANALYTICS_FILE
+            server.ANALYTICS_FILE = Path(temp_dir) / "analytics.json"
+            try:
+                with mock.patch.object(server, "redirect_target", return_value=None):
+                    server.MediaHandler.do_GET(handler)
+            finally:
+                server.ANALYTICS_FILE = original_analytics_file
+
+        payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+        self.assertEqual(payload["totals"]["visits"], 0)
+        handler.send_response.assert_called_once_with(200)
+
+    def test_do_post_records_analytics_event(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/api/analytics/event"
+        handler.headers = {"Content-Length": "44"}
+        handler.rfile = io.BytesIO(b'{"type":"visit","sessionId":"session-a"}')
+        handler.wfile = io.BytesIO()
+
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_analytics_file = server.ANALYTICS_FILE
+            server.ANALYTICS_FILE = Path(temp_dir) / "analytics.json"
+            try:
+                server.MediaHandler.do_POST(handler)
+            finally:
+                server.ANALYTICS_FILE = original_analytics_file
+
+        payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+        self.assertEqual(payload["totals"]["visits"], 1)
+        handler.send_response.assert_called_once_with(202)
+
+    def test_do_post_rejects_invalid_analytics_event(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/api/analytics/event"
+        handler.headers = {"Content-Length": "16"}
+        handler.rfile = io.BytesIO(b'{"type":"visit"}')
+        handler.wfile = io.BytesIO()
+
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+
+        server.MediaHandler.do_POST(handler)
+
+        payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+        self.assertIn("error", payload)
+        handler.send_response.assert_called_once_with(400)
 
     def test_do_get_handles_disconnect_while_writing_media_payload(self) -> None:
         handler = server.MediaHandler.__new__(server.MediaHandler)
@@ -458,6 +532,65 @@ class MainTests(unittest.TestCase):
             ):
                 with self.assertRaises(OSError):
                     server.main()
+
+
+class AnalyticsTests(unittest.TestCase):
+    def test_record_analytics_event_counts_visit_once_per_session(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_analytics_file = server.ANALYTICS_FILE
+            server.ANALYTICS_FILE = Path(temp_dir) / "analytics.json"
+            try:
+                first = server.record_analytics_event(
+                    {"type": "visit", "sessionId": "session-a"}
+                )
+                second = server.record_analytics_event(
+                    {"type": "visit", "sessionId": "session-a"}
+                )
+            finally:
+                server.ANALYTICS_FILE = original_analytics_file
+
+        self.assertEqual(first["totals"]["visits"], 1)
+        self.assertEqual(second["totals"]["visits"], 1)
+
+    def test_record_analytics_event_counts_sessions_with_music(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_analytics_file = server.ANALYTICS_FILE
+            server.ANALYTICS_FILE = Path(temp_dir) / "analytics.json"
+            try:
+                server.record_analytics_event(
+                    {"type": "visit", "sessionId": "session-a"}
+                )
+                first = server.record_analytics_event(
+                    {
+                        "type": "track_play",
+                        "sessionId": "session-a",
+                        "trackFile": "/assets/music/uno.mp3",
+                        "trackTitle": "uno",
+                    }
+                )
+                second = server.record_analytics_event(
+                    {
+                        "type": "track_play",
+                        "sessionId": "session-a",
+                        "trackFile": "/assets/music/dos.mp3",
+                        "trackTitle": "dos",
+                    }
+                )
+                third = server.record_analytics_event(
+                    {
+                        "type": "track_play",
+                        "sessionId": "session-a",
+                        "trackFile": "/assets/music/dos.mp3",
+                        "trackTitle": "dos",
+                    }
+                )
+            finally:
+                server.ANALYTICS_FILE = original_analytics_file
+
+        self.assertEqual(first["totals"]["play_starts"], 1)
+        self.assertEqual(second["totals"]["sessions_with_music"], 1)
+        self.assertEqual(third["totals"]["sessions_with_music"], 1)
+        self.assertEqual(third["top_tracks"][0]["title"], "dos")
 
 
 if __name__ == "__main__":

@@ -271,6 +271,8 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
   const timeouts = new Map();
   const mediaQueryListeners = new Map();
   const localStorageStore = new Map();
+  const sessionStorageStore = new Map();
+  const fetchCalls = [];
 
   const document = {
     hidden: false,
@@ -307,6 +309,17 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
       },
       removeItem(key) {
         localStorageStore.delete(key);
+      },
+    },
+    sessionStorage: {
+      getItem(key) {
+        return sessionStorageStore.has(key) ? sessionStorageStore.get(key) : null;
+      },
+      setItem(key, value) {
+        sessionStorageStore.set(key, String(value));
+      },
+      removeItem(key) {
+        sessionStorageStore.delete(key);
       },
     },
     matchMedia(query) {
@@ -364,12 +377,54 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
     },
   };
 
-  const fetch = async () => ({
-    ok: true,
-    async json() {
-      return mediaPayload;
-    },
-  });
+  const fetch = async (url, options = {}) => {
+    fetchCalls.push({ url, options });
+
+    if (String(url).startsWith("/api/media")) {
+      return {
+        ok: true,
+        async json() {
+          return mediaPayload;
+        },
+      };
+    }
+
+    if (url === "/api/activity" || url === "/api/analytics/event") {
+      return {
+        ok: true,
+        async json() {
+          return {};
+        },
+      };
+    }
+
+    if (
+      String(url).startsWith("/api/activity/summary")
+      || String(url).startsWith("/api/analytics/summary")
+    ) {
+      return {
+        ok: true,
+        async json() {
+          return {
+            generated_at: "2026-03-30T12:00:00+00:00",
+            totals: {
+              visits: 0,
+              play_starts: 0,
+              sessions_with_music: 0,
+            },
+            top_tracks: [],
+          };
+        },
+      };
+    }
+
+    return {
+      ok: false,
+      async json() {
+        return {};
+      },
+    };
+  };
 
   const sandboxMath = Object.create(Math);
   if (randomValues.length) {
@@ -404,6 +459,7 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
   return {
     selectors,
     sandbox,
+    fetchCalls,
     fakeImages: FakeImage.created,
     triggerImageLoad(index = FakeImage.created.length - 1) {
       const image = FakeImage.created[index];
@@ -438,6 +494,7 @@ async function loadApp(options = {}) {
 
   const scripts = [
     "media-api.js",
+    "analytics.js",
     "theme.js",
     "gallery.js",
     "player.js",
@@ -556,6 +613,24 @@ async function testTrackListCanSelectTrack() {
   assert.equal(selectors["#track-position"].textContent, "tema 02");
   assert.equal(selectors["#now-playing"].textContent, "dos");
   assert.equal(trackButtons[1].getAttribute("aria-current"), "true");
+}
+
+async function testTracksVisitAndTrackPlayback() {
+  const env = await loadApp();
+  const { selectors, fetchCalls } = env;
+
+  const analyticsCallsAfterLoad = fetchCalls.filter((call) => call.url === "/api/activity");
+  assert.equal(analyticsCallsAfterLoad.length, 1);
+  assert.equal(JSON.parse(analyticsCallsAfterLoad[0].options.body).type, "visit");
+
+  await selectors["#play-toggle"].listeners.get("click")[0]({ type: "click" });
+
+  const analyticsCallsAfterPlay = fetchCalls.filter((call) => call.url === "/api/activity");
+  assert.equal(analyticsCallsAfterPlay.length, 2);
+  const playPayload = JSON.parse(analyticsCallsAfterPlay[1].options.body);
+  assert.equal(playPayload.type, "track_play");
+  assert.equal(playPayload.trackFile, "/assets/music/uno.mp3");
+  assert.equal(playPayload.trackTitle, "uno");
 }
 
 async function testPhotoCaptionOnlyShowsOnHoverWhenLoaded() {
@@ -685,6 +760,7 @@ async function run() {
     ["shows the album track list in order", testAlbumTrackListShowsOrderedTracks],
     ["toggles the album track list open and closed", testTrackListToggleShowsAndHidesAlbumTracks],
     ["lets you select a track from the album list", testTrackListCanSelectTrack],
+    ["tracks visits and playback analytics", testTracksVisitAndTrackPlayback],
     ["shows photo caption only on hover after load", testPhotoCaptionOnlyShowsOnHoverWhenLoaded],
     ["preloads previous next and random photos", testPreloadsAdjacentAndRandomPhotos],
     ["keeps the current photo visible while the next one loads", testKeepsCurrentPhotoVisibleWhileNextLoads],
