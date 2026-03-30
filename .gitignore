@@ -13,3 +13,5 @@ assets/music/*
 .cache/
 
 .vscode/settings.json
+.codex
+future.md
