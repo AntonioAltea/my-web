@@ -19,6 +19,7 @@
     audioPlayer,
     nowPlaying,
     prevButton,
+    randomButton,
     nextButton,
     playButton,
     trackPosition,
@@ -172,6 +173,7 @@
         audioPlayer.removeAttribute("src");
         playButton.disabled = true;
         prevButton.disabled = true;
+        randomButton.disabled = true;
         nextButton.disabled = true;
         seekBar.value = "0";
         currentTimeLabel.textContent = "0:00";
@@ -189,6 +191,7 @@
       setNowPlayingText(track.title, direction);
       playButton.disabled = false;
       prevButton.disabled = false;
+      randomButton.disabled = tracks.length < 2;
       nextButton.disabled = false;
       seekBar.value = "0";
       currentTimeLabel.textContent = "0:00";
@@ -212,6 +215,19 @@
 
       trackCursor = (trackCursor + step + tracks.length) % tracks.length;
       loadCurrentTrack({ autoplay, direction: step > 0 ? "next" : "prev" });
+    }
+
+    function playRandomTrack() {
+      if (tracks.length < 2) {
+        return;
+      }
+
+      const candidateIndices = tracks
+        .map((_, index) => index)
+        .filter((index) => index !== trackCursor);
+      const randomIndex = Math.floor(Math.random() * candidateIndices.length);
+      trackCursor = candidateIndices[randomIndex];
+      loadCurrentTrack({ autoplay: true });
     }
 
     function updateProgress() {
@@ -263,6 +279,7 @@
       trackPosition.textContent = "tema --";
       playButton.disabled = true;
       prevButton.disabled = true;
+      randomButton.disabled = true;
       nextButton.disabled = true;
       trackListToggle.disabled = true;
       isTrackListOpen = false;
@@ -278,6 +295,7 @@
 
     function init() {
       prevButton.addEventListener("click", () => stepTrack(-1));
+      randomButton.addEventListener("click", playRandomTrack);
       nextButton.addEventListener("click", () => stepTrack(1));
       trackListToggle.addEventListener("click", () => {
         if (!tracks.length) {

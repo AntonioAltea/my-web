@@ -15,6 +15,7 @@ const photoRandomButton = document.querySelector("#photo-random");
 const themeToggleButton = document.querySelector("#theme-toggle");
 const themeToggleLabel = document.querySelector("#theme-toggle-label");
 const prevTrackButton = document.querySelector("#prev-track");
+const randomTrackButton = document.querySelector("#random-track");
 const nextTrackButton = document.querySelector("#next-track");
 const playToggleButton = document.querySelector("#play-toggle");
 const trackPosition = document.querySelector("#track-position");
@@ -62,6 +63,7 @@ const player = playerModule.createPlayer({
   audioPlayer,
   nowPlaying,
   prevButton: prevTrackButton,
+  randomButton: randomTrackButton,
   nextButton: nextTrackButton,
   playButton: playToggleButton,
   trackPosition,

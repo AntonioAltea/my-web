@@ -367,10 +367,11 @@
   color: var(--accent);
   padding: 8px 11px;
   cursor: pointer;
-  min-width: 44px;
-  min-height: 40px;
+  width: 44px;
+  height: 40px;
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
   transform: scale(1);
   box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
   transition:
@@ -382,8 +383,32 @@
 }
 
 .player-button-primary {
-  min-width: 48px;
+  width: 52px;
   background: var(--surface-accent);
+}
+
+.player-button-mode {
+  padding-inline: 11px;
+}
+
+.icon-random {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+.icon-random rect,
+.icon-random circle {
+  fill: none;
+  stroke: currentColor;
+}
+
+.icon-random rect {
+  stroke-width: 1.8;
+}
+
+.icon-random circle {
+  fill: currentColor;
 }
 
 .player-button:focus-visible {

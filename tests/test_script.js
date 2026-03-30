@@ -243,6 +243,7 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
     "#theme-toggle": new FakeElement("theme-toggle"),
     "#theme-toggle-label": new FakeElement("theme-toggle-label"),
     "#prev-track": new FakeElement("prev-track"),
+    "#random-track": new FakeElement("random-track"),
     "#next-track": new FakeElement("next-track"),
     "#play-toggle": new FakeElement("play-toggle"),
     "#play-toggle-icon": new FakeElement("play-toggle-icon"),
@@ -553,6 +554,18 @@ async function testTrackTitleAnimatesByDirection() {
   assert.equal(selectors["#now-playing"].classList.contains("now-playing-enter-prev"), true);
 }
 
+async function testRandomTrackButtonPlaysAnotherTrack() {
+  const env = await loadApp({ randomValues: [0] });
+  const { selectors } = env;
+
+  await selectors["#play-toggle"].listeners.get("click")[0]({ type: "click" });
+  selectors["#random-track"].click();
+
+  assert.equal(selectors["#track-position"].textContent, "tema 02");
+  assert.equal(selectors["#now-playing"].textContent, "dos");
+  assert.equal(selectors["#play-toggle"].dataset.state, "playing");
+}
+
 async function testPlayButtonTogglesPlayingState() {
   const env = await loadApp();
   const { selectors } = env;
@@ -582,6 +595,19 @@ async function testAlbumTrackListShowsOrderedTracks() {
   assert.equal(trackButtons[0].textContent, "");
   assert.equal(trackButtons[0].getAttribute("aria-current"), "true");
   assert.equal(trackButtons[1].getAttribute("aria-current"), "false");
+  assert.equal(selectors["#random-track"].disabled, false);
+}
+
+async function testRandomTrackButtonStaysDisabledWithSingleTrack() {
+  const env = await loadApp({
+    mediaPayload: {
+      photos: ["/assets/photos/uno.jpg"],
+      music: ["/assets/music/uno.mp3"],
+    },
+  });
+  const { selectors } = env;
+
+  assert.equal(selectors["#random-track"].disabled, true);
 }
 
 async function testTrackListToggleShowsAndHidesAlbumTracks() {
@@ -756,8 +782,10 @@ async function run() {
   const tests = [
     ["locks photo controls while loading", testPhotoControlsLockWhileLoading],
     ["animates track title by direction", testTrackTitleAnimatesByDirection],
+    ["plays another track from the random button", testRandomTrackButtonPlaysAnotherTrack],
     ["toggles playing state from play button", testPlayButtonTogglesPlayingState],
     ["shows the album track list in order", testAlbumTrackListShowsOrderedTracks],
+    ["disables random track when there is only one track", testRandomTrackButtonStaysDisabledWithSingleTrack],
     ["toggles the album track list open and closed", testTrackListToggleShowsAndHidesAlbumTracks],
     ["lets you select a track from the album list", testTrackListCanSelectTrack],
     ["tracks visits and playback analytics", testTracksVisitAndTrackPlayback],

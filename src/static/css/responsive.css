@@ -202,6 +202,10 @@
     font-size: 0.7rem;
   }
 
+  .player-button-mode {
+    display: none;
+  }
+
   .gallery-nav {
     font-size: 0.72rem;
   }
