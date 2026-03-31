@@ -488,7 +488,10 @@ async function loadApp(options = {}) {
   const env = createEnvironment(
     options.mediaPayload || {
       photos: ["/assets/photos/uno.jpg", "/assets/photos/dos.jpg"],
-      music: ["/assets/music/uno.mp3", "/assets/music/dos.mp3"],
+      music: [
+        { file: "/assets/music/uno.mp3", title: "uno", track_number: 1 },
+        { file: "/assets/music/dos.mp3", title: "dos", track_number: 2 },
+      ],
     },
     options,
   );
@@ -558,7 +561,13 @@ async function testLongTrackTitleScrollsInsteadOfTruncating() {
   const env = await loadApp({
     mediaPayload: {
       photos: ["/assets/photos/uno.jpg"],
-      music: ["/assets/music/una-cancion-increiblemente-larga-para-probar-el-desplazamiento.mp3"],
+      music: [
+        {
+          file: "/assets/music/una-cancion-increiblemente-larga-para-probar-el-desplazamiento.mp3",
+          title: "una cancion increiblemente larga para probar el desplazamiento",
+          track_number: 1,
+        },
+      ],
     },
   });
   const { selectors } = env;
@@ -603,12 +612,20 @@ async function testPlayButtonTogglesPlayingState() {
 }
 
 async function testAlbumTrackListShowsOrderedTracks() {
-  const env = await loadApp();
+  const env = await loadApp({
+    mediaPayload: {
+      photos: ["/assets/photos/uno.jpg", "/assets/photos/dos.jpg"],
+      music: [
+        { file: "/assets/music/dos.mp3", title: "segunda", track_number: 2 },
+        { file: "/assets/music/uno.mp3", title: "primera", track_number: 1 },
+      ],
+    },
+  });
   const { selectors } = env;
   const trackButtons = selectors["#track-list"].querySelectorAll("button");
 
   assert.equal(selectors["#track-position"].textContent, "tema 01");
-  assert.equal(selectors["#now-playing"].textContent, "uno");
+  assert.equal(selectors["#now-playing"].textContent, "primera");
   assert.equal(selectors["#album-drawer"].hidden, false);
   assert.equal(selectors["#album-drawer"].dataset.state, "closed");
   assert.equal(selectors["#album-drawer"].getAttribute("aria-hidden"), "true");
@@ -625,7 +642,7 @@ async function testRandomTrackButtonStaysDisabledWithSingleTrack() {
   const env = await loadApp({
     mediaPayload: {
       photos: ["/assets/photos/uno.jpg"],
-      music: ["/assets/music/uno.mp3"],
+      music: [{ file: "/assets/music/uno.mp3", title: "uno", track_number: 1 }],
     },
   });
   const { selectors } = env;
@@ -703,7 +720,7 @@ async function testPreloadsAdjacentAndRandomPhotos() {
         "/assets/photos/tres.jpg",
         "/assets/photos/cuatro.jpg",
       ],
-      music: ["/assets/music/uno.mp3"],
+      music: [{ file: "/assets/music/uno.mp3", title: "uno", track_number: 1 }],
     },
     randomValues: [0, 0, 0],
   });
@@ -737,7 +754,7 @@ async function testKeepsCurrentPhotoVisibleWhileNextLoads() {
   const env = await loadApp({
     mediaPayload: {
       photos: ["/assets/photos/uno.jpg", "/assets/photos/dos.jpg"],
-      music: ["/assets/music/uno.mp3"],
+      music: [{ file: "/assets/music/uno.mp3", title: "uno", track_number: 1 }],
     },
     randomValues: [0],
   });
@@ -762,7 +779,7 @@ async function testShowsPreloadedPhotoImmediately() {
   const env = await loadApp({
     mediaPayload: {
       photos: ["/assets/photos/uno.jpg", "/assets/photos/dos.jpg"],
-      music: ["/assets/music/uno.mp3"],
+      music: [{ file: "/assets/music/uno.mp3", title: "uno", track_number: 1 }],
     },
     randomValues: [0],
   });
@@ -786,7 +803,7 @@ async function testRandomButtonUsesPreloadedRandomPhoto() {
         "/assets/photos/tres.jpg",
         "/assets/photos/cuatro.jpg",
       ],
-      music: ["/assets/music/uno.mp3"],
+      music: [{ file: "/assets/music/uno.mp3", title: "uno", track_number: 1 }],
     },
     randomValues: [0, 0, 0],
   });

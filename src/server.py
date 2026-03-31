@@ -45,6 +45,206 @@ def public_files(
     return files
 
 
+def file_name_to_title(file_path: str) -> str:
+    file_name = Path(file_path).name
+    return Path(file_name).stem.replace("_", " ").replace("-", " ")
+
+
+def parse_track_number(value: str) -> int | None:
+    digits = []
+    for char in value.strip():
+        if char.isdigit():
+            digits.append(char)
+            continue
+        if digits:
+            break
+        return None
+
+    if not digits:
+        return None
+
+    return int("".join(digits))
+
+
+def decode_vorbis_comments(block: bytes) -> dict[str, str]:
+    if len(block) < 8:
+        return {}
+
+    offset = 0
+    vendor_length = int.from_bytes(block[offset : offset + 4], "little")
+    offset += 4 + vendor_length
+    if offset + 4 > len(block):
+        return {}
+
+    comment_count = int.from_bytes(block[offset : offset + 4], "little")
+    offset += 4
+    comments: dict[str, str] = {}
+
+    for _ in range(comment_count):
+        if offset + 4 > len(block):
+            break
+
+        comment_length = int.from_bytes(block[offset : offset + 4], "little")
+        offset += 4
+        comment_raw = block[offset : offset + comment_length]
+        offset += comment_length
+        if b"=" not in comment_raw:
+            continue
+
+        key_raw, value_raw = comment_raw.split(b"=", 1)
+        key = key_raw.decode("utf-8", errors="ignore").strip().upper()
+        value = value_raw.decode("utf-8", errors="ignore").strip()
+        if key and value:
+            comments[key] = value
+
+    return comments
+
+
+def read_flac_comments(track_path: Path) -> dict[str, str]:
+    with track_path.open("rb") as audio_file:
+        if audio_file.read(4) != b"fLaC":
+            return {}
+
+        while True:
+            header = audio_file.read(4)
+            if len(header) != 4:
+                return {}
+
+            is_last_block = bool(header[0] & 0x80)
+            block_type = header[0] & 0x7F
+            block_length = int.from_bytes(header[1:4], "big")
+            block_data = audio_file.read(block_length)
+            if len(block_data) != block_length:
+                return {}
+
+            if block_type == 4:
+                return decode_vorbis_comments(block_data)
+
+            if is_last_block:
+                return {}
+
+
+def decode_id3_text(frame_data: bytes) -> str:
+    if not frame_data:
+        return ""
+
+    encoding = frame_data[0]
+    payload = frame_data[1:]
+    if encoding == 0:
+        return payload.decode("latin-1", errors="ignore").strip("\x00 ").strip()
+    if encoding == 1:
+        return payload.decode("utf-16", errors="ignore").strip("\x00 ").strip()
+    if encoding == 2:
+        return payload.decode("utf-16-be", errors="ignore").strip("\x00 ").strip()
+    if encoding == 3:
+        return payload.decode("utf-8", errors="ignore").strip("\x00 ").strip()
+    return ""
+
+
+def syncsafe_to_int(raw_value: bytes) -> int:
+    value = 0
+    for byte in raw_value:
+        value = (value << 7) | (byte & 0x7F)
+    return value
+
+
+def read_mp3_comments(track_path: Path) -> dict[str, str]:
+    with track_path.open("rb") as audio_file:
+        header = audio_file.read(10)
+        if len(header) != 10 or header[:3] != b"ID3":
+            return {}
+
+        version = header[3]
+        tag_size = syncsafe_to_int(header[6:10])
+        tag_data = audio_file.read(tag_size)
+        offset = 0
+        comments: dict[str, str] = {}
+
+        while offset + 10 <= len(tag_data):
+            frame_header = tag_data[offset : offset + 10]
+            if frame_header == b"\x00" * 10:
+                break
+
+            frame_id = frame_header[:4].decode("latin-1", errors="ignore")
+            if not frame_id.strip("\x00"):
+                break
+
+            frame_size = (
+                syncsafe_to_int(frame_header[4:8])
+                if version == 4
+                else int.from_bytes(frame_header[4:8], "big")
+            )
+            offset += 10
+            frame_data = tag_data[offset : offset + frame_size]
+            offset += frame_size
+
+            if frame_id not in {"TIT2", "TRCK"}:
+                continue
+
+            value = decode_id3_text(frame_data)
+            if value:
+                comments[frame_id] = value
+
+        normalized_comments = {}
+        if "TIT2" in comments:
+            normalized_comments["TITLE"] = comments["TIT2"]
+        if "TRCK" in comments:
+            normalized_comments["TRACKNUMBER"] = comments["TRCK"]
+        return normalized_comments
+
+
+def read_track_tags(track_path: Path) -> dict[str, str]:
+    suffix = track_path.suffix.lower()
+
+    try:
+        if suffix == ".flac":
+            return read_flac_comments(track_path)
+        if suffix == ".mp3":
+            return read_mp3_comments(track_path)
+    except OSError:
+        return {}
+
+    return {}
+
+
+def music_entry_from_path(track_path: Path) -> dict[str, object]:
+    public_path = f"/assets/music/{track_path.name}"
+    tags = read_track_tags(track_path)
+    title = tags.get("TITLE") or file_name_to_title(track_path.name)
+    track_number = parse_track_number(tags.get("TRACKNUMBER", ""))
+
+    return {
+        "file": public_path,
+        "title": title,
+        "track_number": track_number,
+    }
+
+
+def music_sort_key(track: dict[str, object]) -> tuple[int, int, str]:
+    track_number = track.get("track_number")
+    normalized_track_number = (
+        track_number if isinstance(track_number, int) and track_number > 0 else None
+    )
+    return (
+        0 if normalized_track_number is not None else 1,
+        normalized_track_number or 0,
+        str(track.get("file", "")).lower(),
+    )
+
+
+def public_music_files(directory: Path) -> list[dict[str, object]]:
+    if not directory.exists():
+        return []
+
+    tracks = [
+        music_entry_from_path(path)
+        for path in sorted(directory.iterdir(), key=lambda item: item.name.lower())
+        if path.is_file() and path.suffix.lower() in MUSIC_EXTENSIONS
+    ]
+    tracks.sort(key=music_sort_key)
+    return tracks
+
+
 def dedupe_photo_paths(paths: list[Path]) -> list[Path]:
     plain_names = {path.stem.lower() for path in paths}
     preferred: dict[str, Path] = {}
@@ -297,7 +497,7 @@ def record_analytics_event(payload: dict[str, object]) -> dict[str, object]:
         return analytics_summary_from_state(state, current_time)
 
 
-def media_payload() -> dict[str, list[str]]:
+def media_payload() -> dict[str, list[object]]:
     photo_paths = (
         [
             path
@@ -312,7 +512,7 @@ def media_payload() -> dict[str, list[str]]:
 
     return {
         "photos": [f"/assets/photos/{path.name}" for path in photo_paths],
-        "music": public_files(MUSIC_DIR, MUSIC_EXTENSIONS, "/assets/music"),
+        "music": public_music_files(MUSIC_DIR),
     }
 
 

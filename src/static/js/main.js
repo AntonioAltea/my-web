@@ -95,9 +95,9 @@ async function loadMedia() {
     return;
   }
 
-  const nextTracks = media.music.map((file) => ({
-    file,
-    title: mediaApi.fileNameToTitle(file),
+  const nextTracks = media.music.map((track) => ({
+    file: track.file,
+    title: track.title,
   }));
   const nextPhotos = media.photos.map((file) => ({
     file,

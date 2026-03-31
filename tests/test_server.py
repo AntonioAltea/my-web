@@ -30,6 +30,25 @@ class PublicFilesTests(unittest.TestCase):
         self.assertEqual(files, [])
 
 
+def make_flac_file(path: Path, comments: dict[str, str]) -> None:
+    vendor = b"manturon-tests"
+    entries = []
+    for key, value in comments.items():
+        comment = f"{key}={value}".encode("utf-8")
+        entries.append(len(comment).to_bytes(4, "little") + comment)
+
+    metadata = b"".join(
+        [
+            len(vendor).to_bytes(4, "little"),
+            vendor,
+            len(entries).to_bytes(4, "little"),
+            *entries,
+        ]
+    )
+    header = bytes([0x84]) + len(metadata).to_bytes(3, "big")
+    path.write_bytes(b"fLaC" + header + metadata)
+
+
 class MediaRequestTests(unittest.TestCase):
     def test_is_media_request_accepts_query_string(self) -> None:
         self.assertTrue(server.is_media_request("/api/media?t=123"))
@@ -218,7 +237,13 @@ class MediaRequestTests(unittest.TestCase):
 
         payload = {
             "photos": ["/assets/photos/demo.jpg"],
-            "music": ["/assets/music/demo.flac"],
+            "music": [
+                {
+                    "file": "/assets/music/demo.flac",
+                    "title": "Demo",
+                    "track_number": 1,
+                }
+            ],
         }
 
         with mock.patch.object(server, "redirect_target", return_value=None):
@@ -227,7 +252,7 @@ class MediaRequestTests(unittest.TestCase):
 
         self.assertEqual(
             handler.wfile.getvalue(),
-            b'{"photos": ["/assets/photos/demo.jpg"], "music": ["/assets/music/demo.flac"]}',
+            b'{"photos": ["/assets/photos/demo.jpg"], "music": [{"file": "/assets/music/demo.flac", "title": "Demo", "track_number": 1}]}',
         )
         handler.send_response.assert_called_once_with(200)
         handler.send_header.assert_any_call(
@@ -337,7 +362,10 @@ class MediaPayloadTests(unittest.TestCase):
             photos.mkdir()
             music.mkdir()
             (photos / "frame.jpg").write_text("x")
-            (music / "song.flac").write_text("x")
+            make_flac_file(
+                music / "song.flac",
+                {"TITLE": "Song From Metadata", "TRACKNUMBER": "2"},
+            )
 
             server.PHOTOS_DIR = photos
             server.MUSIC_DIR = music
@@ -347,7 +375,57 @@ class MediaPayloadTests(unittest.TestCase):
         server.MUSIC_DIR = original_music
 
         self.assertEqual(payload["photos"], ["/assets/photos/frame.jpg"])
-        self.assertEqual(payload["music"], ["/assets/music/song.flac"])
+        self.assertEqual(
+            payload["music"],
+            [
+                {
+                    "file": "/assets/music/song.flac",
+                    "title": "Song From Metadata",
+                    "track_number": 2,
+                }
+            ],
+        )
+
+    def test_media_payload_orders_music_by_track_number(self) -> None:
+        original_music = server.MUSIC_DIR
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            music = Path(temp_dir) / "music"
+            music.mkdir()
+            make_flac_file(
+                music / "b-side.flac",
+                {"TITLE": "B Side", "TRACKNUMBER": "2/10"},
+            )
+            make_flac_file(
+                music / "a-side.flac",
+                {"TITLE": "A Side", "TRACKNUMBER": "1"},
+            )
+            make_flac_file(music / "bonus-track.flac", {"TITLE": "Bonus Track"})
+
+            server.MUSIC_DIR = music
+            payload = server.media_payload()
+
+        server.MUSIC_DIR = original_music
+
+        self.assertEqual(
+            [track["file"] for track in payload["music"]],
+            [
+                "/assets/music/a-side.flac",
+                "/assets/music/b-side.flac",
+                "/assets/music/bonus-track.flac",
+            ],
+        )
+
+    def test_music_entry_from_path_falls_back_to_file_name(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            track_path = Path(temp_dir) / "mi-tema-bonito.flac"
+            track_path.write_bytes(b"fLaC")
+
+            entry = server.music_entry_from_path(track_path)
+
+        self.assertEqual(entry["file"], "/assets/music/mi-tema-bonito.flac")
+        self.assertEqual(entry["title"], "mi tema bonito")
+        self.assertIsNone(entry["track_number"])
 
     def test_ensure_media_dirs_creates_missing_directories(self) -> None:
         original_root = server.MEDIA_ROOT

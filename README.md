@@ -17,10 +17,15 @@ A simple music-and-photography site with a DIY feel.
 2. Copy your music into `assets/music/`.
 3. Start the server and the site will show them automatically.
 
-Each photo or track title is derived from the file name:
+Each photo title is derived from the file name.
+Track titles and album order are read from audio metadata when available.
+Right now that metadata lookup is implemented for `FLAC` and `MP3` files:
 
 - `granada-de-noche.jpg` will show up as `granada de noche`
-- `cinta_01.mp3` will show up as `cinta 01`
+- a track with `TITLE=Mi cancion` will show up as `Mi cancion`
+- a track with `TRACKNUMBER=2` will appear as track 2 in the album list
+
+If a music file has no readable metadata, the site falls back to the file name.
 
 ## Run Locally
 
