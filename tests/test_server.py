@@ -49,6 +49,167 @@ def make_flac_file(path: Path, comments: dict[str, str]) -> None:
     path.write_bytes(b"fLaC" + header + metadata)
 
 
+def make_mp3_text_frame(frame_id: str, text: str, encoding: int = 3) -> bytes:
+    if encoding == 0:
+        payload = text.encode("latin-1")
+    elif encoding == 1:
+        payload = text.encode("utf-16")
+    elif encoding == 2:
+        payload = text.encode("utf-16-be")
+    else:
+        payload = text.encode("utf-8")
+
+    frame_data = bytes([encoding]) + payload
+    return (
+        frame_id.encode("latin-1")
+        + len(frame_data).to_bytes(4, "big")
+        + b"\x00\x00"
+        + frame_data
+    )
+
+
+def to_syncsafe(value: int) -> bytes:
+    return bytes(
+        [
+            (value >> 21) & 0x7F,
+            (value >> 14) & 0x7F,
+            (value >> 7) & 0x7F,
+            value & 0x7F,
+        ]
+    )
+
+
+def make_mp3_file(
+    path: Path,
+    *,
+    title: str | None = None,
+    track_number: str | None = None,
+    version: int = 3,
+) -> None:
+    frames = []
+    if title is not None:
+        frames.append(make_mp3_text_frame("TIT2", title))
+    if track_number is not None:
+        frames.append(make_mp3_text_frame("TRCK", track_number))
+
+    tag_data = b"".join(frames)
+    header = b"ID3" + bytes([version, 0, 0]) + to_syncsafe(len(tag_data))
+    path.write_bytes(header + tag_data)
+
+
+class MetadataHelpersTests(unittest.TestCase):
+    def test_file_name_to_title_replaces_separators(self) -> None:
+        self.assertEqual(
+            server.file_name_to_title("carpeta/mi-tema_bonito.flac"), "mi tema bonito"
+        )
+
+    def test_parse_track_number_accepts_numeric_prefix(self) -> None:
+        self.assertEqual(server.parse_track_number("02/11"), 2)
+
+    def test_parse_track_number_rejects_invalid_prefix_and_empty_values(self) -> None:
+        self.assertIsNone(server.parse_track_number("A2"))
+        self.assertIsNone(server.parse_track_number(""))
+
+    def test_decode_vorbis_comments_handles_short_and_truncated_blocks(self) -> None:
+        self.assertEqual(server.decode_vorbis_comments(b""), {})
+        self.assertEqual(
+            server.decode_vorbis_comments((4).to_bytes(4, "little") + b"ab"), {}
+        )
+
+    def test_decode_vorbis_comments_ignores_invalid_entries_and_normalizes_keys(
+        self,
+    ) -> None:
+        vendor = b"test"
+        valid = b"TITLE=Hola"
+        invalid = b"SINSEPARADOR"
+        block = b"".join(
+            [
+                len(vendor).to_bytes(4, "little"),
+                vendor,
+                (2).to_bytes(4, "little"),
+                len(valid).to_bytes(4, "little"),
+                valid,
+                len(invalid).to_bytes(4, "little"),
+                invalid,
+            ]
+        )
+
+        self.assertEqual(server.decode_vorbis_comments(block), {"TITLE": "Hola"})
+
+    def test_read_flac_comments_returns_empty_for_invalid_and_truncated_data(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            wrong_header = Path(temp_dir) / "wrong.flac"
+            wrong_header.write_bytes(b"nope")
+            self.assertEqual(server.read_flac_comments(wrong_header), {})
+
+            truncated = Path(temp_dir) / "truncated.flac"
+            truncated.write_bytes(b"fLaC" + b"\x84\x00\x00\x08" + b"short")
+            self.assertEqual(server.read_flac_comments(truncated), {})
+
+    def test_read_flac_comments_returns_empty_when_last_block_has_no_comments(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            track = Path(temp_dir) / "empty.flac"
+            track.write_bytes(b"fLaC" + b"\x80\x00\x00\x00")
+
+            self.assertEqual(server.read_flac_comments(track), {})
+
+    def test_decode_id3_text_supports_all_known_encodings_and_unknown(self) -> None:
+        self.assertEqual(server.decode_id3_text(b""), "")
+        self.assertEqual(server.decode_id3_text(b"\x00hola"), "hola")
+        self.assertEqual(
+            server.decode_id3_text(b"\x01" + "hola".encode("utf-16")), "hola"
+        )
+        self.assertEqual(
+            server.decode_id3_text(b"\x02" + "hola".encode("utf-16-be")), "hola"
+        )
+        self.assertEqual(server.decode_id3_text(b"\x03hola"), "hola")
+        self.assertEqual(server.decode_id3_text(b"\x09hola"), "")
+
+    def test_syncsafe_to_int_decodes_expected_value(self) -> None:
+        self.assertEqual(server.syncsafe_to_int(bytes([0, 0, 2, 1])), 257)
+
+    def test_read_mp3_comments_reads_title_and_track_number(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            track = Path(temp_dir) / "song.mp3"
+            make_mp3_file(track, title="Mi tema", track_number="3/9")
+
+            self.assertEqual(
+                server.read_mp3_comments(track),
+                {"TITLE": "Mi tema", "TRACKNUMBER": "3/9"},
+            )
+
+    def test_read_mp3_comments_handles_invalid_header_and_padding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            invalid = Path(temp_dir) / "invalid.mp3"
+            invalid.write_bytes(b"nope")
+            self.assertEqual(server.read_mp3_comments(invalid), {})
+
+            padded = Path(temp_dir) / "padded.mp3"
+            padded.write_bytes(
+                b"ID3" + bytes([4, 0, 0]) + to_syncsafe(10) + b"\x00" * 10
+            )
+            self.assertEqual(server.read_mp3_comments(padded), {})
+
+    def test_read_track_tags_handles_supported_unknown_and_oserror_cases(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            flac = Path(temp_dir) / "song.flac"
+            make_flac_file(flac, {"TITLE": "Desde Flac"})
+            self.assertEqual(server.read_track_tags(flac), {"TITLE": "Desde Flac"})
+
+            unknown = Path(temp_dir) / "song.ogg"
+            unknown.write_text("x")
+            self.assertEqual(server.read_track_tags(unknown), {})
+
+        with mock.patch.object(
+            server, "read_mp3_comments", side_effect=OSError("boom")
+        ):
+            self.assertEqual(server.read_track_tags(Path("broken.mp3")), {})
+
+
 class MediaRequestTests(unittest.TestCase):
     def test_is_media_request_accepts_query_string(self) -> None:
         self.assertTrue(server.is_media_request("/api/media?t=123"))
@@ -86,6 +247,18 @@ class MediaRequestTests(unittest.TestCase):
             self.assertEqual(
                 server.asset_disk_path("/static/css/styles.css"),
                 server.ROOT / "static" / "css" / "styles.css",
+            )
+            self.assertEqual(
+                server.asset_disk_path("/assets/icons/cover.png"),
+                server.PROJECT_ROOT / "assets" / "icons" / "cover.png",
+            )
+            self.assertEqual(
+                server.asset_disk_path("/favicon.ico"),
+                server.PROJECT_ROOT / "favicon.ico",
+            )
+            self.assertEqual(server.asset_disk_path("/"), server.ROOT / "index.html")
+            self.assertEqual(
+                server.asset_disk_path("/stats"), server.ROOT / "stats.html"
             )
         finally:
             server.PHOTOS_DIR = original_photos
@@ -204,6 +377,19 @@ class MediaRequestTests(unittest.TestCase):
             str(server.ROOT / "static" / "css" / "styles.css"),
         )
 
+    def test_translate_path_serves_index_for_directory_requests(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            section = root / "demo"
+            section.mkdir()
+
+            with mock.patch.object(server, "ROOT", root):
+                translated = server.MediaHandler.translate_path(handler, "/demo/")
+
+        self.assertEqual(translated, str(root / "index.html"))
+
     def test_do_get_redirects_to_canonical_host(self) -> None:
         handler = server.MediaHandler.__new__(server.MediaHandler)
         handler.path = "/foto?a=1"
@@ -317,6 +503,34 @@ class MediaRequestTests(unittest.TestCase):
         handler.path = "/api/analytics/event"
         handler.headers = {"Content-Length": "16"}
         handler.rfile = io.BytesIO(b'{"type":"visit"}')
+        handler.wfile = io.BytesIO()
+
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+
+        server.MediaHandler.do_POST(handler)
+
+        payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+        self.assertIn("error", payload)
+        handler.send_response.assert_called_once_with(400)
+
+    def test_do_post_rejects_non_analytics_paths(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/api/other"
+        handler.send_error = mock.Mock()
+
+        server.MediaHandler.do_POST(handler)
+
+        handler.send_error.assert_called_once_with(404, "Not Found")
+
+    def test_do_post_treats_invalid_content_length_and_non_object_body_as_bad_request(
+        self,
+    ) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/api/analytics/event"
+        handler.headers = {"Content-Length": "NaN"}
+        handler.rfile = io.BytesIO(b"[]")
         handler.wfile = io.BytesIO()
 
         handler.send_response = mock.Mock()
