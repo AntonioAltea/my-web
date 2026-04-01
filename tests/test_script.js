@@ -229,7 +229,7 @@ class FakeResizeObserver {
   disconnect() {}
 }
 
-function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
+function createEnvironment(mediaPayload, { randomValues = [], connection = null } = {}) {
   FakeImage.reset();
   const selectors = {
     "#audio-player": new FakeAudioElement(),
@@ -452,6 +452,7 @@ function createEnvironment(mediaPayload, { randomValues = [] } = {}) {
     clearTimeout: windowObject.clearTimeout.bind(windowObject),
     setInterval: windowObject.setInterval.bind(windowObject),
     clearInterval: windowObject.clearInterval.bind(windowObject),
+    navigator: connection ? { connection } : {},
   };
 
   sandbox.globalThis = sandbox;
@@ -542,6 +543,42 @@ async function testPhotoControlsLockWhileLoading() {
   assert.equal(selectors["#next-photo"].disabled, false);
   assert.equal(selectors["#photo-random"].disabled, false);
   assert.equal(selectors["#main-photo"].src.startsWith("/assets/photos/"), true);
+}
+
+async function testPhotoLoadTimeoutUnlocksControls() {
+  const env = await loadApp({ randomValues: [0] });
+  const { selectors, fakeImages, flushTimeouts } = env;
+
+  flushTimeouts();
+
+  assert.equal(selectors["#photo-loader"].hidden, true);
+  assert.equal(selectors["#photo-caption"].textContent, "No se pudo cargar la foto.");
+  assert.equal(selectors["#prev-photo"].disabled, false);
+  assert.equal(selectors["#next-photo"].disabled, false);
+  assert.equal(selectors["#photo-random"].disabled, false);
+  assert.equal(fakeImages[0].src, "");
+}
+
+async function testTimedOutPhotoCanBeRetried() {
+  const env = await loadApp({ randomValues: [0] });
+  const { selectors, fakeImages, triggerImageLoad, flushTimeouts } = env;
+
+  flushTimeouts();
+
+  selectors["#next-photo"].click();
+  assert.equal(fakeImages.length, 2);
+  triggerImageLoad(1);
+  assert.equal(selectors["#main-photo"].src.startsWith("/assets/photos/dos.jpg"), true);
+
+  selectors["#prev-photo"].click();
+
+  assert.equal(fakeImages.length, 3);
+  assert.equal(selectors["#photo-loader"].hidden, false);
+
+  triggerImageLoad(2);
+
+  assert.equal(selectors["#main-photo"].src.startsWith("/assets/photos/uno.jpg"), true);
+  assert.equal(selectors["#photo-loader"].hidden, true);
 }
 
 async function testTrackTitleAnimatesByDirection() {
@@ -726,15 +763,7 @@ async function testPreloadsAdjacentAndRandomPhotos() {
   });
   const { selectors, fakeImages, triggerImageLoad } = env;
 
-  assert.deepEqual(
-    fakeImages.map((image) => image.src),
-    [
-      "/assets/photos/uno.jpg",
-      "/assets/photos/cuatro.jpg",
-      "/assets/photos/dos.jpg",
-      "/assets/photos/tres.jpg",
-    ],
-  );
+  assert.deepEqual(fakeImages.map((image) => image.src), ["/assets/photos/uno.jpg"]);
 
   triggerImageLoad(0);
   selectors["#next-photo"].click();
@@ -743,9 +772,36 @@ async function testPreloadsAdjacentAndRandomPhotos() {
     fakeImages.map((image) => image.src),
     [
       "/assets/photos/uno.jpg",
-      "/assets/photos/cuatro.jpg",
       "/assets/photos/dos.jpg",
+      "/assets/photos/cuatro.jpg",
       "/assets/photos/tres.jpg",
+    ],
+  );
+}
+
+async function testConstrainedConnectionPreloadsOnlyNextPhoto() {
+  const env = await loadApp({
+    mediaPayload: {
+      photos: [
+        "/assets/photos/uno.jpg",
+        "/assets/photos/dos.jpg",
+        "/assets/photos/tres.jpg",
+        "/assets/photos/cuatro.jpg",
+      ],
+      music: [{ file: "/assets/music/uno.mp3", title: "uno", track_number: 1 }],
+    },
+    connection: { effectiveType: "2g", saveData: false },
+    randomValues: [0],
+  });
+  const { fakeImages, triggerImageLoad } = env;
+
+  triggerImageLoad(0);
+
+  assert.deepEqual(
+    fakeImages.map((image) => image.src),
+    [
+      "/assets/photos/uno.jpg",
+      "/assets/photos/dos.jpg",
     ],
   );
 }
@@ -821,6 +877,8 @@ async function testRandomButtonUsesPreloadedRandomPhoto() {
 async function run() {
   const tests = [
     ["locks photo controls while loading", testPhotoControlsLockWhileLoading],
+    ["unlocks photo controls after a stalled image times out", testPhotoLoadTimeoutUnlocksControls],
+    ["retries a timed out photo when you come back to it", testTimedOutPhotoCanBeRetried],
     ["animates track title by direction", testTrackTitleAnimatesByDirection],
     ["scrolls long track titles instead of truncating", testLongTrackTitleScrollsInsteadOfTruncating],
     ["keeps short track titles static", testShortTrackTitleDoesNotScroll],
@@ -833,6 +891,7 @@ async function run() {
     ["tracks visits and playback analytics", testTracksVisitAndTrackPlayback],
     ["shows photo caption only on hover after load", testPhotoCaptionOnlyShowsOnHoverWhenLoaded],
     ["preloads previous next and random photos", testPreloadsAdjacentAndRandomPhotos],
+    ["preloads only the next photo on constrained connections", testConstrainedConnectionPreloadsOnlyNextPhoto],
     ["keeps the current photo visible while the next one loads", testKeepsCurrentPhotoVisibleWhileNextLoads],
     ["shows a preloaded photo immediately", testShowsPreloadedPhotoImmediately],
     ["uses the preloaded random photo on random navigation", testRandomButtonUsesPreloadedRandomPhoto],

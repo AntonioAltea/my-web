@@ -23,6 +23,7 @@ Short guide to work in this repo without wasting time.
 ## Things That Actually Matter
 
 - Locally, assets come from `assets/`; on Fly, they come from `/data`. If a change touches paths, do not assume production reads from the repo.
+- Local `python3 -m src.server` serves the originals currently sitting in `assets/photos`; if you are checking mobile loading behavior, remember those files can be far heavier than the optimized copies served from Fly.
 - Basic analytics now persist in `analytics.json` under the media root as well; locally that means `assets/analytics.json`, and on Fly it means `/data/analytics.json`.
 - For photos, `make sync KIND=photos SRC=assets/photos` already generates optimized web copies before uploading; do not run `prepare-web-photos` separately and do not repeat the sync unless it was interrupted or failed.
 - Photo sync keeps a persistent local cache in `.cache/`; unchanged photos should not be regenerated on every run.

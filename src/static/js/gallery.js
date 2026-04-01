@@ -1,4 +1,6 @@
 (function (global) {
+  const PHOTO_LOAD_TIMEOUT_MS = 12000;
+
   function randomIndex(length) {
     if (length <= 0) {
       return 0;
@@ -23,6 +25,94 @@
     let preloadedRandomPhotoIndex = null;
     const photoCache = new Map();
 
+    function photoRequestSrc(file, attempt) {
+      if (attempt <= 0) {
+        return file;
+      }
+
+      const separator = file.includes("?") ? "&" : "?";
+      return `${file}${separator}manturon-photo-retry=${attempt}`;
+    }
+
+    function detachPhotoImage(image, { clearSrc = false } = {}) {
+      if (!image) {
+        return;
+      }
+
+      image.onload = null;
+      image.onerror = null;
+      if (clearSrc) {
+        image.src = "";
+      }
+    }
+
+    function clearPhotoResourceTimeout(resource) {
+      if (resource?.timeoutId == null) {
+        return;
+      }
+
+      global.clearTimeout(resource.timeoutId);
+      resource.timeoutId = null;
+    }
+
+    function abortPhotoResourceLoad(resource) {
+      if (!resource) {
+        return;
+      }
+
+      clearPhotoResourceTimeout(resource);
+      detachPhotoImage(resource.image, { clearSrc: true });
+      resource.image = null;
+      if (resource.status === "loading") {
+        resource.status = "idle";
+      }
+    }
+
+    function notifyPhotoResource(resource, status) {
+      for (const listener of resource.listeners) {
+        listener(status);
+      }
+      resource.listeners.clear();
+    }
+
+    function finalizePhotoResource(resource, image, status) {
+      if (resource.image !== image || resource.status !== "loading") {
+        return;
+      }
+
+      clearPhotoResourceTimeout(resource);
+      resource.status = status;
+      if (status === "loaded") {
+        resource.loadedSrc = image.src;
+      } else {
+        detachPhotoImage(image, { clearSrc: true });
+        resource.image = null;
+      }
+      notifyPhotoResource(resource, status);
+    }
+
+    function startPhotoResourceLoad(resource) {
+      abortPhotoResourceLoad(resource);
+
+      resource.attempt += 1;
+      resource.status = "loading";
+
+      const image = new Image();
+      const requestSrc = photoRequestSrc(resource.file, resource.attempt - 1);
+
+      resource.image = image;
+      image.onload = () => {
+        finalizePhotoResource(resource, image, "loaded");
+      };
+      image.onerror = () => {
+        finalizePhotoResource(resource, image, "error");
+      };
+      resource.timeoutId = global.setTimeout(() => {
+        finalizePhotoResource(resource, image, "error");
+      }, PHOTO_LOAD_TIMEOUT_MS);
+      image.src = requestSrc;
+    }
+
     function syncPhotoControls() {
       const hasPhotos = photos.length > 0;
       const canNavigate = hasPhotos && photos.length > 1 && !photoControlsLocked;
@@ -32,39 +122,31 @@
       randomButton.disabled = !canNavigate;
     }
 
-    function ensurePhotoResource(file) {
+    function ensurePhotoResource(file, { retryOnError = false } = {}) {
       if (!file) {
         return null;
       }
 
       const existingResource = photoCache.get(file);
       if (existingResource) {
+        if (retryOnError && existingResource.status === "error") {
+          startPhotoResourceLoad(existingResource);
+        }
         return existingResource;
       }
 
-      const image = new Image();
       const resource = {
-        image,
+        attempt: 0,
+        file,
+        image: null,
         listeners: new Set(),
-        status: "loading",
+        loadedSrc: file,
+        status: "idle",
+        timeoutId: null,
       };
 
-      image.onload = () => {
-        resource.status = "loaded";
-        for (const listener of resource.listeners) {
-          listener("loaded");
-        }
-        resource.listeners.clear();
-      };
-      image.onerror = () => {
-        resource.status = "error";
-        for (const listener of resource.listeners) {
-          listener("error");
-        }
-        resource.listeners.clear();
-      };
-      image.src = file;
       photoCache.set(file, resource);
+      startPhotoResourceLoad(resource);
       return resource;
     }
 
@@ -98,6 +180,21 @@
       ensurePhotoResource(file);
     }
 
+    function shouldLimitPreloading() {
+      const connection = global.navigator?.connection
+        || global.navigator?.mozConnection
+        || global.navigator?.webkitConnection;
+      if (!connection) {
+        return false;
+      }
+
+      if (connection.saveData === true) {
+        return true;
+      }
+
+      return ["slow-2g", "2g", "3g"].includes(connection.effectiveType);
+    }
+
     function selectableRandomPhotoIndices() {
       return photos
         .map((_, index) => index)
@@ -118,15 +215,20 @@
         return;
       }
 
+      const limitPreloading = shouldLimitPreloading();
       const nextIndices = new Set([
-        (currentPhotoIndex - 1 + photos.length) % photos.length,
         (currentPhotoIndex + 1) % photos.length,
       ]);
+
+      if (!limitPreloading) {
+        nextIndices.add((currentPhotoIndex - 1 + photos.length) % photos.length);
+      }
+
       const randomCandidates = photos
         .map((_, index) => index)
         .filter((index) => index !== currentPhotoIndex && !nextIndices.has(index));
 
-      if (randomCandidates.length) {
+      if (!limitPreloading && randomCandidates.length) {
         const randomCandidateIndex = chooseRandomPhotoIndex(randomCandidates);
         preloadedRandomPhotoIndex = randomCandidateIndex;
         nextIndices.add(randomCandidateIndex);
@@ -139,25 +241,27 @@
       }
     }
 
-    function finishPhotoUpdate(requestId, photo) {
+    function finishPhotoUpdate(requestId, photo, resource) {
       if (requestId !== photoLoadRequestId) {
         return;
       }
 
       mainPhoto.alt = photo.title;
       photoCaption.textContent = photo.title;
-      mainPhoto.src = photo.file;
+      mainPhoto.src = resource?.loadedSrc || photo.file;
       mainPhoto.hidden = false;
       photoLoader.hidden = true;
       photoControlsLocked = false;
       syncPhotoControls();
       onLayoutChange();
+      preloadNearbyPhotos();
     }
 
     function prunePhotoCache() {
       const activeFiles = new Set(photos.map((photo) => photo.file));
       for (const file of photoCache.keys()) {
         if (!activeFiles.has(file)) {
+          abortPhotoResourceLoad(photoCache.get(file));
           photoCache.delete(file);
         }
       }
@@ -198,7 +302,7 @@
       const photo = photos[currentPhotoIndex];
       const hasDisplayedPhoto = !mainPhoto.hidden && Boolean(mainPhoto.src);
       const requestId = photoLoadRequestId + 1;
-      const resource = ensurePhotoResource(photo.file);
+      const resource = ensurePhotoResource(photo.file, { retryOnError: true });
 
       photoLoadRequestId = requestId;
       photoControlsLocked = true;
@@ -210,11 +314,10 @@
       }
 
       watchPhotoResource(resource, () => {
-        finishPhotoUpdate(requestId, photo);
+        finishPhotoUpdate(requestId, photo, resource);
       }, () => {
         failPhotoUpdate(requestId);
       });
-      preloadNearbyPhotos();
     }
 
     function movePhoto(step) {
