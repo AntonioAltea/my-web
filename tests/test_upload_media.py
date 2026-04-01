@@ -35,7 +35,7 @@ class UploadMediaScriptTests(unittest.TestCase):
                 : > "{sources_path}"
                 while IFS= read -r line; do
                   printf '%s\n' "$line" >> "{stdin_path}"
-                  set -- $line
+                  eval "set -- $line"
                   if [[ "${{1:-}}" == "put" && -n "${{2:-}}" ]]; then
                     printf '%s\n' "$2" >> "{sources_path}"
                     cp "$2" "{uploads_dir}/$(basename "$2")"
@@ -49,7 +49,7 @@ class UploadMediaScriptTests(unittest.TestCase):
 
     def run_upload(
         self, kind: str, local_path: Path
-    ) -> tuple[subprocess.CompletedProcess[str], Path, Path]:
+    ) -> tuple[subprocess.CompletedProcess[str], Path, Path, Path]:
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
         temp_root = Path(temp_dir.name)
@@ -75,7 +75,7 @@ class UploadMediaScriptTests(unittest.TestCase):
             check=False,
         )
 
-        return result, uploads_dir, sources_path
+        return result, uploads_dir, sources_path, stdin_path
 
     def test_upload_media_optimizes_single_photo_before_uploading(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -85,7 +85,9 @@ class UploadMediaScriptTests(unittest.TestCase):
             )
             original_size = photo_path.stat().st_size
 
-            result, uploads_dir, sources_path = self.run_upload("photos", photo_path)
+            result, uploads_dir, sources_path, _stdin_path = self.run_upload(
+                "photos", photo_path
+            )
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Preparing a web copy of the photo...", result.stdout)
@@ -105,12 +107,35 @@ class UploadMediaScriptTests(unittest.TestCase):
             track_path = Path(temp_dir) / "tema.mp3"
             track_path.write_bytes(b"fake mp3 data")
 
-            result, uploads_dir, sources_path = self.run_upload("music", track_path)
+            result, uploads_dir, sources_path, _stdin_path = self.run_upload(
+                "music", track_path
+            )
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((uploads_dir / "tema.mp3").read_bytes(), b"fake mp3 data")
         self.assertEqual(
             sources_path.read_text(encoding="utf-8").strip(), str(track_path)
+        )
+
+    def test_upload_media_quotes_music_paths_with_spaces(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            track_path = Path(temp_dir) / "01 canción tranquila.flac"
+            track_path.write_bytes(b"fake flac data")
+
+            result, uploads_dir, sources_path, stdin_path = self.run_upload(
+                "music", track_path
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            (uploads_dir / "01 canción tranquila.flac").read_bytes(), b"fake flac data"
+        )
+        self.assertEqual(
+            sources_path.read_text(encoding="utf-8").strip(), str(track_path)
+        )
+        self.assertIn(
+            f'put "{track_path}" "/data/music/{track_path.name}"',
+            stdin_path.read_text(encoding="utf-8"),
         )
 
 

@@ -13,6 +13,13 @@ REMOTE_PATH="/data/${MEDIA_KIND}"
 MACHINE_ARGS=()
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+sftp_quote() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '"%s"' "$value"
+}
+
 log_phase() {
   echo
   echo "==> $1"
@@ -90,7 +97,9 @@ if [[ -s "$to_upload" ]]; then
     for i in "${!upload_names[@]}"; do
       name="${upload_names[$i]}"
       printf '[upload %s/%s] %s\n' "$((i + 1))" "${upload_count}" "$name" >&2
-      printf 'put %s %s/%s\n' "$upload_root/$name" "$REMOTE_PATH" "$name"
+      printf 'put %s %s\n' \
+        "$(sftp_quote "$upload_root/$name")" \
+        "$(sftp_quote "$REMOTE_PATH/$name")"
     done
   } | fly ssh sftp shell -a "$APP_NAME" "${MACHINE_ARGS[@]}" >/dev/null
 else

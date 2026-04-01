@@ -13,6 +13,13 @@ MACHINE_ARGS=()
 UPLOAD_PATH="$LOCAL_PATH"
 TMP_DIR=""
 
+sftp_quote() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '"%s"' "$value"
+}
+
 if [[ -n "${MACHINE_ID:-}" ]]; then
   MACHINE_ARGS=(--machine "$MACHINE_ID")
 fi
@@ -62,10 +69,14 @@ if [[ -d "$UPLOAD_PATH" ]]; then
   {
     for file_path in "${files[@]}"; do
       file_name="$(basename "$file_path")"
-      printf 'put %s %s/%s\n' "$file_path" "$REMOTE_PATH" "$file_name"
+      printf 'put %s %s\n' \
+        "$(sftp_quote "$file_path")" \
+        "$(sftp_quote "$REMOTE_PATH/$file_name")"
     done
   } | fly ssh sftp shell -a "$APP_NAME" "${MACHINE_ARGS[@]}"
 else
   file_name="$(basename "$UPLOAD_PATH")"
-  printf 'put %s %s/%s\n' "$UPLOAD_PATH" "$REMOTE_PATH" "$file_name" | fly ssh sftp shell -a "$APP_NAME" "${MACHINE_ARGS[@]}"
+  printf 'put %s %s\n' \
+    "$(sftp_quote "$UPLOAD_PATH")" \
+    "$(sftp_quote "$REMOTE_PATH/$file_name")" | fly ssh sftp shell -a "$APP_NAME" "${MACHINE_ARGS[@]}"
 fi
