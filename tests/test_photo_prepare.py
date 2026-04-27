@@ -11,6 +11,14 @@ from scripts import photo_prepare
 
 
 class PhotoPrepareTests(unittest.TestCase):
+    def test_photo_variant_name_and_detection_work_together(self) -> None:
+        self.assertEqual(
+            photo_prepare.photo_variant_name("granada.jpg", 960),
+            "granada--w960.jpg",
+        )
+        self.assertTrue(photo_prepare.is_photo_variant_name("granada--w960.jpg"))
+        self.assertFalse(photo_prepare.is_photo_variant_name("granada.jpg"))
+
     def test_resize_image_keeps_small_image_size(self) -> None:
         image = Image.new("RGB", (640, 480), color=(20, 30, 40))
 
@@ -108,6 +116,35 @@ class PhotoPrepareTests(unittest.TestCase):
             )
 
             self.assertEqual(target.read_bytes(), source.read_bytes())
+
+    def test_optimize_photo_set_generates_responsive_variants(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "input.jpg"
+            target_dir = root / "prepared"
+            Image.new("RGB", (4000, 2000), color=(20, 30, 40)).save(
+                source, format="JPEG"
+            )
+
+            outputs = photo_prepare.optimize_photo_set(
+                source,
+                target_dir,
+                max_dims=(960, 1600, 2200),
+                jpeg_quality=82,
+                webp_quality=80,
+            )
+
+            self.assertEqual(
+                [output["name"] for output in outputs],
+                ["input--w960.jpg", "input--w1600.jpg", "input.jpg"],
+            )
+            self.assertEqual(
+                [output["width"] for output in outputs],
+                [960, 1600, 2200],
+            )
+            self.assertTrue((target_dir / "input--w960.jpg").exists())
+            self.assertTrue((target_dir / "input--w1600.jpg").exists())
+            self.assertTrue((target_dir / "input.jpg").exists())
 
 
 if __name__ == "__main__":

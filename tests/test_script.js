@@ -210,6 +210,10 @@ class FakeImage {
     return this._src;
   }
 
+  get currentSrc() {
+    return this._src;
+  }
+
   static reset() {
     FakeImage.created = [];
   }
@@ -748,64 +752,6 @@ async function testPhotoCaptionOnlyShowsOnHoverWhenLoaded() {
   assert.equal(selectors["#photo-caption"].classList.contains("photo-caption-visible"), false);
 }
 
-async function testPreloadsAdjacentAndRandomPhotos() {
-  const env = await loadApp({
-    mediaPayload: {
-      photos: [
-        "/assets/photos/uno.jpg",
-        "/assets/photos/dos.jpg",
-        "/assets/photos/tres.jpg",
-        "/assets/photos/cuatro.jpg",
-      ],
-      music: [{ file: "/assets/music/uno.mp3", title: "uno", track_number: 1 }],
-    },
-    randomValues: [0, 0, 0],
-  });
-  const { selectors, fakeImages, triggerImageLoad } = env;
-
-  assert.deepEqual(fakeImages.map((image) => image.src), ["/assets/photos/uno.jpg"]);
-
-  triggerImageLoad(0);
-  selectors["#next-photo"].click();
-
-  assert.deepEqual(
-    fakeImages.map((image) => image.src),
-    [
-      "/assets/photos/uno.jpg",
-      "/assets/photos/dos.jpg",
-      "/assets/photos/cuatro.jpg",
-      "/assets/photos/tres.jpg",
-    ],
-  );
-}
-
-async function testConstrainedConnectionPreloadsOnlyNextPhoto() {
-  const env = await loadApp({
-    mediaPayload: {
-      photos: [
-        "/assets/photos/uno.jpg",
-        "/assets/photos/dos.jpg",
-        "/assets/photos/tres.jpg",
-        "/assets/photos/cuatro.jpg",
-      ],
-      music: [{ file: "/assets/music/uno.mp3", title: "uno", track_number: 1 }],
-    },
-    connection: { effectiveType: "2g", saveData: false },
-    randomValues: [0],
-  });
-  const { fakeImages, triggerImageLoad } = env;
-
-  triggerImageLoad(0);
-
-  assert.deepEqual(
-    fakeImages.map((image) => image.src),
-    [
-      "/assets/photos/uno.jpg",
-      "/assets/photos/dos.jpg",
-    ],
-  );
-}
-
 async function testKeepsCurrentPhotoVisibleWhileNextLoads() {
   const env = await loadApp({
     mediaPayload: {
@@ -831,7 +777,7 @@ async function testKeepsCurrentPhotoVisibleWhileNextLoads() {
   assert.equal(selectors["#photo-loader"].hidden, true);
 }
 
-async function testShowsPreloadedPhotoImmediately() {
+async function testShowsLoadedPhotoImmediatelyWhenRevisited() {
   const env = await loadApp({
     mediaPayload: {
       photos: ["/assets/photos/uno.jpg", "/assets/photos/dos.jpg"],
@@ -842,7 +788,9 @@ async function testShowsPreloadedPhotoImmediately() {
   const { selectors, triggerImageLoad } = env;
 
   triggerImageLoad(0);
+  selectors["#next-photo"].click();
   triggerImageLoad(1);
+  selectors["#prev-photo"].click();
   selectors["#next-photo"].click();
 
   assert.equal(selectors["#main-photo"].src, "/assets/photos/dos.jpg");
@@ -850,28 +798,55 @@ async function testShowsPreloadedPhotoImmediately() {
   assert.equal(selectors["#next-photo"].disabled, false);
 }
 
-async function testRandomButtonUsesPreloadedRandomPhoto() {
+async function testRandomButtonStartsANewPhotoLoad() {
   const env = await loadApp({
     mediaPayload: {
       photos: [
         "/assets/photos/uno.jpg",
         "/assets/photos/dos.jpg",
         "/assets/photos/tres.jpg",
-        "/assets/photos/cuatro.jpg",
       ],
       music: [{ file: "/assets/music/uno.mp3", title: "uno", track_number: 1 }],
     },
-    randomValues: [0, 0, 0],
+    randomValues: [0.99],
   });
-  const { selectors, triggerImageLoad } = env;
+  const { selectors, fakeImages, triggerImageLoad } = env;
 
   triggerImageLoad(0);
-  triggerImageLoad(3);
   selectors["#photo-random"].click();
 
-  assert.equal(selectors["#main-photo"].src, "/assets/photos/tres.jpg");
+  assert.equal(fakeImages.length, 2);
+  assert.equal(selectors["#photo-loader"].hidden, false);
+  triggerImageLoad(1);
+  assert.equal(selectors["#main-photo"].src, "/assets/photos/dos.jpg");
   assert.equal(selectors["#photo-loader"].hidden, true);
   assert.equal(selectors["#photo-random"].disabled, false);
+}
+
+async function testUsesResponsivePhotoCandidatesFromMediaPayload() {
+  const env = await loadApp({
+    mediaPayload: {
+      photos: [
+        {
+          src: "/assets/photos/uno.jpg?v=1",
+          srcset: "/assets/photos/uno--w960.jpg?v=1 960w, /assets/photos/uno.jpg?v=1 1600w",
+          sizes: "(max-width: 640px) calc(100vw - 34px), 1224px",
+        },
+      ],
+      music: [{ file: "/assets/music/uno.mp3", title: "uno", track_number: 1 }],
+    },
+  });
+  const { fakeImages } = env;
+
+  assert.equal(fakeImages[0].src, "/assets/photos/uno.jpg?v=1");
+  assert.equal(
+    fakeImages[0].srcset,
+    "/assets/photos/uno--w960.jpg?v=1 960w, /assets/photos/uno.jpg?v=1 1600w",
+  );
+  assert.equal(
+    fakeImages[0].sizes,
+    "(max-width: 640px) calc(100vw - 34px), 1224px",
+  );
 }
 
 async function run() {
@@ -890,11 +865,10 @@ async function run() {
     ["lets you select a track from the album list", testTrackListCanSelectTrack],
     ["tracks visits and playback analytics", testTracksVisitAndTrackPlayback],
     ["shows photo caption only on hover after load", testPhotoCaptionOnlyShowsOnHoverWhenLoaded],
-    ["preloads previous next and random photos", testPreloadsAdjacentAndRandomPhotos],
-    ["preloads only the next photo on constrained connections", testConstrainedConnectionPreloadsOnlyNextPhoto],
     ["keeps the current photo visible while the next one loads", testKeepsCurrentPhotoVisibleWhileNextLoads],
-    ["shows a preloaded photo immediately", testShowsPreloadedPhotoImmediately],
-    ["uses the preloaded random photo on random navigation", testRandomButtonUsesPreloadedRandomPhoto],
+    ["shows a loaded photo immediately when revisited", testShowsLoadedPhotoImmediatelyWhenRevisited],
+    ["starts a fresh load for random navigation", testRandomButtonStartsANewPhotoLoad],
+    ["uses responsive photo candidates from the media payload", testUsesResponsivePhotoCandidatesFromMediaPayload],
   ];
 
   for (const [name, testFn] of tests) {

@@ -22,7 +22,6 @@
     let currentPhotoIndex = 0;
     let photoControlsLocked = false;
     let photoLoadRequestId = 0;
-    let preloadedRandomPhotoIndex = null;
     const photoCache = new Map();
 
     function photoRequestSrc(file, attempt) {
@@ -32,6 +31,28 @@
 
       const separator = file.includes("?") ? "&" : "?";
       return `${file}${separator}manturon-photo-retry=${attempt}`;
+    }
+
+    function photoRequestSrcset(srcset, attempt) {
+      if (attempt <= 0 || !srcset) {
+        return srcset;
+      }
+
+      return srcset
+        .split(",")
+        .map((candidate) => candidate.trim())
+        .filter(Boolean)
+        .map((candidate) => {
+          const separatorIndex = candidate.lastIndexOf(" ");
+          if (separatorIndex < 0) {
+            return photoRequestSrc(candidate, attempt);
+          }
+
+          const url = candidate.slice(0, separatorIndex);
+          const descriptor = candidate.slice(separatorIndex + 1);
+          return `${photoRequestSrc(url, attempt)} ${descriptor}`;
+        })
+        .join(", ");
     }
 
     function detachPhotoImage(image, { clearSrc = false } = {}) {
@@ -63,6 +84,7 @@
       clearPhotoResourceTimeout(resource);
       detachPhotoImage(resource.image, { clearSrc: true });
       resource.image = null;
+      resource.listeners.clear();
       if (resource.status === "loading") {
         resource.status = "idle";
       }
@@ -83,7 +105,7 @@
       clearPhotoResourceTimeout(resource);
       resource.status = status;
       if (status === "loaded") {
-        resource.loadedSrc = image.src;
+        resource.loadedSrc = image.currentSrc || image.src;
       } else {
         detachPhotoImage(image, { clearSrc: true });
         resource.image = null;
@@ -99,7 +121,16 @@
 
       const image = new Image();
       const requestSrc = photoRequestSrc(resource.file, resource.attempt - 1);
+      const requestSrcset = photoRequestSrcset(resource.srcset, resource.attempt - 1);
 
+      image.decoding = "async";
+      image.fetchPriority = "high";
+      if (requestSrcset) {
+        image.srcset = requestSrcset;
+      }
+      if (resource.sizes) {
+        image.sizes = resource.sizes;
+      }
       resource.image = image;
       image.onload = () => {
         finalizePhotoResource(resource, image, "loaded");
@@ -122,13 +153,16 @@
       randomButton.disabled = !canNavigate;
     }
 
-    function ensurePhotoResource(file, { retryOnError = false } = {}) {
+    function ensurePhotoResource(photo, { retryOnError = false } = {}) {
+      const file = photo?.file;
       if (!file) {
         return null;
       }
 
       const existingResource = photoCache.get(file);
       if (existingResource) {
+        existingResource.sizes = photo.sizes || "";
+        existingResource.srcset = photo.srcset || "";
         if (retryOnError && existingResource.status === "error") {
           startPhotoResourceLoad(existingResource);
         }
@@ -141,6 +175,8 @@
         image: null,
         listeners: new Set(),
         loadedSrc: file,
+        sizes: photo.sizes || "",
+        srcset: photo.srcset || "",
         status: "idle",
         timeoutId: null,
       };
@@ -176,25 +212,6 @@
       });
     }
 
-    function preloadPhoto(file) {
-      ensurePhotoResource(file);
-    }
-
-    function shouldLimitPreloading() {
-      const connection = global.navigator?.connection
-        || global.navigator?.mozConnection
-        || global.navigator?.webkitConnection;
-      if (!connection) {
-        return false;
-      }
-
-      if (connection.saveData === true) {
-        return true;
-      }
-
-      return ["slow-2g", "2g", "3g"].includes(connection.effectiveType);
-    }
-
     function selectableRandomPhotoIndices() {
       return photos
         .map((_, index) => index)
@@ -207,38 +224,6 @@
       }
 
       return candidates[randomIndex(candidates.length)];
-    }
-
-    function preloadNearbyPhotos() {
-      if (photos.length <= 1) {
-        preloadedRandomPhotoIndex = null;
-        return;
-      }
-
-      const limitPreloading = shouldLimitPreloading();
-      const nextIndices = new Set([
-        (currentPhotoIndex + 1) % photos.length,
-      ]);
-
-      if (!limitPreloading) {
-        nextIndices.add((currentPhotoIndex - 1 + photos.length) % photos.length);
-      }
-
-      const randomCandidates = photos
-        .map((_, index) => index)
-        .filter((index) => index !== currentPhotoIndex && !nextIndices.has(index));
-
-      if (!limitPreloading && randomCandidates.length) {
-        const randomCandidateIndex = chooseRandomPhotoIndex(randomCandidates);
-        preloadedRandomPhotoIndex = randomCandidateIndex;
-        nextIndices.add(randomCandidateIndex);
-      } else {
-        preloadedRandomPhotoIndex = null;
-      }
-
-      for (const index of nextIndices) {
-        preloadPhoto(photos[index]?.file);
-      }
     }
 
     function finishPhotoUpdate(requestId, photo, resource) {
@@ -254,7 +239,6 @@
       photoControlsLocked = false;
       syncPhotoControls();
       onLayoutChange();
-      preloadNearbyPhotos();
     }
 
     function prunePhotoCache() {
@@ -264,13 +248,6 @@
           abortPhotoResourceLoad(photoCache.get(file));
           photoCache.delete(file);
         }
-      }
-
-      if (
-        preloadedRandomPhotoIndex !== null
-        && (preloadedRandomPhotoIndex < 0 || preloadedRandomPhotoIndex >= photos.length)
-      ) {
-        preloadedRandomPhotoIndex = null;
       }
     }
 
@@ -302,7 +279,7 @@
       const photo = photos[currentPhotoIndex];
       const hasDisplayedPhoto = !mainPhoto.hidden && Boolean(mainPhoto.src);
       const requestId = photoLoadRequestId + 1;
-      const resource = ensurePhotoResource(photo.file, { retryOnError: true });
+      const resource = ensurePhotoResource(photo, { retryOnError: true });
 
       photoLoadRequestId = requestId;
       photoControlsLocked = true;
@@ -334,11 +311,7 @@
         return;
       }
 
-      const randomCandidates = selectableRandomPhotoIndices();
-      currentPhotoIndex = randomCandidates.includes(preloadedRandomPhotoIndex)
-        ? preloadedRandomPhotoIndex
-        : chooseRandomPhotoIndex(randomCandidates);
-      preloadedRandomPhotoIndex = null;
+      currentPhotoIndex = chooseRandomPhotoIndex();
       updatePhoto();
     }
 

@@ -4,6 +4,7 @@ import argparse
 import errno
 import json
 import os
+import re
 import socket
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -26,6 +27,13 @@ REDIRECT_HOSTS = {
     if host.strip()
 }
 PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"}
+PHOTO_MANIFEST_NAME = ".photo-manifest.json"
+PHOTO_SLOT_SIZES = (
+    "(max-width: 640px) calc(100vw - 34px), "
+    "(max-width: 1280px) calc(100vw - 56px), "
+    "1224px"
+)
+PHOTO_VARIANT_PATTERN = re.compile(r"^(?P<stem>.+)--w(?P<max_dim>\d+)$")
 MUSIC_EXTENSIONS = {".mp3", ".wav", ".ogg", ".m4a", ".flac"}
 ANALYTICS_LOCK = threading.Lock()
 ANALYTICS_SESSION_RETENTION = timedelta(days=30)
@@ -275,6 +283,85 @@ def dedupe_photo_paths(paths: list[Path]) -> list[Path]:
     return sorted(preferred.values(), key=lambda item: item.name.lower())
 
 
+def is_photo_variant_path(path: Path) -> bool:
+    return PHOTO_VARIANT_PATTERN.match(path.stem) is not None
+
+
+def photo_manifest_path() -> Path:
+    return PHOTOS_DIR / PHOTO_MANIFEST_NAME
+
+
+def load_photo_manifest() -> dict[str, dict[str, object]]:
+    path = photo_manifest_path()
+    if not path.exists():
+        return {}
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    photos = payload.get("photos")
+    if not isinstance(photos, dict):
+        return {}
+
+    manifest: dict[str, dict[str, object]] = {}
+    for file_name, entry in photos.items():
+        if not isinstance(file_name, str) or not isinstance(entry, dict):
+            continue
+        manifest[file_name] = entry
+    return manifest
+
+
+def versioned_photo_url(file_name: str, version: str | None) -> str:
+    base_url = f"/assets/photos/{file_name}"
+    if not version:
+        return base_url
+    return f"{base_url}?v={version}"
+
+
+def responsive_photo_entry(
+    path: Path, manifest: dict[str, dict[str, object]]
+) -> dict[str, str]:
+    entry = manifest.get(path.name, {})
+    version = entry.get("version") if isinstance(entry.get("version"), str) else None
+    raw_sources = entry.get("sources")
+    sources: list[dict[str, object]] = []
+    if isinstance(raw_sources, list):
+        for source in raw_sources:
+            if not isinstance(source, dict):
+                continue
+            name = source.get("name")
+            if not isinstance(name, str) or not name:
+                continue
+            candidate: dict[str, object] = {"name": name}
+            width = source.get("width")
+            if isinstance(width, int) and width > 0:
+                candidate["width"] = width
+            sources.append(candidate)
+
+    if not sources:
+        sources = [{"name": path.name}]
+
+    srcset_candidates = []
+    for source in sorted(
+        sources, key=lambda item: (int(item.get("width", 0)), str(item["name"]).lower())
+    ):
+        width = source.get("width")
+        if isinstance(width, int) and width > 0:
+            srcset_candidates.append(
+                f"{versioned_photo_url(str(source['name']), version)} {width}w"
+            )
+
+    payload = {
+        "src": versioned_photo_url(path.name, version),
+    }
+    if len(srcset_candidates) >= 2:
+        payload["sizes"] = PHOTO_SLOT_SIZES
+        payload["srcset"] = ", ".join(srcset_candidates)
+    return payload
+
+
 def is_media_request(path: str) -> bool:
     return urlparse(path).path == "/api/media"
 
@@ -498,11 +585,14 @@ def record_analytics_event(payload: dict[str, object]) -> dict[str, object]:
 
 
 def media_payload() -> dict[str, list[object]]:
+    manifest = load_photo_manifest()
     photo_paths = (
         [
             path
             for path in sorted(PHOTOS_DIR.iterdir(), key=lambda item: item.name.lower())
-            if path.is_file() and path.suffix.lower() in PHOTO_EXTENSIONS
+            if path.is_file()
+            and path.suffix.lower() in PHOTO_EXTENSIONS
+            and not is_photo_variant_path(path)
         ]
         if PHOTOS_DIR.exists()
         else []
@@ -511,7 +601,7 @@ def media_payload() -> dict[str, list[object]]:
     photo_paths = dedupe_photo_paths(photo_paths)
 
     return {
-        "photos": [f"/assets/photos/{path.name}" for path in photo_paths],
+        "photos": [responsive_photo_entry(path, manifest) for path in photo_paths],
         "music": public_music_files(MUSIC_DIR),
     }
 
@@ -602,7 +692,9 @@ class MediaHandler(SimpleHTTPRequestHandler):
             raise
 
     def end_headers(self) -> None:
-        request_path = urlparse(self.path).path
+        parsed_request = urlparse(self.path)
+        request_path = parsed_request.path
+        request_query = parsed_request.query
 
         if (
             request_path
@@ -612,6 +704,11 @@ class MediaHandler(SimpleHTTPRequestHandler):
             or request_path.startswith("/assets/icons/")
         ):
             self.send_header("Cache-Control", "no-store, max-age=0")
+        elif request_path.startswith("/assets/photos/"):
+            if "v=" in request_query:
+                self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+            else:
+                self.send_header("Cache-Control", "no-cache")
 
         super().end_headers()
 

@@ -12,6 +12,8 @@ assets/analytics.json
 
 .env
 .cache/
+node_modules/
+src/static/app/
 
 .vscode/settings.json
 .codex

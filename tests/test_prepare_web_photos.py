@@ -103,29 +103,39 @@ class PrepareWebPhotosTests(unittest.TestCase):
                 webp_quality=60,
             )
 
-            calls: list[tuple[str, str, int, int, int]] = []
+            calls: list[tuple[str, tuple[int, ...], int, int]] = []
 
-            def fake_optimize(
+            def fake_optimize_set(
                 source_path: Path,
                 target_path: Path,
-                max_dim: int,
+                *,
+                max_dims: tuple[int, ...],
                 jpeg_quality: int,
                 webp_quality: int,
-            ) -> None:
+            ) -> list[dict[str, object]]:
                 calls.append(
                     (
                         source_path.name,
-                        target_path.name,
-                        max_dim,
+                        max_dims,
                         jpeg_quality,
                         webp_quality,
                     )
                 )
-                target_path.write_bytes(b"prepared")
+                (target_path / source_path.name).write_bytes(b"prepared")
+                return [
+                    {
+                        "name": source_path.name,
+                        "output_size": 8,
+                        "width": 120,
+                        "height": 80,
+                    }
+                ]
 
             with mock.patch.object(prepare_web_photos, "parse_args", return_value=args):
                 with mock.patch.object(
-                    prepare_web_photos, "optimize_photo", side_effect=fake_optimize
+                    prepare_web_photos,
+                    "optimize_photo_set",
+                    side_effect=fake_optimize_set,
                 ):
                     result = prepare_web_photos.main()
 
@@ -133,8 +143,8 @@ class PrepareWebPhotosTests(unittest.TestCase):
             self.assertEqual(
                 calls,
                 [
-                    ("A.JPG", "A.JPG", 1800, 70, 60),
-                    ("b.webp", "b.webp", 1800, 70, 60),
+                    ("A.JPG", (960, 1600, 1800), 70, 60),
+                    ("b.webp", (960, 1600, 1800), 70, 60),
                 ],
             )
             self.assertTrue((target / "A.JPG").exists())

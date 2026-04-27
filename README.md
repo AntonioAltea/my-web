@@ -163,7 +163,7 @@ Or both at once:
 make sync-all
 ```
 
-For photos, both `make upload` and `make sync` generate optimized web copies first. Your local originals are not touched, but smaller versions are uploaded to Fly so they load much better.
+For photos, both `make upload` and `make sync` generate optimized web copies first. Your local originals are not touched, but smaller responsive variants are uploaded to Fly so the browser can pick a better size for the current viewport.
 Photo sync now keeps a persistent local cache of those web copies under `.cache/`, so repeated syncs only regenerate photos whose source or optimization settings changed.
 At the end of each real sync, the script re-reads the Fly volume and verifies that it matches the prepared local set; if it does not, the command fails.
 
@@ -192,7 +192,7 @@ files actually served in production
         |
         v
 /api/media
-list of public photo URLs
+list of public photo sources plus responsive `srcset` metadata
 ```
 
 Music is simpler because it is not recompressed:

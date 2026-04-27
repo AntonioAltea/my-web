@@ -322,6 +322,51 @@ class MediaRequestTests(unittest.TestCase):
         self.assertEqual(cache_headers, ["Cache-Control: no-store, max-age=0\r\n"])
         end_headers_mock.assert_called_once_with(handler)
 
+    def test_end_headers_uses_long_cache_for_versioned_photos(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/assets/photos/demo.jpg?v=123"
+        handler._headers_buffer = []
+        handler.wfile = io.BytesIO()
+        handler.request_version = "HTTP/1.1"
+        handler.command = "GET"
+
+        with mock.patch.object(
+            server.SimpleHTTPRequestHandler, "end_headers", autospec=True
+        ) as end_headers_mock:
+            server.MediaHandler.end_headers(handler)
+
+        cache_headers = [
+            header.decode("latin-1")
+            for header in handler._headers_buffer
+            if b"Cache-Control" in header
+        ]
+        self.assertEqual(
+            cache_headers,
+            ["Cache-Control: public, max-age=31536000, immutable\r\n"],
+        )
+        end_headers_mock.assert_called_once_with(handler)
+
+    def test_end_headers_uses_revalidation_for_unversioned_photos(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/assets/photos/demo.jpg"
+        handler._headers_buffer = []
+        handler.wfile = io.BytesIO()
+        handler.request_version = "HTTP/1.1"
+        handler.command = "GET"
+
+        with mock.patch.object(
+            server.SimpleHTTPRequestHandler, "end_headers", autospec=True
+        ) as end_headers_mock:
+            server.MediaHandler.end_headers(handler)
+
+        cache_headers = [
+            header.decode("latin-1")
+            for header in handler._headers_buffer
+            if b"Cache-Control" in header
+        ]
+        self.assertEqual(cache_headers, ["Cache-Control: no-cache\r\n"])
+        end_headers_mock.assert_called_once_with(handler)
+
     def test_do_get_ignores_client_disconnect_while_serving_file(self) -> None:
         handler = server.MediaHandler.__new__(server.MediaHandler)
         handler.path = "/assets/music/demo.flac"
@@ -422,7 +467,7 @@ class MediaRequestTests(unittest.TestCase):
         handler.end_headers = mock.Mock()
 
         payload = {
-            "photos": ["/assets/photos/demo.jpg"],
+            "photos": [{"src": "/assets/photos/demo.jpg?v=123"}],
             "music": [
                 {
                     "file": "/assets/music/demo.flac",
@@ -438,7 +483,7 @@ class MediaRequestTests(unittest.TestCase):
 
         self.assertEqual(
             handler.wfile.getvalue(),
-            b'{"photos": ["/assets/photos/demo.jpg"], "music": [{"file": "/assets/music/demo.flac", "title": "Demo", "track_number": 1}]}',
+            b'{"photos": [{"src": "/assets/photos/demo.jpg?v=123"}], "music": [{"file": "/assets/music/demo.flac", "title": "Demo", "track_number": 1}]}',
         )
         handler.send_response.assert_called_once_with(200)
         handler.send_header.assert_any_call(
@@ -576,6 +621,22 @@ class MediaPayloadTests(unittest.TestCase):
             photos.mkdir()
             music.mkdir()
             (photos / "frame.jpg").write_text("x")
+            (photos / ".photo-manifest.json").write_text(
+                json.dumps(
+                    {
+                        "photos": {
+                            "frame.jpg": {
+                                "sources": [
+                                    {"name": "frame--w960.jpg", "width": 960},
+                                    {"name": "frame.jpg", "width": 1600},
+                                ],
+                                "version": "12-34",
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
             make_flac_file(
                 music / "song.flac",
                 {"TITLE": "Song From Metadata", "TRACKNUMBER": "2"},
@@ -588,7 +649,16 @@ class MediaPayloadTests(unittest.TestCase):
         server.PHOTOS_DIR = original_photos
         server.MUSIC_DIR = original_music
 
-        self.assertEqual(payload["photos"], ["/assets/photos/frame.jpg"])
+        self.assertEqual(
+            payload["photos"],
+            [
+                {
+                    "sizes": server.PHOTO_SLOT_SIZES,
+                    "src": "/assets/photos/frame.jpg?v=12-34",
+                    "srcset": "/assets/photos/frame--w960.jpg?v=12-34 960w, /assets/photos/frame.jpg?v=12-34 1600w",
+                }
+            ],
+        )
         self.assertEqual(
             payload["music"],
             [
@@ -629,6 +699,22 @@ class MediaPayloadTests(unittest.TestCase):
                 "/assets/music/bonus-track.flac",
             ],
         )
+
+    def test_media_payload_ignores_variant_photo_files(self) -> None:
+        original_photos = server.PHOTOS_DIR
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            photos = Path(temp_dir) / "photos"
+            photos.mkdir()
+            (photos / "frame.jpg").write_text("x")
+            (photos / "frame--w960.jpg").write_text("x")
+            server.PHOTOS_DIR = photos
+
+            payload = server.media_payload()
+
+        server.PHOTOS_DIR = original_photos
+
+        self.assertEqual(payload["photos"], [{"src": "/assets/photos/frame.jpg"}])
 
     def test_music_entry_from_path_falls_back_to_file_name(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

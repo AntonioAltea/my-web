@@ -6,9 +6,17 @@ import sys
 from pathlib import Path
 
 try:
-    from .photo_prepare import PHOTO_EXTENSIONS, optimize_photo
+    from .photo_prepare import (
+        PHOTO_EXTENSIONS,
+        PHOTO_VARIANT_MAX_DIMS,
+        optimize_photo_set,
+    )
 except ImportError:
-    from photo_prepare import PHOTO_EXTENSIONS, optimize_photo
+    from photo_prepare import (
+        PHOTO_EXTENSIONS,
+        PHOTO_VARIANT_MAX_DIMS,
+        optimize_photo_set,
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -17,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("source")
     parser.add_argument("target")
-    parser.add_argument("--max-dim", type=int, default=2200)
+    parser.add_argument("--max-dim", type=int, default=PHOTO_VARIANT_MAX_DIMS[-1])
     parser.add_argument("--jpeg-quality", type=int, default=82)
     parser.add_argument("--webp-quality", type=int, default=80)
     return parser.parse_args()
@@ -47,11 +55,11 @@ def main() -> int:
         return 0
 
     for index, source in enumerate(photo_sources, start=1):
-        target = target_dir / source.name
-        optimize_photo(
+        optimize_photo_set(
             source,
-            target,
-            max_dim=args.max_dim,
+            target_dir,
+            max_dims=tuple(dim for dim in PHOTO_VARIANT_MAX_DIMS if dim < args.max_dim)
+            + (args.max_dim,),
             jpeg_quality=args.jpeg_quality,
             webp_quality=args.webp_quality,
         )

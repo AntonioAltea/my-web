@@ -26,9 +26,10 @@ Short guide to work in this repo without wasting time.
 - Local `python3 -m src.server` serves the originals currently sitting in `assets/photos`; if you are checking mobile loading behavior, remember those files can be far heavier than the optimized copies served from Fly.
 - Basic analytics now persist in `analytics.json` under the media root as well; locally that means `assets/analytics.json`, and on Fly it means `/data/analytics.json`.
 - For photos, `make sync KIND=photos SRC=assets/photos` already generates optimized web copies before uploading; do not run `prepare-web-photos` separately and do not repeat the sync unless it was interrupted or failed.
+- The prepared photo set now includes responsive variants plus a `.photo-manifest.json` file consumed by `/api/media`; if you change photo preparation, keep that manifest in sync with the frontend payload.
 - Photo sync keeps a persistent local cache in `.cache/`; unchanged photos should not be regenerated on every run.
 - A real `make sync` must finish by verifying that the prepared local set and the remote volume match; if they do not, treat it as a failed sync.
-- `/api/media` returns the `photos` and `music` keys with web paths. If you change that contract, update `script.js` too.
+- `/api/media` returns the `music` key with web paths and the `photos` key as responsive photo entries (`src`, optional `srcset`, and optional `sizes`). If you change that contract, update `script.js` too.
 - `/stats` reads from `/api/analytics/summary`, and playback events post to `/api/analytics/event`; keep those in sync if analytics changes.
 - If you change `src/server.py` behavior, add or update tests in `tests/`.
 - Keep Python test coverage high; if it drops, bring it back up with useful tests before closing the task.

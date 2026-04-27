@@ -99,9 +99,11 @@ async function loadMedia() {
     file: track.file,
     title: track.title,
   }));
-  const nextPhotos = media.photos.map((file) => ({
-    file,
-    title: mediaApi.fileNameToTitle(file),
+  const nextPhotos = media.photos.map((photo) => ({
+    file: photo.file,
+    sizes: photo.sizes,
+    srcset: photo.srcset,
+    title: mediaApi.fileNameToTitle(photo.file),
   }));
 
   if (!mediaApi.arraysEqual(player.getTrackFiles(), nextTracks.map((track) => track.file))) {

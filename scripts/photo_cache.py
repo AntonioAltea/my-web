@@ -4,13 +4,24 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import tempfile
 from pathlib import Path
 
 try:
-    from .photo_prepare import PHOTO_EXTENSIONS, PREPARE_VERSION, optimize_photo
+    from .photo_prepare import (
+        PHOTO_EXTENSIONS,
+        PHOTO_MANIFEST_NAME,
+        PHOTO_VARIANT_MAX_DIMS,
+        PREPARE_VERSION,
+        optimize_photo_set,
+    )
 except ImportError:
-    from photo_prepare import PHOTO_EXTENSIONS, PREPARE_VERSION, optimize_photo
+    from photo_prepare import (
+        PHOTO_EXTENSIONS,
+        PHOTO_MANIFEST_NAME,
+        PHOTO_VARIANT_MAX_DIMS,
+        PREPARE_VERSION,
+        optimize_photo_set,
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -20,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("source")
     parser.add_argument("cache_dir")
     parser.add_argument("manifest")
-    parser.add_argument("--max-dim", type=int, default=2200)
+    parser.add_argument("--max-dim", type=int, default=PHOTO_VARIANT_MAX_DIMS[-1])
     parser.add_argument("--jpeg-quality", type=int, default=82)
     parser.add_argument("--webp-quality", type=int, default=80)
     return parser.parse_args()
@@ -67,6 +78,58 @@ def current_settings(args: argparse.Namespace) -> dict[str, int]:
     }
 
 
+def output_names(entry: dict) -> set[str]:
+    outputs = entry.get("outputs", [])
+    if not isinstance(outputs, list):
+        return set()
+
+    names = set()
+    for output in outputs:
+        if not isinstance(output, dict):
+            continue
+        name = output.get("name")
+        if isinstance(name, str) and name:
+            names.add(name)
+    return names
+
+
+def public_manifest_payload(files: dict[str, dict]) -> dict[str, object]:
+    photos: dict[str, dict[str, object]] = {}
+
+    for file_name, entry in sorted(files.items(), key=lambda item: item[0].lower()):
+        source = entry.get("source", {})
+        outputs = entry.get("outputs", [])
+        if not isinstance(source, dict) or not isinstance(outputs, list):
+            continue
+
+        version = f"{source.get('mtime_ns', 0)}-{source.get('size', 0)}"
+        candidates = []
+        for output in outputs:
+            if not isinstance(output, dict):
+                continue
+            name = output.get("name")
+            width = output.get("width")
+            if not isinstance(name, str) or not name:
+                continue
+            candidate: dict[str, object] = {"name": name}
+            if isinstance(width, int) and width > 0:
+                candidate["width"] = width
+            candidates.append(candidate)
+
+        if not candidates:
+            continue
+
+        photos[file_name] = {
+            "sources": candidates,
+            "version": version,
+        }
+
+    return {
+        "schema_version": 1,
+        "photos": photos,
+    }
+
+
 def build_photo_cache(
     args: argparse.Namespace,
 ) -> tuple[dict[str, int], dict[str, int]]:
@@ -95,41 +158,44 @@ def build_photo_cache(
     total = len(photo_sources)
 
     for stale_name in sorted(set(previous_files) - source_names):
-        stale_path = cache_dir / stale_name
-        if stale_path.exists():
-            stale_path.unlink()
+        for output_name in output_names(previous_files.get(stale_name, {})):
+            stale_path = cache_dir / output_name
+            if stale_path.exists():
+                stale_path.unlink()
         stats["removed"] += 1
 
     for index, source in enumerate(photo_sources, start=1):
         signature = file_signature(source)
-        target = cache_dir / source.name
         previous_entry = previous_files.get(source.name, {})
+        previous_outputs = output_names(previous_entry)
         can_reuse = (
             not settings_changed
             and previous_entry.get("source") == signature
-            and target.exists()
+            and previous_outputs
+            and all(
+                (cache_dir / output_name).exists() for output_name in previous_outputs
+            )
         )
 
         if can_reuse:
+            outputs = previous_entry.get("outputs", [])
             stats["reused"] += 1
         else:
-            fd, temp_path_str = tempfile.mkstemp(
-                prefix=f"{source.stem}-", suffix=source.suffix, dir=cache_dir
-            )
-            os.close(fd)
-            temp_path = Path(temp_path_str)
-            try:
-                optimize_photo(
-                    source,
-                    temp_path,
-                    max_dim=args.max_dim,
-                    jpeg_quality=args.jpeg_quality,
-                    webp_quality=args.webp_quality,
+            outputs = optimize_photo_set(
+                source,
+                cache_dir,
+                max_dims=tuple(
+                    dim for dim in PHOTO_VARIANT_MAX_DIMS if dim < args.max_dim
                 )
-                temp_path.replace(target)
-            finally:
-                if temp_path.exists():
-                    temp_path.unlink()
+                + (args.max_dim,),
+                jpeg_quality=args.jpeg_quality,
+                webp_quality=args.webp_quality,
+            )
+            current_output_names = {str(output["name"]) for output in outputs}
+            for stale_output_name in previous_outputs - current_output_names:
+                stale_path = cache_dir / stale_output_name
+                if stale_path.exists():
+                    stale_path.unlink()
             stats["regenerated"] += 1
 
         if total <= 12 or index == total or index % 25 == 0 or not can_reuse:
@@ -139,12 +205,18 @@ def build_photo_cache(
                 file=os.sys.stderr,
             )
 
-        output_size = target.stat().st_size
-        output_index[source.name] = output_size
         next_files[source.name] = {
+            "outputs": outputs,
             "source": signature,
-            "output_size": output_size,
         }
+        for output in outputs:
+            output_name = str(output["name"])
+            output_index[output_name] = int(output["output_size"])
+
+    public_manifest_path = cache_dir / PHOTO_MANIFEST_NAME
+    public_manifest = public_manifest_payload(next_files)
+    save_manifest(public_manifest_path, public_manifest)
+    output_index[PHOTO_MANIFEST_NAME] = public_manifest_path.stat().st_size
 
     save_manifest(
         manifest_path,

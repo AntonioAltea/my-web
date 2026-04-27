@@ -51,6 +51,26 @@
     return left.every((item, index) => item === right[index]);
   }
 
+  function normalizePhoto(photo) {
+    if (typeof photo === "string") {
+      return {
+        file: photo,
+        sizes: "",
+        srcset: "",
+      };
+    }
+
+    if (!photo || typeof photo.src !== "string") {
+      return null;
+    }
+
+    return {
+      file: photo.src,
+      sizes: typeof photo.sizes === "string" ? photo.sizes : "",
+      srcset: typeof photo.srcset === "string" ? photo.srcset : "",
+    };
+  }
+
   async function fetchMediaPayload(fetchFn) {
     const response = await fetchFn(`/api/media?t=${Date.now()}`, {
       cache: "no-store",
@@ -60,13 +80,16 @@
     }
 
     const payload = await response.json();
+    const photos = Array.isArray(payload.photos)
+      ? payload.photos.map(normalizePhoto).filter(Boolean)
+      : [];
     const music = Array.isArray(payload.music)
       ? payload.music.map(normalizeTrack).filter(Boolean)
       : [];
     music.sort(compareTracks);
 
     return {
-      photos: Array.isArray(payload.photos) ? payload.photos : [],
+      photos,
       music,
     };
   }
@@ -75,6 +98,7 @@
     arraysEqual,
     fetchMediaPayload,
     fileNameToTitle,
+    normalizePhoto,
     normalizeTrack,
   };
 })(globalThis);

@@ -22,6 +22,27 @@ def make_args(source: Path, cache_dir: Path, manifest: Path) -> SimpleNamespace:
 
 
 class PhotoCacheTests(unittest.TestCase):
+    @staticmethod
+    def fake_outputs(base_name: str) -> list[dict[str, int | str]]:
+        stem = Path(base_name).stem
+        suffix = Path(base_name).suffix
+        return [
+            {
+                "height": 540,
+                "max_dim": 960,
+                "name": f"{stem}--w960{suffix}",
+                "output_size": len(b"small"),
+                "width": 960,
+            },
+            {
+                "height": 900,
+                "max_dim": 2200,
+                "name": base_name,
+                "output_size": len(b"base"),
+                "width": 1600,
+            },
+        ]
+
     def test_parse_args_accepts_custom_values(self) -> None:
         with mock.patch(
             "sys.argv",
@@ -113,23 +134,46 @@ class PhotoCacheTests(unittest.TestCase):
             (source / "frame.jpg").write_bytes(b"original")
             args = make_args(source, cache_dir, manifest)
 
+            def write_outputs(
+                src: Path, target_dir: Path, **_: object
+            ) -> list[dict[str, int | str]]:
+                (target_dir / f"{src.stem}--w960{src.suffix}").write_bytes(b"small")
+                (target_dir / src.name).write_bytes(b"base")
+                return self.fake_outputs(src.name)
+
             with mock.patch.object(
                 photo_cache,
-                "optimize_photo",
-                side_effect=lambda src, target, **_: Path(target).write_bytes(
-                    b"prepared"
-                ),
+                "optimize_photo_set",
+                side_effect=write_outputs,
             ) as optimize_mock:
                 index, stats = photo_cache.build_photo_cache(args)
 
-            self.assertEqual(index, {"frame.jpg": len(b"prepared")})
+            self.assertEqual(
+                index,
+                {
+                    ".photo-manifest.json": (cache_dir / ".photo-manifest.json")
+                    .stat()
+                    .st_size,
+                    "frame--w960.jpg": len(b"small"),
+                    "frame.jpg": len(b"base"),
+                },
+            )
             self.assertEqual(stats, {"reused": 0, "regenerated": 1, "removed": 0})
             optimize_mock.assert_called_once()
 
-            with mock.patch.object(photo_cache, "optimize_photo") as optimize_mock:
+            with mock.patch.object(photo_cache, "optimize_photo_set") as optimize_mock:
                 index, stats = photo_cache.build_photo_cache(args)
 
-            self.assertEqual(index, {"frame.jpg": len(b"prepared")})
+            self.assertEqual(
+                index,
+                {
+                    ".photo-manifest.json": (cache_dir / ".photo-manifest.json")
+                    .stat()
+                    .st_size,
+                    "frame--w960.jpg": len(b"small"),
+                    "frame.jpg": len(b"base"),
+                },
+            )
             self.assertEqual(stats, {"reused": 1, "regenerated": 0, "removed": 0})
             optimize_mock.assert_not_called()
 
@@ -144,23 +188,36 @@ class PhotoCacheTests(unittest.TestCase):
             file_path.write_bytes(b"original")
             args = make_args(source, cache_dir, manifest)
 
+            def write_outputs(
+                src: Path, target_dir: Path, **_: object
+            ) -> list[dict[str, int | str]]:
+                (target_dir / f"{src.stem}--w960{src.suffix}").write_bytes(b"small")
+                (target_dir / src.name).write_bytes(b"base")
+                return self.fake_outputs(src.name)
+
             with mock.patch.object(
                 photo_cache,
-                "optimize_photo",
-                side_effect=lambda src, target, **_: Path(target).write_bytes(
-                    b"prepared"
-                ),
+                "optimize_photo_set",
+                side_effect=write_outputs,
             ):
                 photo_cache.build_photo_cache(args)
 
             file_path.unlink()
 
-            with mock.patch.object(photo_cache, "optimize_photo") as optimize_mock:
+            with mock.patch.object(photo_cache, "optimize_photo_set") as optimize_mock:
                 index, stats = photo_cache.build_photo_cache(args)
 
-            self.assertEqual(index, {})
+            self.assertEqual(
+                index,
+                {
+                    ".photo-manifest.json": (cache_dir / ".photo-manifest.json")
+                    .stat()
+                    .st_size
+                },
+            )
             self.assertEqual(stats, {"reused": 0, "regenerated": 0, "removed": 1})
             self.assertFalse((cache_dir / "old.jpg").exists())
+            self.assertFalse((cache_dir / "old--w960.jpg").exists())
             optimize_mock.assert_not_called()
 
     def test_build_photo_cache_cleans_temp_file_when_optimization_fails(self) -> None:
@@ -173,12 +230,13 @@ class PhotoCacheTests(unittest.TestCase):
             (source / "frame.jpg").write_bytes(b"original")
             args = make_args(source, cache_dir, manifest)
 
-            def fail_and_leave_temp(_src: Path, target: Path, **_: object) -> None:
-                Path(target).write_bytes(b"temp")
+            def fail_to_prepare(
+                _src: Path, _target_dir: Path, **_: object
+            ) -> list[dict[str, int | str]]:
                 raise RuntimeError("boom")
 
             with mock.patch.object(
-                photo_cache, "optimize_photo", side_effect=fail_and_leave_temp
+                photo_cache, "optimize_photo_set", side_effect=fail_to_prepare
             ):
                 with self.assertRaises(RuntimeError):
                     photo_cache.build_photo_cache(args)
@@ -215,6 +273,26 @@ class PhotoCacheTests(unittest.TestCase):
         self.assertIn(
             "Photo cache ready: reused 1, regenerated 2, removed 3.",
             print_mock.call_args_list[0].args[0],
+        )
+
+    def test_public_manifest_payload_lists_responsive_sources(self) -> None:
+        payload = photo_cache.public_manifest_payload(
+            {
+                "frame.jpg": {
+                    "outputs": self.fake_outputs("frame.jpg"),
+                    "source": {"mtime_ns": 12, "size": 34},
+                }
+            }
+        )
+
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["photos"]["frame.jpg"]["version"], "12-34")
+        self.assertEqual(
+            payload["photos"]["frame.jpg"]["sources"],
+            [
+                {"name": "frame--w960.jpg", "width": 960},
+                {"name": "frame.jpg", "width": 1600},
+            ],
         )
 
 
