@@ -701,6 +701,7 @@ class MediaHandler(SimpleHTTPRequestHandler):
             in {"/", "/index.html", "/favicon.ico", "/stats", "/stats/", "/stats.html"}
             or request_path.startswith("/static/css/")
             or request_path.startswith("/static/js/")
+            or request_path.startswith("/static/data/")
             or request_path.startswith("/assets/icons/")
         ):
             self.send_header("Cache-Control", "no-store, max-age=0")

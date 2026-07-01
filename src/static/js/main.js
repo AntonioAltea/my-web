@@ -53,7 +53,6 @@ const bandcamp = bandcampModule.createBandcampPlayer({
   toggleButton: albumToggle,
   toggleCurrent: albumToggleCurrent,
   list: albumList,
-  albums: globalThis.ManturonAlbums,
 });
 
 const themeController = theme.createThemeController({
@@ -85,9 +84,9 @@ async function loadMedia() {
 }
 
 gallery.init();
-bandcamp.init();
 themeController.init();
 analytics.trackVisit();
+bandcampModule.fetchAlbums(fetch).then((albums) => bandcamp.init(albums));
 
 document.addEventListener("keydown", (event) => {
   if (event.target instanceof HTMLInputElement) {

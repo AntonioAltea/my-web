@@ -213,7 +213,15 @@ class FakeResizeObserver {
   disconnect() {}
 }
 
-function createEnvironment(mediaPayload, { randomValues = [], connection = null } = {}) {
+const DEFAULT_ALBUMS = [
+  { id: "356629898", title: "la tormenta" },
+  { id: "3133548639", title: "ola de incendios" },
+];
+
+function createEnvironment(
+  mediaPayload,
+  { randomValues = [], connection = null, albums = DEFAULT_ALBUMS } = {},
+) {
   FakeImage.reset();
   const selectors = {
     "#main-photo": new FakeElement("main-photo"),
@@ -362,6 +370,15 @@ function createEnvironment(mediaPayload, { randomValues = [], connection = null 
       };
     }
 
+    if (String(url).startsWith("/static/data/albums.json")) {
+      return {
+        ok: true,
+        async json() {
+          return albums;
+        },
+      };
+    }
+
     if (url === "/api/activity" || url === "/api/analytics/event") {
       return {
         ok: true,
@@ -483,7 +500,6 @@ async function loadApp(options = {}) {
 
   const scripts = [
     "media-api.js",
-    "albums.js",
     "analytics.js",
     "theme.js",
     "gallery.js",

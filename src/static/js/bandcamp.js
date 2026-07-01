@@ -1,5 +1,6 @@
 (function (global) {
   const ALBUM_STORAGE_KEY = "manturon-album";
+  const ALBUMS_URL = "/static/data/albums.json";
 
   function findAlbum(albums, id) {
     return albums.find((album) => album.id === id) || albums[0];
@@ -27,13 +28,32 @@
     );
   }
 
-  function createBandcampPlayer({ iframe, toggleButton, toggleCurrent, list, albums }) {
+  async function fetchAlbums(fetchFn) {
+    try {
+      const response = await fetchFn(ALBUMS_URL);
+      if (!response.ok) {
+        return [];
+      }
+
+      const payload = await response.json();
+      return Array.isArray(payload) ? payload : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function createBandcampPlayer({ iframe, toggleButton, toggleCurrent, list }) {
     let theme = "light";
-    let album = findAlbum(albums, global.window.localStorage.getItem(ALBUM_STORAGE_KEY));
+    let albums = [];
+    let album = null;
     let isOpen = false;
     let tiles = [];
 
     function renderIframe() {
+      if (!album) {
+        return;
+      }
+
       const nextSrc = playerSrc(album.id, theme);
       if (iframe.src !== nextSrc) {
         iframe.src = nextSrc;
@@ -50,6 +70,10 @@
     }
 
     function syncToggle() {
+      if (!album) {
+        return;
+      }
+
       toggleCurrent.textContent = album.title;
       toggleButton.setAttribute("aria-expanded", isOpen ? "true" : "false");
       list.hidden = false;
@@ -59,7 +83,7 @@
 
     function syncSelection() {
       tiles.forEach(({ button, data }) => {
-        const isCurrent = data.id === album.id;
+        const isCurrent = album && data.id === album.id;
         button.classList.toggle("album-tile-select-current", isCurrent);
         button.setAttribute("aria-pressed", isCurrent ? "true" : "false");
       });
@@ -115,7 +139,13 @@
       return { item, button, art, data: candidate };
     }
 
-    function init() {
+    function init(nextAlbums) {
+      albums = nextAlbums;
+      if (!albums.length) {
+        return;
+      }
+
+      album = findAlbum(albums, global.window.localStorage.getItem(ALBUM_STORAGE_KEY));
       tiles = albums.map(buildTile);
       list.replaceChildren(...tiles.map((tile) => tile.item));
 
@@ -135,5 +165,6 @@
 
   global.ManturonBandcamp = {
     createBandcampPlayer,
+    fetchAlbums,
   };
 })(globalThis);
