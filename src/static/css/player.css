@@ -11,14 +11,163 @@
   width: min(1280px, calc(100% - 28px));
   margin: 0 auto;
   padding: 8px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 6px;
+}
+
+.album-picker {
+  width: 700px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.album-toggle {
+  width: 100%;
   display: flex;
-  justify-content: center;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-soft);
+  color: var(--accent);
+  padding: 4px 10px 5px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.album-toggle-label {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+}
+
+.album-toggle-current {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  text-transform: lowercase;
+}
+
+.album-toggle:focus-visible {
+  outline: none;
+  border-color: var(--control-line-strong);
+  color: var(--ink);
+}
+
+.album-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 0 solid rgba(var(--line-strong-rgb), 0.35);
+  transition:
+    max-height 220ms ease,
+    opacity 180ms ease,
+    border-top-width 220ms ease,
+    padding-top 220ms ease;
+}
+
+.album-list[data-state="open"] {
+  max-height: 240px;
+  opacity: 1;
+  padding-top: 8px;
+  border-top-width: 1px;
+}
+
+.album-list-item {
+  margin: 0;
+}
+
+.album-tile {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  border: 1px solid var(--line-strong);
+  overflow: hidden;
+}
+
+.album-tile-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  pointer-events: none;
+}
+
+.album-tile-select {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.album-tile-caption {
+  width: 100%;
+  padding: 4px 6px 3px;
+  background: rgba(var(--line-strong-rgb), 0.55);
+  color: #fff;
+  font-size: 0.72rem;
+  line-height: 1.15;
+  text-align: left;
+  text-transform: lowercase;
+  transition: background-color 160ms ease;
+}
+
+.album-tile-select-current {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.album-tile-select-current .album-tile-caption {
+  background: rgba(var(--accent-rgb), 0.75);
+}
+
+.album-tile-select:focus-visible {
+  outline: 2px solid var(--control-line-strong);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .album-toggle:hover {
+    border-color: var(--control-line-strong);
+    color: var(--ink);
+  }
+
+  .album-tile-select:hover .album-tile-caption {
+    background: rgba(var(--accent-rgb), 0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .album-list {
+    transition: none;
+  }
 }
 
 .bandcamp-player {
   display: block;
   width: 700px;
   max-width: 100%;
+  min-width: 0;
   height: 120px;
   border: 0;
 }

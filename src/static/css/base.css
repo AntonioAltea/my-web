@@ -43,7 +43,7 @@
   --control-line: rgba(var(--line-strong-rgb), 0.28);
   --control-line-strong: rgba(var(--line-strong-rgb), 0.5);
   --photo-frame: rgba(var(--line-strong-rgb), 0.14);
-  --player-bar-height: 136px;
+  --player-bar-height: 170px;
 }
 
 :root[data-theme="dark"] {

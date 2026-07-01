@@ -13,6 +13,9 @@ const photoRandomButton = document.querySelector("#photo-random");
 const themeToggleButton = document.querySelector("#theme-toggle");
 const themeToggleLabel = document.querySelector("#theme-toggle-label");
 const bandcampIframe = document.querySelector("#bandcamp-player");
+const albumToggle = document.querySelector("#album-toggle");
+const albumToggleCurrent = document.querySelector("#album-toggle-current");
+const albumList = document.querySelector("#album-list");
 const playerBar = document.querySelector(".player-bar");
 
 function syncPlayerBarHeight() {
@@ -45,7 +48,13 @@ const gallery = galleryModule.createGallery({
   onLayoutChange: syncPlayerBarHeight,
 });
 
-const bandcamp = bandcampModule.createBandcampPlayer({ iframe: bandcampIframe });
+const bandcamp = bandcampModule.createBandcampPlayer({
+  iframe: bandcampIframe,
+  toggleButton: albumToggle,
+  toggleCurrent: albumToggleCurrent,
+  list: albumList,
+  albums: globalThis.ManturonAlbums,
+});
 
 const themeController = theme.createThemeController({
   button: themeToggleButton,
@@ -76,6 +85,7 @@ async function loadMedia() {
 }
 
 gallery.init();
+bandcamp.init();
 themeController.init();
 analytics.trackVisit();
 

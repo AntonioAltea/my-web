@@ -225,6 +225,9 @@ function createEnvironment(mediaPayload, { randomValues = [], connection = null 
     "#theme-toggle": new FakeElement("theme-toggle"),
     "#theme-toggle-label": new FakeElement("theme-toggle-label"),
     "#bandcamp-player": new FakeElement("bandcamp-player"),
+    "#album-toggle": new FakeElement("album-toggle"),
+    "#album-toggle-current": new FakeElement("album-toggle-current"),
+    "#album-list": new FakeElement("album-list"),
     ".player-bar": new FakeElement("player-bar"),
   };
 
@@ -480,6 +483,7 @@ async function loadApp(options = {}) {
 
   const scripts = [
     "media-api.js",
+    "albums.js",
     "analytics.js",
     "theme.js",
     "gallery.js",
@@ -592,6 +596,65 @@ async function testBandcampPlayerFollowsSystemThemeInAutoMode() {
   const src = selectors["#bandcamp-player"].src;
   assert.equal(src.includes("bgcol=1c1c1c"), true);
   assert.equal(src.includes("linkcol=88b5a0"), true);
+}
+
+async function testBandcampPlayerTileArtMatchesAlbumsAndTheme() {
+  const env = await loadApp();
+  const { selectors } = env;
+  const tiles = selectors["#album-list"].querySelectorAll("iframe");
+
+  assert.equal(tiles.length, 2);
+  assert.equal(tiles[0].src.includes("album=356629898"), true);
+  assert.equal(tiles[0].src.includes("minimal=true"), true);
+  assert.equal(tiles[0].src.includes("bgcol=f6f7f5"), true);
+  assert.equal(tiles[1].src.includes("album=3133548639"), true);
+
+  selectors["#theme-toggle"].click();
+
+  assert.equal(tiles[0].src.includes("bgcol=1c1c1c"), true);
+  assert.equal(tiles[1].src.includes("bgcol=1c1c1c"), true);
+}
+
+async function testBandcampPlayerShowsCurrentAlbumInToggle() {
+  const env = await loadApp();
+  const { selectors } = env;
+  const items = selectors["#album-list"].querySelectorAll("button");
+
+  assert.equal(selectors["#album-toggle-current"].textContent, "la tormenta");
+  assert.equal(items.length, 2);
+  assert.equal(items[0].children[0].textContent, "la tormenta");
+  assert.equal(items[0].getAttribute("aria-pressed"), "true");
+  assert.equal(items[1].children[0].textContent, "ola de incendios");
+  assert.equal(items[1].getAttribute("aria-pressed"), "false");
+}
+
+async function testBandcampPlayerTogglesAlbumListOpenAndClosed() {
+  const env = await loadApp();
+  const { selectors } = env;
+
+  selectors["#album-toggle"].click();
+  assert.equal(selectors["#album-toggle"].getAttribute("aria-expanded"), "true");
+  assert.equal(selectors["#album-list"].dataset.state, "open");
+
+  selectors["#album-toggle"].click();
+  assert.equal(selectors["#album-toggle"].getAttribute("aria-expanded"), "false");
+  assert.equal(selectors["#album-list"].dataset.state, "closed");
+}
+
+async function testBandcampPlayerSwitchesAlbumOnSelectAndRemembersChoice() {
+  const env = await loadApp();
+  const { selectors, sandbox } = env;
+  const items = selectors["#album-list"].querySelectorAll("button");
+
+  selectors["#album-toggle"].click();
+  items[1].click();
+
+  const src = selectors["#bandcamp-player"].src;
+  assert.equal(src.includes("album=3133548639"), true);
+  assert.equal(selectors["#album-toggle-current"].textContent, "ola de incendios");
+  assert.equal(selectors["#album-toggle"].getAttribute("aria-expanded"), "false");
+  assert.equal(items[1].getAttribute("aria-pressed"), "true");
+  assert.equal(sandbox.window.localStorage.getItem("manturon-album"), "3133548639");
 }
 
 async function testTracksVisit() {
@@ -720,6 +783,10 @@ async function run() {
     ["uses light bandcamp embed colors by default", testBandcampPlayerUsesLightColorsByDefault],
     ["switches bandcamp embed colors when the theme is toggled", testBandcampPlayerSwitchesColorsWhenThemeToggled],
     ["follows the system theme for the bandcamp embed in auto mode", testBandcampPlayerFollowsSystemThemeInAutoMode],
+    ["matches tile art to each album and the current theme", testBandcampPlayerTileArtMatchesAlbumsAndTheme],
+    ["shows the current album in the toggle", testBandcampPlayerShowsCurrentAlbumInToggle],
+    ["toggles the album list open and closed", testBandcampPlayerTogglesAlbumListOpenAndClosed],
+    ["switches album on select and remembers the choice", testBandcampPlayerSwitchesAlbumOnSelectAndRemembersChoice],
     ["tracks visits", testTracksVisit],
     ["shows photo caption only on hover after load", testPhotoCaptionOnlyShowsOnHoverWhenLoaded],
     ["keeps the current photo visible while the next one loads", testKeepsCurrentPhotoVisibleWhileNextLoads],

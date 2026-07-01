@@ -70,20 +70,34 @@
 
   <footer class="player-bar">
     <div class="player-bar-inner">
+      <div class="album-picker">
+        <button
+          id="album-toggle"
+          class="album-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="album-list"
+        >
+          <span class="album-toggle-label">álbum</span>
+          <span id="album-toggle-current" class="album-toggle-current"></span>
+        </button>
+        <ul id="album-list" class="album-list" aria-label="Elegir álbum" hidden></ul>
+      </div>
       <iframe
         id="bandcamp-player"
         class="bandcamp-player"
-        title="Reproductor de Bandcamp: la tormenta, de manturón"
+        title="Reproductor de Bandcamp"
         seamless
         loading="lazy"
       ></iframe>
       <noscript>
-        <a href="https://manturon.bandcamp.com/album/la-tormenta">la tormenta, de manturón</a>
+        <a href="https://manturon.bandcamp.com">discografía de manturón en Bandcamp</a>
       </noscript>
     </div>
   </footer>
 
   <script src="/static/js/media-api.js"></script>
+  <script src="/static/js/albums.js"></script>
   <script src="/static/js/analytics.js"></script>
   <script src="/static/js/theme.js"></script>
   <script src="/static/js/gallery.js"></script>

@@ -40,7 +40,7 @@ Short guide to work in this repo without wasting time.
 - If a local, editor, or generated file appears and should not be versioned, add it to `.gitignore`.
 - Do not add build steps, frameworks, or heavy dependencies unless explicitly requested.
 - If the app is connected to the repo in the Fly UI, auto-deploy updates code on each `push` to `main`, but it does not upload new photos or music to the `/data` volume.
-- The footer player embeds Bandcamp (`src/static/js/bandcamp.js`, album id in that file) instead of playing local files; it re-sets the iframe `src` on theme change to swap `bgcol`/`linkcol`. The `assets/music` backend (metadata parsing, `/api/media` `music` key, `track_play` analytics) is intentionally kept but unused by the frontend for now — don't be surprised that nothing calls it.
+- The footer player embeds Bandcamp (`src/static/js/bandcamp.js`) instead of playing local files; it re-sets the iframe `src` on theme or album change to swap `bgcol`/`linkcol`/`album`, and remembers the chosen album (by id) in `localStorage`. The list of albums lives in `src/static/js/albums.js` (just `{id, title}` pairs) so adding one doesn't require touching `bandcamp.js`. The picker shows a small `minimal=true` Bandcamp embed per album as clickable cover art (non-interactive, `pointer-events: none`) — that means one extra iframe load per album in the list, fine for a handful of albums but worth knowing if this list grows a lot. The `assets/music` backend (metadata parsing, `/api/media` `music` key, `track_play` analytics) is intentionally kept but unused by the frontend for now — don't be surprised that nothing calls it.
 
 ## Useful Commands
 

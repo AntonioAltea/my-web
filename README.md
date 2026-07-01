@@ -71,7 +71,9 @@ COVERAGE_MIN=95 git push
 
 ## Bandcamp
 
-Music is an embedded Bandcamp player (`https://manturon.bandcamp.com/album/la-tormenta`) fixed at the bottom of the page. The embed colors switch between the light and dark theme automatically; see `src/static/js/bandcamp.js`.
+Music is an embedded Bandcamp player fixed at the bottom of the page, with a picker (album cover thumbnails) to choose which album plays (currently `la tormenta` and `ola de incendios`). The embed colors switch between the light and dark theme automatically, and the chosen album is remembered between visits.
+
+To add another album, edit `src/static/js/albums.js` and add `{ id: "<embed id>", title: "<display title>" }` to the list — nothing else needs to change. Get the embed id from the album's Bandcamp page: "Share / Embed" → "Embed this album" → copy the `<iframe>` code and take the number after `album=` in its `src`.
 
 The `assets/music/` pipeline (metadata parsing, `/api/media` `music` key, `track_play` analytics) still exists in the backend but nothing in the frontend renders it right now.
 
