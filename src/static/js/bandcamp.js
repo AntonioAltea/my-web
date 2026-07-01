@@ -6,25 +6,14 @@
     return albums.find((album) => album.id === id) || albums[0];
   }
 
-  function themeColors(theme) {
-    return theme === "dark"
-      ? { bgcol: "1c1c1c", linkcol: "88b5a0" }
-      : { bgcol: "f6f7f5", linkcol: "2f5f4d" };
-  }
-
-  function playerSrc(albumId, theme) {
-    const { bgcol, linkcol } = themeColors(theme);
+  function embedSrc(albumId, theme) {
+    const { bgcol, linkcol } =
+      theme === "dark"
+        ? { bgcol: "141414", linkcol: "88b5a0" }
+        : { bgcol: "eef0ee", linkcol: "2f5f4d" };
     return (
       `https://bandcamp.com/EmbeddedPlayer/album=${albumId}/size=large/` +
       `bgcol=${bgcol}/linkcol=${linkcol}/tracklist=false/artwork=small/transparent=true/`
-    );
-  }
-
-  function tileArtSrc(albumId, theme) {
-    const { bgcol, linkcol } = themeColors(theme);
-    return (
-      `https://bandcamp.com/EmbeddedPlayer/album=${albumId}/size=large/` +
-      `bgcol=${bgcol}/linkcol=${linkcol}/minimal=true/transparent=true/`
     );
   }
 
@@ -42,7 +31,7 @@
     }
   }
 
-  function createBandcampPlayer({ iframe, toggleButton, toggleCurrent, list }) {
+  function createBandcampPlayer({ iframe, loader, toggleButton, toggleCurrent, list }) {
     let theme = "light";
     let albums = [];
     let album = null;
@@ -54,19 +43,13 @@
         return;
       }
 
-      const nextSrc = playerSrc(album.id, theme);
+      const nextSrc = embedSrc(album.id, theme);
       if (iframe.src !== nextSrc) {
+        if (loader) {
+          loader.hidden = false;
+        }
         iframe.src = nextSrc;
       }
-    }
-
-    function renderTileArt() {
-      tiles.forEach(({ art, data }) => {
-        const nextSrc = tileArtSrc(data.id, theme);
-        if (art.src !== nextSrc) {
-          art.src = nextSrc;
-        }
-      });
     }
 
     function syncToggle() {
@@ -92,7 +75,6 @@
     function setTheme(nextTheme) {
       theme = nextTheme === "dark" ? "dark" : "light";
       renderIframe();
-      renderTileArt();
     }
 
     function selectAlbum(id) {
@@ -116,10 +98,10 @@
       const tile = global.document.createElement("div");
       tile.className = "album-tile";
 
-      const art = global.document.createElement("iframe");
+      const art = global.document.createElement("img");
       art.className = "album-tile-art";
-      art.tabIndex = -1;
-      art.setAttribute("aria-hidden", "true");
+      art.src = candidate.cover;
+      art.alt = "";
       art.setAttribute("loading", "lazy");
 
       const button = global.document.createElement("button");
@@ -136,7 +118,7 @@
       tile.append(art, button);
       item.append(tile);
 
-      return { item, button, art, data: candidate };
+      return { item, button, data: candidate };
     }
 
     function init(nextAlbums) {
@@ -151,10 +133,15 @@
 
       toggleButton.addEventListener("click", toggleOpen);
 
+      if (loader) {
+        iframe.addEventListener("load", () => {
+          loader.hidden = true;
+        });
+      }
+
       syncToggle();
       syncSelection();
       renderIframe();
-      renderTileArt();
     }
 
     return {

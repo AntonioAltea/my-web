@@ -73,7 +73,7 @@ COVERAGE_MIN=95 git push
 
 Music is an embedded Bandcamp player fixed at the bottom of the page, with a picker (album cover thumbnails) to choose which album plays (currently `la tormenta` and `ola de incendios`). The embed colors switch between the light and dark theme automatically, and the chosen album is remembered between visits.
 
-To add another album, edit `src/static/data/albums.json` and add `{ "id": "<embed id>", "title": "<display title>" }` to the list — nothing else needs to change. Get the embed id from the album's Bandcamp page: "Share / Embed" → "Embed this album" → copy the `<iframe>` code and take the number after `album=` in its `src`.
+To add another album, drop a square cover image in `assets/icons/` and add `{ "id": "<embed id>", "title": "<display title>", "cover": "/assets/icons/<file>" }` to `src/static/data/albums.json` — nothing else needs to change. Get the embed id from the album's Bandcamp page: "Share / Embed" → "Embed this album" → copy the `<iframe>` code and take the number after `album=` in its `src`. The cover image has to be provided manually; Bandcamp doesn't expose the artwork file for a given album id without scraping the page (which its bot protection blocks).
 
 The `assets/music/` pipeline (metadata parsing, `/api/media` `music` key, `track_play` analytics) still exists in the backend but nothing in the frontend renders it right now.
 

@@ -13,6 +13,7 @@ const photoRandomButton = document.querySelector("#photo-random");
 const themeToggleButton = document.querySelector("#theme-toggle");
 const themeToggleLabel = document.querySelector("#theme-toggle-label");
 const bandcampIframe = document.querySelector("#bandcamp-player");
+const bandcampLoader = document.querySelector("#bandcamp-loader");
 const albumToggle = document.querySelector("#album-toggle");
 const albumToggleCurrent = document.querySelector("#album-toggle-current");
 const albumList = document.querySelector("#album-list");
@@ -50,6 +51,7 @@ const gallery = galleryModule.createGallery({
 
 const bandcamp = bandcampModule.createBandcampPlayer({
   iframe: bandcampIframe,
+  loader: bandcampLoader,
   toggleButton: albumToggle,
   toggleCurrent: albumToggleCurrent,
   list: albumList,

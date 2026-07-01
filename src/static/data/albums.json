@@ -1,4 +1,12 @@
 [
-  { "id": "356629898", "title": "la tormenta" },
-  { "id": "3133548639", "title": "ola de incendios" }
+  {
+    "id": "356629898",
+    "title": "la tormenta",
+    "cover": "/assets/icons/la-tormenta-portada.jpg"
+  },
+  {
+    "id": "3133548639",
+    "title": "ola de incendios",
+    "cover": "/assets/icons/ola-de-incendios-portada.jpg"
+  }
 ]

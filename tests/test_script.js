@@ -214,8 +214,12 @@ class FakeResizeObserver {
 }
 
 const DEFAULT_ALBUMS = [
-  { id: "356629898", title: "la tormenta" },
-  { id: "3133548639", title: "ola de incendios" },
+  { id: "356629898", title: "la tormenta", cover: "/assets/icons/la-tormenta-portada.jpg" },
+  {
+    id: "3133548639",
+    title: "ola de incendios",
+    cover: "/assets/icons/ola-de-incendios-portada.jpg",
+  },
 ];
 
 function createEnvironment(
@@ -233,6 +237,7 @@ function createEnvironment(
     "#theme-toggle": new FakeElement("theme-toggle"),
     "#theme-toggle-label": new FakeElement("theme-toggle-label"),
     "#bandcamp-player": new FakeElement("bandcamp-player"),
+    "#bandcamp-loader": new FakeElement("bandcamp-loader"),
     "#album-toggle": new FakeElement("album-toggle"),
     "#album-toggle-current": new FakeElement("album-toggle-current"),
     "#album-list": new FakeElement("album-list"),
@@ -588,8 +593,19 @@ async function testBandcampPlayerUsesLightColorsByDefault() {
 
   const src = selectors["#bandcamp-player"].src;
   assert.equal(src.includes("album=356629898"), true);
-  assert.equal(src.includes("bgcol=f6f7f5"), true);
+  assert.equal(src.includes("bgcol=eef0ee"), true);
   assert.equal(src.includes("linkcol=2f5f4d"), true);
+}
+
+async function testBandcampLoaderHidesOnceTheEmbedLoads() {
+  const env = await loadApp();
+  const { selectors } = env;
+
+  assert.equal(selectors["#bandcamp-loader"].hidden, false);
+
+  selectors["#bandcamp-player"].dispatchEvent("load");
+
+  assert.equal(selectors["#bandcamp-loader"].hidden, true);
 }
 
 async function testBandcampPlayerSwitchesColorsWhenThemeToggled() {
@@ -599,7 +615,7 @@ async function testBandcampPlayerSwitchesColorsWhenThemeToggled() {
   selectors["#theme-toggle"].click();
 
   const src = selectors["#bandcamp-player"].src;
-  assert.equal(src.includes("bgcol=1c1c1c"), true);
+  assert.equal(src.includes("bgcol=141414"), true);
   assert.equal(src.includes("linkcol=88b5a0"), true);
 }
 
@@ -610,25 +626,23 @@ async function testBandcampPlayerFollowsSystemThemeInAutoMode() {
   setColorSchemeMatches(true);
 
   const src = selectors["#bandcamp-player"].src;
-  assert.equal(src.includes("bgcol=1c1c1c"), true);
+  assert.equal(src.includes("bgcol=141414"), true);
   assert.equal(src.includes("linkcol=88b5a0"), true);
 }
 
-async function testBandcampPlayerTileArtMatchesAlbumsAndTheme() {
+async function testBandcampPlayerTileArtUsesAlbumCoverImages() {
   const env = await loadApp();
   const { selectors } = env;
-  const tiles = selectors["#album-list"].querySelectorAll("iframe");
+  const tiles = selectors["#album-list"].querySelectorAll("img");
 
   assert.equal(tiles.length, 2);
-  assert.equal(tiles[0].src.includes("album=356629898"), true);
-  assert.equal(tiles[0].src.includes("minimal=true"), true);
-  assert.equal(tiles[0].src.includes("bgcol=f6f7f5"), true);
-  assert.equal(tiles[1].src.includes("album=3133548639"), true);
+  assert.equal(tiles[0].src, "/assets/icons/la-tormenta-portada.jpg");
+  assert.equal(tiles[1].src, "/assets/icons/ola-de-incendios-portada.jpg");
 
   selectors["#theme-toggle"].click();
 
-  assert.equal(tiles[0].src.includes("bgcol=1c1c1c"), true);
-  assert.equal(tiles[1].src.includes("bgcol=1c1c1c"), true);
+  assert.equal(tiles[0].src, "/assets/icons/la-tormenta-portada.jpg");
+  assert.equal(tiles[1].src, "/assets/icons/ola-de-incendios-portada.jpg");
 }
 
 async function testBandcampPlayerShowsCurrentAlbumInToggle() {
@@ -797,9 +811,10 @@ async function run() {
     ["unlocks photo controls after a stalled image times out", testPhotoLoadTimeoutUnlocksControls],
     ["retries a timed out photo when you come back to it", testTimedOutPhotoCanBeRetried],
     ["uses light bandcamp embed colors by default", testBandcampPlayerUsesLightColorsByDefault],
+    ["hides the bandcamp loader once the embed loads", testBandcampLoaderHidesOnceTheEmbedLoads],
     ["switches bandcamp embed colors when the theme is toggled", testBandcampPlayerSwitchesColorsWhenThemeToggled],
     ["follows the system theme for the bandcamp embed in auto mode", testBandcampPlayerFollowsSystemThemeInAutoMode],
-    ["matches tile art to each album and the current theme", testBandcampPlayerTileArtMatchesAlbumsAndTheme],
+    ["uses each album's cover image for its tile art", testBandcampPlayerTileArtUsesAlbumCoverImages],
     ["shows the current album in the toggle", testBandcampPlayerShowsCurrentAlbumInToggle],
     ["toggles the album list open and closed", testBandcampPlayerTogglesAlbumListOpenAndClosed],
     ["switches album on select and remembers the choice", testBandcampPlayerSwitchesAlbumOnSelectAndRemembersChoice],

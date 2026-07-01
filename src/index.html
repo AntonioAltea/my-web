@@ -15,6 +15,8 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://bandcamp.com">
+  <link rel="preconnect" href="https://f4.bcbits.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400&display=swap"
     rel="stylesheet"
@@ -83,13 +85,15 @@
         </button>
         <ul id="album-list" class="album-list" aria-label="Elegir álbum" hidden></ul>
       </div>
-      <iframe
-        id="bandcamp-player"
-        class="bandcamp-player"
-        title="Reproductor de Bandcamp"
-        seamless
-        loading="lazy"
-      ></iframe>
+      <div class="bandcamp-player-shell">
+        <div id="bandcamp-loader" class="bandcamp-loader">cargando reproductor...</div>
+        <iframe
+          id="bandcamp-player"
+          class="bandcamp-player"
+          title="Reproductor de Bandcamp"
+          seamless
+        ></iframe>
+      </div>
       <noscript>
         <a href="https://manturon.bandcamp.com">discografía de manturón en Bandcamp</a>
       </noscript>

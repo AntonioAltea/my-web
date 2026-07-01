@@ -8,7 +8,7 @@
   justify-content: center;
   gap: 0.45rem;
   min-width: 5.8rem;
-  border: 1px solid var(--control-line);
+  border: 0;
   background: var(--surface-soft);
   color: var(--accent);
   padding: 4px 10px 5px;
@@ -17,7 +17,6 @@
   letter-spacing: 0.08em;
   text-transform: lowercase;
   transition:
-    border-color 140ms ease,
     background-color 140ms ease,
     color 140ms ease,
     transform 140ms ease;
@@ -38,12 +37,19 @@
 }
 
 .theme-toggle:focus-visible {
-  border-color: var(--control-line-strong);
+  outline: 2px solid var(--control-line-strong);
+  outline-offset: -2px;
   color: var(--ink);
-  outline: none;
   transform: translateY(-1px);
 }
 
 .theme-toggle:active {
   transform: translateY(0);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .theme-toggle:hover {
+    color: var(--ink);
+    transform: translateY(-1px);
+  }
 }
