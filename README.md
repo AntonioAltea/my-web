@@ -71,7 +71,9 @@ COVERAGE_MIN=95 git push
 
 ## Bandcamp
 
-Music appears as an album-style player fixed at the bottom, with cover art, a visible track list, sequential playback order, and a link to `https://manturon.bandcamp.com`.
+Music is an embedded Bandcamp player (`https://manturon.bandcamp.com/album/la-tormenta`) fixed at the bottom of the page. The embed colors switch between the light and dark theme automatically; see `src/static/js/bandcamp.js`.
+
+The `assets/music/` pipeline (metadata parsing, `/api/media` `music` key, `track_play` analytics) still exists in the backend but nothing in the frontend renders it right now.
 
 ## Basic Analytics
 

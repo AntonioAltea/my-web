@@ -43,13 +43,7 @@
   --control-line: rgba(var(--line-strong-rgb), 0.28);
   --control-line-strong: rgba(var(--line-strong-rgb), 0.5);
   --photo-frame: rgba(var(--line-strong-rgb), 0.14);
-  --seek-track: rgba(var(--line-rgb), 0.16);
-  --seek-wave: #2f5f4d;
-  --thumb-shadow: rgba(var(--line-strong-rgb), 0.28);
-  --thumb-active-ring: rgba(var(--accent-rgb), 0.14);
-  --thumb-focus-ring: rgba(var(--accent-rgb), 0.12);
-  --thumb-active-fill: rgba(247, 252, 249, 1);
-  --player-bar-height: 88px;
+  --player-bar-height: 136px;
 }
 
 :root[data-theme="dark"] {
@@ -73,12 +67,6 @@
   --control-line: rgba(var(--line-strong-rgb), 0.34);
   --control-line-strong: rgba(var(--line-strong-rgb), 0.58);
   --photo-frame: rgba(var(--line-strong-rgb), 0.2);
-  --seek-track: rgba(var(--line-rgb), 0.28);
-  --seek-wave: #88b5a0;
-  --thumb-shadow: rgba(5, 8, 7, 0.58);
-  --thumb-active-ring: rgba(var(--accent-rgb), 0.22);
-  --thumb-focus-ring: rgba(var(--accent-rgb), 0.18);
-  --thumb-active-fill: rgba(235, 244, 239, 1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -103,12 +91,6 @@
     --control-line: rgba(var(--line-strong-rgb), 0.34);
     --control-line-strong: rgba(var(--line-strong-rgb), 0.58);
     --photo-frame: rgba(var(--line-strong-rgb), 0.2);
-    --seek-track: rgba(var(--line-rgb), 0.28);
-    --seek-wave: #88b5a0;
-    --thumb-shadow: rgba(5, 8, 7, 0.58);
-    --thumb-active-ring: rgba(var(--accent-rgb), 0.22);
-    --thumb-focus-ring: rgba(var(--accent-rgb), 0.18);
-    --thumb-active-fill: rgba(235, 244, 239, 1);
   }
 }
 

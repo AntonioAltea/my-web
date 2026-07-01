@@ -172,26 +172,6 @@ class FakeElement {
 
 class FakeInputElement extends FakeElement {}
 
-class FakeAudioElement extends FakeElement {
-  constructor() {
-    super("audio");
-    this.paused = true;
-    this.duration = 0;
-    this.currentTime = 0;
-  }
-
-  play() {
-    this.paused = false;
-    this.dispatchEvent("play");
-    return Promise.resolve();
-  }
-
-  pause() {
-    this.paused = true;
-    this.dispatchEvent("pause");
-  }
-}
-
 class FakeImage {
   static created = [];
 
@@ -236,8 +216,6 @@ class FakeResizeObserver {
 function createEnvironment(mediaPayload, { randomValues = [], connection = null } = {}) {
   FakeImage.reset();
   const selectors = {
-    "#audio-player": new FakeAudioElement(),
-    "#now-playing": new FakeElement("now-playing"),
     "#main-photo": new FakeElement("main-photo"),
     "#photo-loader": new FakeElement("photo-loader"),
     "#photo-caption": new FakeElement("photo-caption"),
@@ -246,26 +224,11 @@ function createEnvironment(mediaPayload, { randomValues = [], connection = null 
     "#photo-random": new FakeElement("photo-random"),
     "#theme-toggle": new FakeElement("theme-toggle"),
     "#theme-toggle-label": new FakeElement("theme-toggle-label"),
-    "#prev-track": new FakeElement("prev-track"),
-    "#random-track": new FakeElement("random-track"),
-    "#next-track": new FakeElement("next-track"),
-    "#play-toggle": new FakeElement("play-toggle"),
-    "#play-toggle-icon": new FakeElement("play-toggle-icon"),
-    "#track-position": new FakeElement("track-position"),
-    "#track-list-toggle": new FakeElement("track-list-toggle"),
-    "#album-drawer": new FakeElement("album-drawer"),
-    "#track-list-shell": new FakeElement("track-list-shell"),
-    "#track-list": new FakeElement("track-list"),
-    "#seek-bar": new FakeInputElement("seek-bar"),
-    "#seek-bar-shell": new FakeElement("seek-bar-shell"),
-    "#current-time": new FakeElement("current-time"),
-    "#total-time": new FakeElement("total-time"),
+    "#bandcamp-player": new FakeElement("bandcamp-player"),
     ".player-bar": new FakeElement("player-bar"),
   };
 
-  selectors["#play-toggle"].dataset = {};
   selectors["#theme-toggle"].dataset = {};
-  selectors["#seek-bar"].value = "0";
   selectors["#main-photo"].hidden = true;
   selectors["#photo-loader"].hidden = true;
 
@@ -275,6 +238,7 @@ function createEnvironment(mediaPayload, { randomValues = [], connection = null 
   let timeoutId = 0;
   const timeouts = new Map();
   const mediaQueryListeners = new Map();
+  const mediaQueryObjects = new Map();
   const localStorageStore = new Map();
   const sessionStorageStore = new Map();
   const fetchCalls = [];
@@ -353,6 +317,7 @@ function createEnvironment(mediaPayload, { randomValues = [], connection = null 
         },
       };
 
+      mediaQueryObjects.set(query, mediaQuery);
       return mediaQuery;
     },
     setInterval(fn) {
@@ -486,6 +451,18 @@ function createEnvironment(mediaPayload, { randomValues = [], connection = null 
         callback();
       }
     },
+    setColorSchemeMatches(matches) {
+      const query = "(prefers-color-scheme: dark)";
+      const mediaQuery = mediaQueryObjects.get(query);
+      if (mediaQuery) {
+        mediaQuery.matches = matches;
+      }
+
+      const listeners = mediaQueryListeners.get(query) || [];
+      for (const listener of listeners) {
+        listener({ matches });
+      }
+    },
   };
 }
 
@@ -506,7 +483,7 @@ async function loadApp(options = {}) {
     "analytics.js",
     "theme.js",
     "gallery.js",
-    "player.js",
+    "bandcamp.js",
     "main.js",
   ];
 
@@ -585,159 +562,45 @@ async function testTimedOutPhotoCanBeRetried() {
   assert.equal(selectors["#photo-loader"].hidden, true);
 }
 
-async function testTrackTitleAnimatesByDirection() {
-  const env = await loadApp();
-  const { selectors, flushTimeouts } = env;
-
-  selectors["#next-track"].click();
-  assert.equal(selectors["#now-playing"].classList.contains("now-playing-enter-next"), true);
-  flushTimeouts();
-  assert.equal(selectors["#now-playing"].classList.contains("now-playing-enter-next"), false);
-
-  selectors["#prev-track"].click();
-  assert.equal(selectors["#now-playing"].classList.contains("now-playing-enter-prev"), true);
-}
-
-async function testLongTrackTitleScrollsInsteadOfTruncating() {
-  const env = await loadApp({
-    mediaPayload: {
-      photos: ["/assets/photos/uno.jpg"],
-      music: [
-        {
-          file: "/assets/music/una-cancion-increiblemente-larga-para-probar-el-desplazamiento.mp3",
-          title: "una cancion increiblemente larga para probar el desplazamiento",
-          track_number: 1,
-        },
-      ],
-    },
-  });
-  const { selectors } = env;
-  const nowPlayingText = selectors["#now-playing"].children[0];
-
-  assert.equal(selectors["#now-playing"].classList.contains("now-playing-marquee"), true);
-  assert.equal(nowPlayingText.classList.contains("now-playing-text-marquee"), true);
-}
-
-async function testShortTrackTitleDoesNotScroll() {
-  const env = await loadApp();
-  const { selectors } = env;
-  const nowPlayingText = selectors["#now-playing"].children[0];
-
-  assert.equal(selectors["#now-playing"].classList.contains("now-playing-marquee"), false);
-  assert.equal(nowPlayingText.classList.contains("now-playing-text-marquee"), false);
-}
-
-async function testRandomTrackButtonPlaysAnotherTrack() {
-  const env = await loadApp({ randomValues: [0] });
-  const { selectors } = env;
-
-  await selectors["#play-toggle"].listeners.get("click")[0]({ type: "click" });
-  selectors["#random-track"].click();
-
-  assert.equal(selectors["#track-position"].textContent, "tema 02");
-  assert.equal(selectors["#now-playing"].textContent, "dos");
-  assert.equal(selectors["#play-toggle"].dataset.state, "playing");
-}
-
-async function testPlayButtonTogglesPlayingState() {
+async function testBandcampPlayerUsesLightColorsByDefault() {
   const env = await loadApp();
   const { selectors } = env;
 
-  await selectors["#play-toggle"].listeners.get("click")[0]({ type: "click" });
-  assert.equal(selectors["#play-toggle"].dataset.state, "playing");
-  assert.equal(selectors["#seek-bar-shell"].classList.contains("seek-bar-shell-playing"), true);
-
-  await selectors["#play-toggle"].listeners.get("click")[0]({ type: "click" });
-  assert.equal(selectors["#play-toggle"].dataset.state, "paused");
-  assert.equal(selectors["#seek-bar-shell"].classList.contains("seek-bar-shell-playing"), false);
+  const src = selectors["#bandcamp-player"].src;
+  assert.equal(src.includes("album=356629898"), true);
+  assert.equal(src.includes("bgcol=f6f7f5"), true);
+  assert.equal(src.includes("linkcol=2f5f4d"), true);
 }
 
-async function testAlbumTrackListShowsOrderedTracks() {
-  const env = await loadApp({
-    mediaPayload: {
-      photos: ["/assets/photos/uno.jpg", "/assets/photos/dos.jpg"],
-      music: [
-        { file: "/assets/music/dos.mp3", title: "segunda", track_number: 2 },
-        { file: "/assets/music/uno.mp3", title: "primera", track_number: 1 },
-      ],
-    },
-  });
-  const { selectors } = env;
-  const trackButtons = selectors["#track-list"].querySelectorAll("button");
-
-  assert.equal(selectors["#track-position"].textContent, "tema 01");
-  assert.equal(selectors["#now-playing"].textContent, "primera");
-  assert.equal(selectors["#album-drawer"].hidden, false);
-  assert.equal(selectors["#album-drawer"].dataset.state, "closed");
-  assert.equal(selectors["#album-drawer"].getAttribute("aria-hidden"), "true");
-  assert.equal(selectors["#track-list-toggle"].textContent, "ver canciones");
-  assert.equal(selectors["#track-list-toggle"].getAttribute("aria-expanded"), "false");
-  assert.equal(trackButtons.length, 2);
-  assert.equal(trackButtons[0].textContent, "");
-  assert.equal(trackButtons[0].getAttribute("aria-current"), "true");
-  assert.equal(trackButtons[1].getAttribute("aria-current"), "false");
-  assert.equal(selectors["#random-track"].disabled, false);
-}
-
-async function testRandomTrackButtonStaysDisabledWithSingleTrack() {
-  const env = await loadApp({
-    mediaPayload: {
-      photos: ["/assets/photos/uno.jpg"],
-      music: [{ file: "/assets/music/uno.mp3", title: "uno", track_number: 1 }],
-    },
-  });
-  const { selectors } = env;
-
-  assert.equal(selectors["#random-track"].disabled, true);
-}
-
-async function testTrackListToggleShowsAndHidesAlbumTracks() {
+async function testBandcampPlayerSwitchesColorsWhenThemeToggled() {
   const env = await loadApp();
   const { selectors } = env;
 
-  selectors["#track-list-toggle"].click();
-  assert.equal(selectors["#album-drawer"].hidden, false);
-  assert.equal(selectors["#album-drawer"].dataset.state, "open");
-  assert.equal(selectors["#album-drawer"].getAttribute("aria-hidden"), "false");
-  assert.equal(selectors["#track-list-toggle"].textContent, "ocultar canciones");
-  assert.equal(selectors["#track-list-toggle"].getAttribute("aria-expanded"), "true");
+  selectors["#theme-toggle"].click();
 
-  selectors["#track-list-toggle"].click();
-  assert.equal(selectors["#album-drawer"].hidden, false);
-  assert.equal(selectors["#album-drawer"].dataset.state, "closed");
-  assert.equal(selectors["#album-drawer"].getAttribute("aria-hidden"), "true");
-  assert.equal(selectors["#track-list-toggle"].textContent, "ver canciones");
-  assert.equal(selectors["#track-list-toggle"].getAttribute("aria-expanded"), "false");
+  const src = selectors["#bandcamp-player"].src;
+  assert.equal(src.includes("bgcol=1c1c1c"), true);
+  assert.equal(src.includes("linkcol=88b5a0"), true);
 }
 
-async function testTrackListCanSelectTrack() {
+async function testBandcampPlayerFollowsSystemThemeInAutoMode() {
   const env = await loadApp();
-  const { selectors } = env;
-  const trackButtons = selectors["#track-list"].querySelectorAll("button");
+  const { selectors, setColorSchemeMatches } = env;
 
-  trackButtons[1].click();
+  setColorSchemeMatches(true);
 
-  assert.equal(selectors["#track-position"].textContent, "tema 02");
-  assert.equal(selectors["#now-playing"].textContent, "dos");
-  assert.equal(trackButtons[1].getAttribute("aria-current"), "true");
+  const src = selectors["#bandcamp-player"].src;
+  assert.equal(src.includes("bgcol=1c1c1c"), true);
+  assert.equal(src.includes("linkcol=88b5a0"), true);
 }
 
-async function testTracksVisitAndTrackPlayback() {
+async function testTracksVisit() {
   const env = await loadApp();
-  const { selectors, fetchCalls } = env;
+  const { fetchCalls } = env;
 
   const analyticsCallsAfterLoad = fetchCalls.filter((call) => call.url === "/api/activity");
   assert.equal(analyticsCallsAfterLoad.length, 1);
   assert.equal(JSON.parse(analyticsCallsAfterLoad[0].options.body).type, "visit");
-
-  await selectors["#play-toggle"].listeners.get("click")[0]({ type: "click" });
-
-  const analyticsCallsAfterPlay = fetchCalls.filter((call) => call.url === "/api/activity");
-  assert.equal(analyticsCallsAfterPlay.length, 2);
-  const playPayload = JSON.parse(analyticsCallsAfterPlay[1].options.body);
-  assert.equal(playPayload.type, "track_play");
-  assert.equal(playPayload.trackFile, "/assets/music/uno.mp3");
-  assert.equal(playPayload.trackTitle, "uno");
 }
 
 async function testPhotoCaptionOnlyShowsOnHoverWhenLoaded() {
@@ -854,16 +717,10 @@ async function run() {
     ["locks photo controls while loading", testPhotoControlsLockWhileLoading],
     ["unlocks photo controls after a stalled image times out", testPhotoLoadTimeoutUnlocksControls],
     ["retries a timed out photo when you come back to it", testTimedOutPhotoCanBeRetried],
-    ["animates track title by direction", testTrackTitleAnimatesByDirection],
-    ["scrolls long track titles instead of truncating", testLongTrackTitleScrollsInsteadOfTruncating],
-    ["keeps short track titles static", testShortTrackTitleDoesNotScroll],
-    ["plays another track from the random button", testRandomTrackButtonPlaysAnotherTrack],
-    ["toggles playing state from play button", testPlayButtonTogglesPlayingState],
-    ["shows the album track list in order", testAlbumTrackListShowsOrderedTracks],
-    ["disables random track when there is only one track", testRandomTrackButtonStaysDisabledWithSingleTrack],
-    ["toggles the album track list open and closed", testTrackListToggleShowsAndHidesAlbumTracks],
-    ["lets you select a track from the album list", testTrackListCanSelectTrack],
-    ["tracks visits and playback analytics", testTracksVisitAndTrackPlayback],
+    ["uses light bandcamp embed colors by default", testBandcampPlayerUsesLightColorsByDefault],
+    ["switches bandcamp embed colors when the theme is toggled", testBandcampPlayerSwitchesColorsWhenThemeToggled],
+    ["follows the system theme for the bandcamp embed in auto mode", testBandcampPlayerFollowsSystemThemeInAutoMode],
+    ["tracks visits", testTracksVisit],
     ["shows photo caption only on hover after load", testPhotoCaptionOnlyShowsOnHoverWhenLoaded],
     ["keeps the current photo visible while the next one loads", testKeepsCurrentPhotoVisibleWhileNextLoads],
     ["shows a loaded photo immediately when revisited", testShowsLoadedPhotoImmediatelyWhenRevisited],

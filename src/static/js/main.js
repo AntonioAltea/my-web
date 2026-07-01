@@ -2,10 +2,8 @@ const mediaApi = globalThis.ManturonMediaApi;
 const analyticsModule = globalThis.ManturonAnalytics;
 const theme = globalThis.ManturonTheme;
 const galleryModule = globalThis.ManturonGallery;
-const playerModule = globalThis.ManturonPlayer;
+const bandcampModule = globalThis.ManturonBandcamp;
 
-const audioPlayer = document.querySelector("#audio-player");
-const nowPlaying = document.querySelector("#now-playing");
 const mainPhoto = document.querySelector("#main-photo");
 const photoLoader = document.querySelector("#photo-loader");
 const photoCaption = document.querySelector("#photo-caption");
@@ -14,19 +12,7 @@ const nextPhotoButton = document.querySelector("#next-photo");
 const photoRandomButton = document.querySelector("#photo-random");
 const themeToggleButton = document.querySelector("#theme-toggle");
 const themeToggleLabel = document.querySelector("#theme-toggle-label");
-const prevTrackButton = document.querySelector("#prev-track");
-const randomTrackButton = document.querySelector("#random-track");
-const nextTrackButton = document.querySelector("#next-track");
-const playToggleButton = document.querySelector("#play-toggle");
-const trackPosition = document.querySelector("#track-position");
-const trackListToggle = document.querySelector("#track-list-toggle");
-const albumDrawer = document.querySelector("#album-drawer");
-const trackListShell = document.querySelector("#track-list-shell");
-const trackList = document.querySelector("#track-list");
-const seekBar = document.querySelector("#seek-bar");
-const seekBarShell = document.querySelector("#seek-bar-shell");
-const currentTimeLabel = document.querySelector("#current-time");
-const totalTimeLabel = document.querySelector("#total-time");
+const bandcampIframe = document.querySelector("#bandcamp-player");
 const playerBar = document.querySelector(".player-bar");
 
 function syncPlayerBarHeight() {
@@ -59,29 +45,12 @@ const gallery = galleryModule.createGallery({
   onLayoutChange: syncPlayerBarHeight,
 });
 
-const player = playerModule.createPlayer({
-  audioPlayer,
-  nowPlaying,
-  prevButton: prevTrackButton,
-  randomButton: randomTrackButton,
-  nextButton: nextTrackButton,
-  playButton: playToggleButton,
-  trackPosition,
-  trackListToggle,
-  albumDrawer,
-  trackListShell,
-  trackList,
-  seekBar,
-  seekBarShell,
-  currentTimeLabel,
-  totalTimeLabel,
-  onLayoutChange: syncPlayerBarHeight,
-  onTrackPlay: analytics.trackTrackPlay,
-});
+const bandcamp = bandcampModule.createBandcampPlayer({ iframe: bandcampIframe });
 
 const themeController = theme.createThemeController({
   button: themeToggleButton,
   label: themeToggleLabel,
+  onChange: bandcamp.setTheme,
 });
 
 async function loadMedia() {
@@ -90,15 +59,10 @@ async function loadMedia() {
   try {
     media = await mediaApi.fetchMediaPayload(fetch);
   } catch (error) {
-    player.showLoadError();
     gallery.showLoadError();
     return;
   }
 
-  const nextTracks = media.music.map((track) => ({
-    file: track.file,
-    title: track.title,
-  }));
   const nextPhotos = media.photos.map((photo) => ({
     file: photo.file,
     sizes: photo.sizes,
@@ -106,17 +70,12 @@ async function loadMedia() {
     title: mediaApi.fileNameToTitle(photo.file),
   }));
 
-  if (!mediaApi.arraysEqual(player.getTrackFiles(), nextTracks.map((track) => track.file))) {
-    player.setTracks(nextTracks);
-  }
-
   if (!mediaApi.arraysEqual(gallery.getPhotoFiles(), nextPhotos.map((photo) => photo.file))) {
     gallery.setPhotos(nextPhotos);
   }
 }
 
 gallery.init();
-player.init();
 themeController.init();
 analytics.trackVisit();
 
@@ -126,7 +85,6 @@ document.addEventListener("keydown", (event) => {
   }
 
   gallery.handleKey(event);
-  player.handleKey(event);
 });
 
 document.addEventListener("visibilitychange", () => {

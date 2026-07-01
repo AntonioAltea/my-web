@@ -40,6 +40,7 @@ Short guide to work in this repo without wasting time.
 - If a local, editor, or generated file appears and should not be versioned, add it to `.gitignore`.
 - Do not add build steps, frameworks, or heavy dependencies unless explicitly requested.
 - If the app is connected to the repo in the Fly UI, auto-deploy updates code on each `push` to `main`, but it does not upload new photos or music to the `/data` volume.
+- The footer player embeds Bandcamp (`src/static/js/bandcamp.js`, album id in that file) instead of playing local files; it re-sets the iframe `src` on theme change to swap `bgcol`/`linkcol`. The `assets/music` backend (metadata parsing, `/api/media` `music` key, `track_play` analytics) is intentionally kept but unused by the frontend for now — don't be surprised that nothing calls it.
 
 ## Useful Commands
 
