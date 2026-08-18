@@ -126,9 +126,15 @@ class FakeElement {
 
   querySelectorAll(selector) {
     const matches = [];
+    const matchesSelector = (node) => {
+      if (selector.startsWith(".")) {
+        return node.classList.contains(selector.slice(1));
+      }
+      return selector === node.name || selector === node.tagName;
+    };
     const visit = (node) => {
       for (const child of node.children) {
-        if (selector === child.name || selector === child.tagName) {
+        if (matchesSelector(child)) {
           matches.push(child);
         }
         visit(child);
@@ -136,6 +142,17 @@ class FakeElement {
     };
     visit(this);
     return matches;
+  }
+
+  remove() {
+    if (!this.parentNode) {
+      return;
+    }
+
+    this.parentNode.children = this.parentNode.children.filter(
+      (child) => child !== this,
+    );
+    this.parentNode = null;
   }
 
   setAttribute(name, value) {
@@ -154,7 +171,16 @@ class FakeElement {
   }
 
   getBoundingClientRect() {
-    return { width: 320, height: 180 };
+    return {
+      width: 320,
+      height: 180,
+      left: 0,
+      top: 0,
+      right: 320,
+      bottom: 180,
+      x: 0,
+      y: 0,
+    };
   }
 
   set className(value) {
@@ -171,26 +197,6 @@ class FakeElement {
 }
 
 class FakeInputElement extends FakeElement {}
-
-class FakeAudioElement extends FakeElement {
-  constructor() {
-    super("audio");
-    this.paused = true;
-    this.duration = 0;
-    this.currentTime = 0;
-  }
-
-  play() {
-    this.paused = false;
-    this.dispatchEvent("play");
-    return Promise.resolve();
-  }
-
-  pause() {
-    this.paused = true;
-    this.dispatchEvent("pause");
-  }
-}
 
 class FakeImage {
   static created = [];
@@ -233,11 +239,43 @@ class FakeResizeObserver {
   disconnect() {}
 }
 
-function createEnvironment(mediaPayload, { randomValues = [], connection = null } = {}) {
+const DEFAULT_ALBUMS = [
+  { id: "356629898", title: "la tormenta", cover: "/assets/icons/la-tormenta-portada.jpg" },
+  {
+    id: "3133548639",
+    title: "ola de incendios",
+    cover: "/assets/icons/ola-de-incendios-portada.jpg",
+  },
+];
+
+const DEFAULT_ZINES = [
+  {
+    slug: "la-tormenta",
+    title: "la tormenta",
+    printable: { url: "/assets/zines/la-tormenta.pdf?v=2-1-1", bytes: 5471400 },
+    pages: Array.from({ length: 8 }, (_, index) => ({
+      number: index + 1,
+      src: `/assets/zines/la-tormenta-p${index + 1}.jpg?v=2-1-1`,
+      sizes: "(max-width: 720px) calc(100vw - 36px), 44vw",
+      srcset:
+        `/assets/zines/la-tormenta-p${index + 1}--w440.jpg?v=2-1-1 440w, ` +
+        `/assets/zines/la-tormenta-p${index + 1}.jpg?v=2-1-1 877w`,
+    })),
+  },
+];
+
+function createEnvironment(
+  mediaPayload,
+  {
+    randomValues = [],
+    connection = null,
+    albums = DEFAULT_ALBUMS,
+    zines = DEFAULT_ZINES,
+    initialHash = "#/fotos",
+  } = {},
+) {
   FakeImage.reset();
   const selectors = {
-    "#audio-player": new FakeAudioElement(),
-    "#now-playing": new FakeElement("now-playing"),
     "#main-photo": new FakeElement("main-photo"),
     "#photo-loader": new FakeElement("photo-loader"),
     "#photo-caption": new FakeElement("photo-caption"),
@@ -246,26 +284,31 @@ function createEnvironment(mediaPayload, { randomValues = [], connection = null 
     "#photo-random": new FakeElement("photo-random"),
     "#theme-toggle": new FakeElement("theme-toggle"),
     "#theme-toggle-label": new FakeElement("theme-toggle-label"),
-    "#prev-track": new FakeElement("prev-track"),
-    "#random-track": new FakeElement("random-track"),
-    "#next-track": new FakeElement("next-track"),
-    "#play-toggle": new FakeElement("play-toggle"),
-    "#play-toggle-icon": new FakeElement("play-toggle-icon"),
-    "#track-position": new FakeElement("track-position"),
-    "#track-list-toggle": new FakeElement("track-list-toggle"),
-    "#album-drawer": new FakeElement("album-drawer"),
-    "#track-list-shell": new FakeElement("track-list-shell"),
-    "#track-list": new FakeElement("track-list"),
-    "#seek-bar": new FakeInputElement("seek-bar"),
-    "#seek-bar-shell": new FakeElement("seek-bar-shell"),
-    "#current-time": new FakeElement("current-time"),
-    "#total-time": new FakeElement("total-time"),
+    "#bandcamp-player": new FakeElement("bandcamp-player"),
+    "#bandcamp-loader": new FakeElement("bandcamp-loader"),
+    "#album-toggle": new FakeElement("album-toggle"),
+    "#album-toggle-current": new FakeElement("album-toggle-current"),
+    "#album-list": new FakeElement("album-list"),
     ".player-bar": new FakeElement("player-bar"),
+    "#back-link": new FakeElement("back-link"),
+    "#view-inicio": new FakeElement("view-inicio"),
+    "#view-fotos": new FakeElement("view-fotos"),
+    "#view-musica": new FakeElement("view-musica"),
+    "#view-fanzines": new FakeElement("view-fanzines"),
+    "#album-grid": new FakeElement("album-grid"),
+    "#zine-grid": new FakeElement("zine-grid"),
+    "#zine-status": new FakeElement("zine-status"),
+    "#zine-index": new FakeElement("zine-index"),
+    "#zine-reader": new FakeElement("zine-reader"),
+    "#zine-spread": new FakeElement("zine-spread"),
+    "#zine-prev": new FakeElement("zine-prev"),
+    "#zine-next": new FakeElement("zine-next"),
+    "#zine-progress": new FakeElement("zine-progress"),
+    "#zine-layout": new FakeElement("zine-layout"),
+    "#zine-download": new FakeElement("zine-download"),
   };
 
-  selectors["#play-toggle"].dataset = {};
   selectors["#theme-toggle"].dataset = {};
-  selectors["#seek-bar"].value = "0";
   selectors["#main-photo"].hidden = true;
   selectors["#photo-loader"].hidden = true;
 
@@ -275,6 +318,7 @@ function createEnvironment(mediaPayload, { randomValues = [], connection = null 
   let timeoutId = 0;
   const timeouts = new Map();
   const mediaQueryListeners = new Map();
+  const mediaQueryObjects = new Map();
   const localStorageStore = new Map();
   const sessionStorageStore = new Map();
   const fetchCalls = [];
@@ -305,6 +349,7 @@ function createEnvironment(mediaPayload, { randomValues = [], connection = null 
   };
 
   const windowObject = {
+    location: { hash: initialHash },
     localStorage: {
       getItem(key) {
         return localStorageStore.has(key) ? localStorageStore.get(key) : null;
@@ -353,6 +398,7 @@ function createEnvironment(mediaPayload, { randomValues = [], connection = null 
         },
       };
 
+      mediaQueryObjects.set(query, mediaQuery);
       return mediaQuery;
     },
     setInterval(fn) {
@@ -390,6 +436,24 @@ function createEnvironment(mediaPayload, { randomValues = [], connection = null 
         ok: true,
         async json() {
           return mediaPayload;
+        },
+      };
+    }
+
+    if (String(url).startsWith("/static/data/albums.json")) {
+      return {
+        ok: true,
+        async json() {
+          return albums;
+        },
+      };
+    }
+
+    if (String(url).startsWith("/api/zines")) {
+      return {
+        ok: zines !== null,
+        async json() {
+          return { zines };
         },
       };
     }
@@ -486,6 +550,25 @@ function createEnvironment(mediaPayload, { randomValues = [], connection = null 
         callback();
       }
     },
+    async navigate(hash) {
+      windowObject.location.hash = hash;
+      windowObject.dispatchEvent({ type: "hashchange" });
+      for (let index = 0; index < 10; index += 1) {
+        await Promise.resolve();
+      }
+    },
+    setColorSchemeMatches(matches) {
+      const query = "(prefers-color-scheme: dark)";
+      const mediaQuery = mediaQueryObjects.get(query);
+      if (mediaQuery) {
+        mediaQuery.matches = matches;
+      }
+
+      const listeners = mediaQueryListeners.get(query) || [];
+      for (const listener of listeners) {
+        listener({ matches });
+      }
+    },
   };
 }
 
@@ -505,8 +588,11 @@ async function loadApp(options = {}) {
     "media-api.js",
     "analytics.js",
     "theme.js",
+    "router.js",
     "gallery.js",
-    "player.js",
+    "music.js",
+    "zines.js",
+    "bandcamp.js",
     "main.js",
   ];
 
@@ -523,7 +609,7 @@ async function loadApp(options = {}) {
     vm.runInNewContext(code, env.sandbox, { filename: scriptName });
   }
 
-  for (let index = 0; index < 6; index += 1) {
+  for (let index = 0; index < 10; index += 1) {
     await Promise.resolve();
   }
 
@@ -585,159 +671,113 @@ async function testTimedOutPhotoCanBeRetried() {
   assert.equal(selectors["#photo-loader"].hidden, true);
 }
 
-async function testTrackTitleAnimatesByDirection() {
-  const env = await loadApp();
-  const { selectors, flushTimeouts } = env;
-
-  selectors["#next-track"].click();
-  assert.equal(selectors["#now-playing"].classList.contains("now-playing-enter-next"), true);
-  flushTimeouts();
-  assert.equal(selectors["#now-playing"].classList.contains("now-playing-enter-next"), false);
-
-  selectors["#prev-track"].click();
-  assert.equal(selectors["#now-playing"].classList.contains("now-playing-enter-prev"), true);
-}
-
-async function testLongTrackTitleScrollsInsteadOfTruncating() {
-  const env = await loadApp({
-    mediaPayload: {
-      photos: ["/assets/photos/uno.jpg"],
-      music: [
-        {
-          file: "/assets/music/una-cancion-increiblemente-larga-para-probar-el-desplazamiento.mp3",
-          title: "una cancion increiblemente larga para probar el desplazamiento",
-          track_number: 1,
-        },
-      ],
-    },
-  });
-  const { selectors } = env;
-  const nowPlayingText = selectors["#now-playing"].children[0];
-
-  assert.equal(selectors["#now-playing"].classList.contains("now-playing-marquee"), true);
-  assert.equal(nowPlayingText.classList.contains("now-playing-text-marquee"), true);
-}
-
-async function testShortTrackTitleDoesNotScroll() {
-  const env = await loadApp();
-  const { selectors } = env;
-  const nowPlayingText = selectors["#now-playing"].children[0];
-
-  assert.equal(selectors["#now-playing"].classList.contains("now-playing-marquee"), false);
-  assert.equal(nowPlayingText.classList.contains("now-playing-text-marquee"), false);
-}
-
-async function testRandomTrackButtonPlaysAnotherTrack() {
-  const env = await loadApp({ randomValues: [0] });
-  const { selectors } = env;
-
-  await selectors["#play-toggle"].listeners.get("click")[0]({ type: "click" });
-  selectors["#random-track"].click();
-
-  assert.equal(selectors["#track-position"].textContent, "tema 02");
-  assert.equal(selectors["#now-playing"].textContent, "dos");
-  assert.equal(selectors["#play-toggle"].dataset.state, "playing");
-}
-
-async function testPlayButtonTogglesPlayingState() {
+async function testBandcampPlayerUsesLightColorsByDefault() {
   const env = await loadApp();
   const { selectors } = env;
 
-  await selectors["#play-toggle"].listeners.get("click")[0]({ type: "click" });
-  assert.equal(selectors["#play-toggle"].dataset.state, "playing");
-  assert.equal(selectors["#seek-bar-shell"].classList.contains("seek-bar-shell-playing"), true);
-
-  await selectors["#play-toggle"].listeners.get("click")[0]({ type: "click" });
-  assert.equal(selectors["#play-toggle"].dataset.state, "paused");
-  assert.equal(selectors["#seek-bar-shell"].classList.contains("seek-bar-shell-playing"), false);
+  const src = selectors["#bandcamp-player"].src;
+  assert.equal(src.includes("album=356629898"), true);
+  assert.equal(src.includes("bgcol=eef0ee"), true);
+  assert.equal(src.includes("linkcol=2f5f4d"), true);
 }
 
-async function testAlbumTrackListShowsOrderedTracks() {
-  const env = await loadApp({
-    mediaPayload: {
-      photos: ["/assets/photos/uno.jpg", "/assets/photos/dos.jpg"],
-      music: [
-        { file: "/assets/music/dos.mp3", title: "segunda", track_number: 2 },
-        { file: "/assets/music/uno.mp3", title: "primera", track_number: 1 },
-      ],
-    },
-  });
-  const { selectors } = env;
-  const trackButtons = selectors["#track-list"].querySelectorAll("button");
-
-  assert.equal(selectors["#track-position"].textContent, "tema 01");
-  assert.equal(selectors["#now-playing"].textContent, "primera");
-  assert.equal(selectors["#album-drawer"].hidden, false);
-  assert.equal(selectors["#album-drawer"].dataset.state, "closed");
-  assert.equal(selectors["#album-drawer"].getAttribute("aria-hidden"), "true");
-  assert.equal(selectors["#track-list-toggle"].textContent, "ver canciones");
-  assert.equal(selectors["#track-list-toggle"].getAttribute("aria-expanded"), "false");
-  assert.equal(trackButtons.length, 2);
-  assert.equal(trackButtons[0].textContent, "");
-  assert.equal(trackButtons[0].getAttribute("aria-current"), "true");
-  assert.equal(trackButtons[1].getAttribute("aria-current"), "false");
-  assert.equal(selectors["#random-track"].disabled, false);
-}
-
-async function testRandomTrackButtonStaysDisabledWithSingleTrack() {
-  const env = await loadApp({
-    mediaPayload: {
-      photos: ["/assets/photos/uno.jpg"],
-      music: [{ file: "/assets/music/uno.mp3", title: "uno", track_number: 1 }],
-    },
-  });
-  const { selectors } = env;
-
-  assert.equal(selectors["#random-track"].disabled, true);
-}
-
-async function testTrackListToggleShowsAndHidesAlbumTracks() {
+async function testBandcampLoaderHidesOnceTheEmbedLoads() {
   const env = await loadApp();
   const { selectors } = env;
 
-  selectors["#track-list-toggle"].click();
-  assert.equal(selectors["#album-drawer"].hidden, false);
-  assert.equal(selectors["#album-drawer"].dataset.state, "open");
-  assert.equal(selectors["#album-drawer"].getAttribute("aria-hidden"), "false");
-  assert.equal(selectors["#track-list-toggle"].textContent, "ocultar canciones");
-  assert.equal(selectors["#track-list-toggle"].getAttribute("aria-expanded"), "true");
+  assert.equal(selectors["#bandcamp-loader"].hidden, false);
 
-  selectors["#track-list-toggle"].click();
-  assert.equal(selectors["#album-drawer"].hidden, false);
-  assert.equal(selectors["#album-drawer"].dataset.state, "closed");
-  assert.equal(selectors["#album-drawer"].getAttribute("aria-hidden"), "true");
-  assert.equal(selectors["#track-list-toggle"].textContent, "ver canciones");
-  assert.equal(selectors["#track-list-toggle"].getAttribute("aria-expanded"), "false");
+  selectors["#bandcamp-player"].dispatchEvent("load");
+
+  assert.equal(selectors["#bandcamp-loader"].hidden, true);
 }
 
-async function testTrackListCanSelectTrack() {
+async function testBandcampPlayerSwitchesColorsWhenThemeToggled() {
   const env = await loadApp();
   const { selectors } = env;
-  const trackButtons = selectors["#track-list"].querySelectorAll("button");
 
-  trackButtons[1].click();
+  selectors["#theme-toggle"].click();
 
-  assert.equal(selectors["#track-position"].textContent, "tema 02");
-  assert.equal(selectors["#now-playing"].textContent, "dos");
-  assert.equal(trackButtons[1].getAttribute("aria-current"), "true");
+  const src = selectors["#bandcamp-player"].src;
+  assert.equal(src.includes("bgcol=141414"), true);
+  assert.equal(src.includes("linkcol=88b5a0"), true);
 }
 
-async function testTracksVisitAndTrackPlayback() {
+async function testBandcampPlayerFollowsSystemThemeInAutoMode() {
   const env = await loadApp();
-  const { selectors, fetchCalls } = env;
+  const { selectors, setColorSchemeMatches } = env;
+
+  setColorSchemeMatches(true);
+
+  const src = selectors["#bandcamp-player"].src;
+  assert.equal(src.includes("bgcol=141414"), true);
+  assert.equal(src.includes("linkcol=88b5a0"), true);
+}
+
+async function testBandcampPlayerTileArtUsesAlbumCoverImages() {
+  const env = await loadApp();
+  const { selectors } = env;
+  const tiles = selectors["#album-list"].querySelectorAll("img");
+
+  assert.equal(tiles.length, 2);
+  assert.equal(tiles[0].src, "/assets/icons/la-tormenta-portada.jpg");
+  assert.equal(tiles[1].src, "/assets/icons/ola-de-incendios-portada.jpg");
+
+  selectors["#theme-toggle"].click();
+
+  assert.equal(tiles[0].src, "/assets/icons/la-tormenta-portada.jpg");
+  assert.equal(tiles[1].src, "/assets/icons/ola-de-incendios-portada.jpg");
+}
+
+async function testBandcampPlayerShowsCurrentAlbumInToggle() {
+  const env = await loadApp();
+  const { selectors } = env;
+  const items = selectors["#album-list"].querySelectorAll("button");
+
+  assert.equal(selectors["#album-toggle-current"].textContent, "la tormenta");
+  assert.equal(items.length, 2);
+  assert.equal(items[0].children[0].textContent, "la tormenta");
+  assert.equal(items[0].getAttribute("aria-pressed"), "true");
+  assert.equal(items[1].children[0].textContent, "ola de incendios");
+  assert.equal(items[1].getAttribute("aria-pressed"), "false");
+}
+
+async function testBandcampPlayerTogglesAlbumListOpenAndClosed() {
+  const env = await loadApp();
+  const { selectors } = env;
+
+  selectors["#album-toggle"].click();
+  assert.equal(selectors["#album-toggle"].getAttribute("aria-expanded"), "true");
+  assert.equal(selectors["#album-list"].dataset.state, "open");
+
+  selectors["#album-toggle"].click();
+  assert.equal(selectors["#album-toggle"].getAttribute("aria-expanded"), "false");
+  assert.equal(selectors["#album-list"].dataset.state, "closed");
+}
+
+async function testBandcampPlayerSwitchesAlbumOnSelectAndRemembersChoice() {
+  const env = await loadApp();
+  const { selectors, sandbox } = env;
+  const items = selectors["#album-list"].querySelectorAll("button");
+
+  selectors["#album-toggle"].click();
+  items[1].click();
+
+  const src = selectors["#bandcamp-player"].src;
+  assert.equal(src.includes("album=3133548639"), true);
+  assert.equal(selectors["#album-toggle-current"].textContent, "ola de incendios");
+  assert.equal(selectors["#album-toggle"].getAttribute("aria-expanded"), "false");
+  assert.equal(items[1].getAttribute("aria-pressed"), "true");
+  assert.equal(sandbox.window.localStorage.getItem("manturon-album"), "3133548639");
+}
+
+async function testTracksVisit() {
+  const env = await loadApp();
+  const { fetchCalls } = env;
 
   const analyticsCallsAfterLoad = fetchCalls.filter((call) => call.url === "/api/activity");
   assert.equal(analyticsCallsAfterLoad.length, 1);
   assert.equal(JSON.parse(analyticsCallsAfterLoad[0].options.body).type, "visit");
-
-  await selectors["#play-toggle"].listeners.get("click")[0]({ type: "click" });
-
-  const analyticsCallsAfterPlay = fetchCalls.filter((call) => call.url === "/api/activity");
-  assert.equal(analyticsCallsAfterPlay.length, 2);
-  const playPayload = JSON.parse(analyticsCallsAfterPlay[1].options.body);
-  assert.equal(playPayload.type, "track_play");
-  assert.equal(playPayload.trackFile, "/assets/music/uno.mp3");
-  assert.equal(playPayload.trackTitle, "uno");
 }
 
 async function testPhotoCaptionOnlyShowsOnHoverWhenLoaded() {
@@ -849,26 +889,306 @@ async function testUsesResponsivePhotoCandidatesFromMediaPayload() {
   );
 }
 
+function routerModule() {
+  const code = fs.readFileSync(
+    path.join(__dirname, "..", "src", "static", "js", "router.js"),
+    "utf8",
+  );
+  const sandbox = {};
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(code, sandbox, { filename: "router.js" });
+  return sandbox.ManturonRouter;
+}
+
+function zinesModule() {
+  const code = fs.readFileSync(
+    path.join(__dirname, "..", "src", "static", "js", "zines.js"),
+    "utf8",
+  );
+  const sandbox = {};
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(code, sandbox, { filename: "zines.js" });
+  return sandbox.ManturonZines;
+}
+
+async function testRouteParsingFallsBackToHome() {
+  const { parseRoute, routeHash, parentHash } = routerModule();
+
+  assert.deepEqual(parseRoute(""), { route: "inicio", param: "" });
+  assert.deepEqual(parseRoute("#/"), { route: "inicio", param: "" });
+  assert.deepEqual(parseRoute("#/pepinillos"), { route: "inicio", param: "" });
+  assert.deepEqual(parseRoute("#/fotos"), { route: "fotos", param: "" });
+  assert.deepEqual(parseRoute("#/fanzines/la-tormenta"), {
+    route: "fanzines",
+    param: "la-tormenta",
+  });
+  assert.deepEqual(parseRoute("#/fanzines/%E2%98%85"), {
+    route: "fanzines",
+    param: "★",
+  });
+  // A malformed escape should not throw, just come back as written.
+  assert.deepEqual(parseRoute("#/fanzines/%E0%A4%A"), {
+    route: "fanzines",
+    param: "%E0%A4%A",
+  });
+
+  assert.equal(routeHash("inicio", ""), "#/");
+  assert.equal(routeHash("musica", ""), "#/musica");
+  assert.equal(routeHash("fanzines", "san juan"), "#/fanzines/san%20juan");
+
+  assert.equal(parentHash({ route: "inicio", param: "" }), "#/");
+  assert.equal(parentHash({ route: "musica", param: "" }), "#/");
+  assert.equal(parentHash({ route: "fanzines", param: "la-tormenta" }), "#/fanzines");
+}
+
+async function testSectionsSwapWithoutTouchingThePlayer() {
+  const env = await loadApp({ initialHash: "#/" });
+  const { selectors, navigate } = env;
+
+  assert.equal(selectors["#view-inicio"].hidden, false);
+  assert.equal(selectors["#view-fotos"].hidden, true);
+  assert.equal(selectors["#back-link"].hidden, true);
+
+  const playerSrcOnHome = selectors["#bandcamp-player"].src;
+
+  await navigate("#/fanzines/la-tormenta");
+  assert.equal(selectors["#view-inicio"].hidden, true);
+  assert.equal(selectors["#view-fanzines"].hidden, false);
+  assert.equal(selectors["#back-link"].hidden, false);
+  // Backing out of a zine lands on the zine list, not on the home menu.
+  assert.equal(selectors["#back-link"].getAttribute("href"), "#/fanzines");
+
+  await navigate("#/musica");
+  assert.equal(selectors["#back-link"].getAttribute("href"), "#/");
+
+  // Changing section must never re-point the embed, or playback restarts.
+  assert.equal(selectors["#bandcamp-player"].src, playerSrcOnHome);
+}
+
+async function testZineSpreadsKeepFacingPagesTogether() {
+  const { buildSpreads, spreadIndexForPage, progressLabel } = zinesModule();
+
+  assert.deepEqual(buildSpreads(8, true), [[1], [2, 3], [4, 5], [6, 7], [8]]);
+  assert.deepEqual(buildSpreads(8, false), [[1], [2], [3], [4], [5], [6], [7], [8]]);
+  assert.deepEqual(buildSpreads(0, true), []);
+
+  const spreads = buildSpreads(8, true);
+  assert.equal(spreadIndexForPage(spreads, 5), 2);
+  assert.equal(spreadIndexForPage(spreads, 99), 0);
+
+  assert.equal(progressLabel([4, 5], 8), "4-5 / 8");
+  assert.equal(progressLabel([1], 8), "1 / 8");
+  assert.equal(progressLabel([], 8), "");
+}
+
+async function testZineReaderPagesThroughSpreads() {
+  const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
+  const { selectors } = env;
+
+  // Two pages by default, on any screen size.
+  assert.equal(selectors["#zine-index"].hidden, true);
+  assert.equal(selectors["#zine-reader"].hidden, false);
+  assert.equal(selectors["#zine-progress"].textContent, "1 / 8");
+  assert.equal(selectors["#zine-prev"].disabled, true);
+
+  selectors["#zine-next"].click();
+  assert.equal(selectors["#zine-progress"].textContent, "2-3 / 8");
+  assert.equal(selectors["#zine-spread"].dataset.pages, "2");
+  assert.equal(selectors["#zine-prev"].disabled, false);
+
+  // Spreads: [1], [2,3], [4,5], [6,7], [8] — three more clicks reach the end.
+  selectors["#zine-next"].click();
+  selectors["#zine-next"].click();
+  selectors["#zine-next"].click();
+  assert.equal(selectors["#zine-progress"].textContent, "8 / 8");
+  assert.equal(selectors["#zine-next"].disabled, true);
+
+  selectors["#zine-next"].click();
+  assert.equal(selectors["#zine-progress"].textContent, "8 / 8");
+}
+
+async function testZineTurnLaysASheetOverTheNewPage() {
+  const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
+  const { selectors } = env;
+  const spread = selectors["#zine-spread"];
+
+  // Opening a zine has nothing to turn away from.
+  assert.equal(spread.querySelectorAll(".zine-sheet").length, 0);
+
+  selectors["#zine-next"].click();
+  const forward = spread.querySelectorAll(".zine-sheet");
+  assert.equal(forward.length, 1);
+  assert.equal(forward[0].classList.contains("zine-sheet-forward"), true);
+  // The sheet is a copy of the page you just left.
+  assert.equal(forward[0].src.includes("la-tormenta-p1.jpg"), true);
+
+  selectors["#zine-prev"].click();
+  const back = spread.querySelectorAll(".zine-sheet");
+  assert.equal(back.length, 1);
+  assert.equal(back[0].classList.contains("zine-sheet-back"), true);
+  assert.equal(back[0].src.includes("la-tormenta-p2.jpg"), true);
+
+  // The overlay is cleaned up even if no animation event ever arrives.
+  env.flushTimeouts();
+  assert.equal(spread.querySelectorAll(".zine-sheet").length, 0);
+}
+
+async function testZineLayoutTogglePersists() {
+  const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
+  const { selectors, sandbox } = env;
+  const layout = selectors["#zine-layout"];
+
+  // Two pages by default, past the cover which is on its own either way.
+  selectors["#zine-next"].click();
+  assert.equal(selectors["#zine-spread"].dataset.pages, "2");
+  assert.equal(selectors["#zine-progress"].textContent, "2-3 / 8");
+  assert.equal(layout.textContent, "ver una página");
+
+  layout.click();
+  assert.equal(selectors["#zine-spread"].dataset.pages, "1");
+  assert.equal(layout.textContent, "ver dos páginas");
+  assert.equal(
+    sandbox.window.localStorage.getItem("manturon-zine-layout"),
+    "single",
+  );
+
+  layout.click();
+  assert.equal(selectors["#zine-spread"].dataset.pages, "2");
+  assert.equal(
+    sandbox.window.localStorage.getItem("manturon-zine-layout"),
+    "spread",
+  );
+}
+
+async function testZineReaderOffersThePrintablePdf() {
+  const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
+  const download = env.selectors["#zine-download"];
+
+  assert.equal(download.hidden, false);
+  assert.equal(
+    download.getAttribute("href"),
+    "/assets/zines/la-tormenta.pdf?v=2-1-1",
+  );
+  assert.equal(download.getAttribute("download"), "la-tormenta.pdf");
+}
+
+async function testZineWithoutAPdfHidesTheDownload() {
+  const zines = [
+    {
+      slug: "sin-pdf",
+      title: "sin pdf",
+      pages: [{ number: 1, src: "/assets/zines/sin-pdf-p1.jpg" }],
+    },
+  ];
+  const env = await loadApp({ initialHash: "#/fanzines/sin-pdf", zines });
+
+  assert.equal(env.selectors["#zine-download"].hidden, true);
+}
+
+async function testZineReaderRespondsToArrowKeys() {
+  const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
+  const { selectors, sandbox } = env;
+
+  sandbox.document.dispatchEvent({ type: "keydown", key: "ArrowRight" });
+  assert.equal(selectors["#zine-progress"].textContent, "2-3 / 8");
+
+  sandbox.document.dispatchEvent({ type: "keydown", key: "ArrowLeft" });
+  assert.equal(selectors["#zine-progress"].textContent, "1 / 8");
+}
+
+async function testUnknownZineFallsBackToTheList() {
+  const env = await loadApp({ initialHash: "#/fanzines/no-existe" });
+  const { selectors } = env;
+
+  assert.equal(selectors["#zine-index"].hidden, false);
+  assert.equal(selectors["#zine-reader"].hidden, true);
+  assert.equal(selectors["#zine-grid"].children.length, 1);
+}
+
+async function testZineListReportsLoadFailures() {
+  const env = await loadApp({ initialHash: "#/fanzines", zines: null });
+  const { selectors } = env;
+
+  assert.equal(selectors["#zine-status"].hidden, false);
+  assert.equal(
+    selectors["#zine-status"].textContent,
+    "No se pudieron cargar los fanzines.",
+  );
+}
+
+async function testMusicSectionListsTheAlbums() {
+  const env = await loadApp({ initialHash: "#/musica" });
+  const { selectors } = env;
+
+  assert.equal(selectors["#album-grid"].children.length, DEFAULT_ALBUMS.length);
+}
+
+async function testMusicSectionAlbumSwitchesThePlayer() {
+  const env = await loadApp({ initialHash: "#/musica" });
+  const { selectors, sandbox } = env;
+
+  const secondAlbum = selectors["#album-grid"].children[1];
+  secondAlbum.children[0].click();
+
+  assert.equal(
+    selectors["#bandcamp-player"].src.includes(`album=${DEFAULT_ALBUMS[1].id}`),
+    true,
+  );
+  assert.equal(
+    sandbox.window.localStorage.getItem("manturon-album"),
+    DEFAULT_ALBUMS[1].id,
+  );
+}
+
+async function testPhotosOnlyLoadOnceYouOpenThatSection() {
+  const env = await loadApp({ initialHash: "#/" });
+  const { fetchCalls, navigate } = env;
+
+  const mediaCallsOnHome = fetchCalls.filter((call) =>
+    String(call.url).startsWith("/api/media"),
+  );
+  assert.equal(mediaCallsOnHome.length, 0);
+
+  await navigate("#/fotos");
+  const mediaCallsAfter = fetchCalls.filter((call) =>
+    String(call.url).startsWith("/api/media"),
+  );
+  assert.equal(mediaCallsAfter.length, 1);
+}
+
 async function run() {
   const tests = [
     ["locks photo controls while loading", testPhotoControlsLockWhileLoading],
     ["unlocks photo controls after a stalled image times out", testPhotoLoadTimeoutUnlocksControls],
     ["retries a timed out photo when you come back to it", testTimedOutPhotoCanBeRetried],
-    ["animates track title by direction", testTrackTitleAnimatesByDirection],
-    ["scrolls long track titles instead of truncating", testLongTrackTitleScrollsInsteadOfTruncating],
-    ["keeps short track titles static", testShortTrackTitleDoesNotScroll],
-    ["plays another track from the random button", testRandomTrackButtonPlaysAnotherTrack],
-    ["toggles playing state from play button", testPlayButtonTogglesPlayingState],
-    ["shows the album track list in order", testAlbumTrackListShowsOrderedTracks],
-    ["disables random track when there is only one track", testRandomTrackButtonStaysDisabledWithSingleTrack],
-    ["toggles the album track list open and closed", testTrackListToggleShowsAndHidesAlbumTracks],
-    ["lets you select a track from the album list", testTrackListCanSelectTrack],
-    ["tracks visits and playback analytics", testTracksVisitAndTrackPlayback],
+    ["uses light bandcamp embed colors by default", testBandcampPlayerUsesLightColorsByDefault],
+    ["hides the bandcamp loader once the embed loads", testBandcampLoaderHidesOnceTheEmbedLoads],
+    ["switches bandcamp embed colors when the theme is toggled", testBandcampPlayerSwitchesColorsWhenThemeToggled],
+    ["follows the system theme for the bandcamp embed in auto mode", testBandcampPlayerFollowsSystemThemeInAutoMode],
+    ["uses each album's cover image for its tile art", testBandcampPlayerTileArtUsesAlbumCoverImages],
+    ["shows the current album in the toggle", testBandcampPlayerShowsCurrentAlbumInToggle],
+    ["toggles the album list open and closed", testBandcampPlayerTogglesAlbumListOpenAndClosed],
+    ["switches album on select and remembers the choice", testBandcampPlayerSwitchesAlbumOnSelectAndRemembersChoice],
+    ["tracks visits", testTracksVisit],
     ["shows photo caption only on hover after load", testPhotoCaptionOnlyShowsOnHoverWhenLoaded],
     ["keeps the current photo visible while the next one loads", testKeepsCurrentPhotoVisibleWhileNextLoads],
     ["shows a loaded photo immediately when revisited", testShowsLoadedPhotoImmediatelyWhenRevisited],
     ["starts a fresh load for random navigation", testRandomButtonStartsANewPhotoLoad],
     ["uses responsive photo candidates from the media payload", testUsesResponsivePhotoCandidatesFromMediaPayload],
+    ["falls back to home for unknown routes", testRouteParsingFallsBackToHome],
+    ["swaps sections without touching the player", testSectionsSwapWithoutTouchingThePlayer],
+    ["keeps facing zine pages in the same spread", testZineSpreadsKeepFacingPagesTogether],
+    ["pages through zine spreads", testZineReaderPagesThroughSpreads],
+    ["lays a turning sheet over the new page", testZineTurnLaysASheetOverTheNewPage],
+    ["lets you choose one or two pages", testZineLayoutTogglePersists],
+    ["offers the printable pdf", testZineReaderOffersThePrintablePdf],
+    ["hides the download when a zine has no pdf", testZineWithoutAPdfHidesTheDownload],
+    ["turns zine pages with the arrow keys", testZineReaderRespondsToArrowKeys],
+    ["falls back to the zine list for an unknown zine", testUnknownZineFallsBackToTheList],
+    ["reports a failed zine load", testZineListReportsLoadFailures],
+    ["lists the albums", testMusicSectionListsTheAlbums],
+    ["switches the player from the music section", testMusicSectionAlbumSwitchesThePlayer],
+    ["only loads photos once you open that section", testPhotosOnlyLoadOnceYouOpenThatSection],
   ];
 
   for (const [name, testFn] of tests) {

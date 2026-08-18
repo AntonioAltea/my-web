@@ -18,6 +18,7 @@ Short guide to work in this repo without wasting time.
 - `tests/`: backend and frontend tests.
 - `Makefile`: common commands.
 - `scripts/prepare-web-photos.py`: optimizes photos for the web.
+- `scripts/prepare-zines.py`: slices one-sheet zine PDFs into page images.
 - `scripts/sync-media.sh`: syncs media with Fly; for photos it generates web copies first.
 
 ## Things That Actually Matter
@@ -40,6 +41,14 @@ Short guide to work in this repo without wasting time.
 - If a local, editor, or generated file appears and should not be versioned, add it to `.gitignore`.
 - Do not add build steps, frameworks, or heavy dependencies unless explicitly requested.
 - If the app is connected to the repo in the Fly UI, auto-deploy updates code on each `push` to `main`, but it does not upload new photos or music to the `/data` volume.
+- The site is a single page with four hash routes handled by `src/static/js/router.js`: `#/` (menu), `#/fotos`, `#/musica` and `#/fanzines`, plus `#/fanzines/<slug>` for one zine. Sections are sibling `<section class="view">` elements that the router shows and hides; nothing is re-created on navigation. That is the whole point of the structure, because the Bandcamp iframe lives in the footer outside `.page` and must never be re-rendered or the music restarts. If you touch navigation, keep the test "swaps sections without touching the player" passing. The back control is the `<` at the top left and goes up one level (zine to zine list, section to menu); the theme toggle stays at the top right.
+- Photos and the zine list load the first time you open their section, not on boot. The `/api/media` refresh on focus and visibility change only runs when the photos section is showing.
+- In the zine reader the index scrolls but the reader itself has to fit the viewport, so the overflow lives on `.zine-index`, not on the section. A page turn overlays a copy of the page you are leaving (`.zine-sheet`) and swings it about the spine; the overlay is removed by a timer rather than `animationend`, which never fires in a hidden tab. A toggle switches between one page and a spread and is remembered in `localStorage`; the default is a spread on any screen size. The zine cover grid is pinned to 4 columns below 640px (see `zine.css`) so the current four zines fit one row without scrolling on a phone; if a fifth zine gets added, revisit that.
+- Zines are standard one-sheet zines: one landscape A4 printed on a single side, 4x2 panels, top row upside down, folded into eight pages. `scripts/zine_prepare.py` holds the panel-to-page map in `PAGE_CELLS`, derived from the usual template (bottom row: back cover, front cover, page 1, page 2; top row inverted and read right to left). Facing pages land on neighbouring panels, so a photo drawn across two panels stays whole as long as the reader shows those pairs together. Do not "simplify" that ordering; there are tests pinning it.
+- The sheet carries a dashed cut guide about 2 px wide around its outer edge at 300 dpi, trimmed by `SHEET_BORDER_TRIM` before slicing. Page URLs are served immutable and versioned from the source PDF's mtime and size plus `PREPARE_VERSION`, so bump `PREPARE_VERSION` whenever slicing changes or readers keep their cached pages.
+- `src/static/data/zines.json` is the editable list of published zines (`{slug, title, source, page}` plus an optional `download` for a different print file, such as the version with the back page merged in; paths are relative to the PDF folder); `assets/zines/.zine-manifest.json` is generated. Adding a zine means editing the JSON and rerunning `make prepare-zines`. Output file names are flat (`<slug>-p<N>.jpg`) because `scripts/sync-media.sh` only walks flat directories. Each zine's print PDF is copied next to its pages as `<slug>.pdf` and offered as a download in the reader. A rerun prunes files that are no longer in the manifest but leaves hidden files alone, so `.gitkeep` and the manifest survive.
+- `/api/zines` serves the zine manifest. The music section is deliberately just the album covers plus plain links to Bandcamp and YouTube; there was an embedded latest-video reader once and it was dropped on purpose to keep the records the focus, so do not add it back without being asked.
+- The footer player embeds Bandcamp (`src/static/js/bandcamp.js`) instead of playing local files; it re-sets the iframe `src` on theme or album change to swap `bgcol`/`linkcol`/`album`, and remembers the chosen album (by id) in `localStorage`. The list of albums lives in `src/static/data/albums.json` (plain data, `{id, title, cover}` per entry, fetched at runtime) so adding one doesn't require touching any JS. That path is covered by the same "no cache" rule as `/static/css/` and `/static/js/` in `src/server.py`'s `end_headers`, so edits show up without a hard refresh. The picker shows each album's `cover` image (a real file under `assets/icons/`, plain `<img>`, no iframe) — Bandcamp's own embed always draws a play button on top of any artwork it renders (tested `minimal=true` and `artwork=big`), so there's no way to get clean cover art from the embed alone, and Bandcamp doesn't expose the artwork file for an album id without scraping the page (blocked by their bot protection). The `assets/music` backend (metadata parsing, `/api/media` `music` key, `track_play` analytics) is intentionally kept but unused by the frontend for now — don't be surprised that nothing calls it.
 
 ## Useful Commands
 
@@ -50,6 +59,7 @@ Short guide to work in this repo without wasting time.
 - `make test-front`
 - `make deploy`
 - `make prepare-web-photos SRC=assets/photos OUT=/tmp/fotos-web`
+- `make prepare-zines` (reads `ZINES_SRC`, defaults to `~/Documents/zines`)
 - `make sync-all`
 - `make clean-photos`
 - `make clean-photos-dry`

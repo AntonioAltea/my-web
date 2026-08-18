@@ -2,6 +2,10 @@
 
 A simple music-and-photography site with a DIY feel.
 
+The site has three sections behind a small menu: photos, music and zines. A `<`
+at the top left goes up one level. The Bandcamp player sits in the footer and
+keeps playing while you move between sections.
+
 ## Structure
 
 - `src/`: app code (`index.html`, `server.py`) and frontend assets in `src/static/`
@@ -10,6 +14,7 @@ A simple music-and-photography site with a DIY feel.
 - `fly.toml`: Fly.io configuration
 - `assets/photos/`: put your images here
 - `assets/music/`: put your mp3 files here
+- `assets/zines/`: generated zine pages, produced by `make prepare-zines`
 
 ## How To Use It
 
@@ -71,7 +76,36 @@ COVERAGE_MIN=95 git push
 
 ## Bandcamp
 
-Music appears as an album-style player fixed at the bottom, with cover art, a visible track list, sequential playback order, and a link to `https://manturon.bandcamp.com`.
+Music is an embedded Bandcamp player fixed at the bottom of the page, with a picker (album cover thumbnails) to choose which album plays (currently `la tormenta` and `ola de incendios`). The embed colors switch between the light and dark theme automatically, and the chosen album is remembered between visits.
+
+To add another album, drop a square cover image in `assets/icons/` and add `{ "id": "<embed id>", "title": "<display title>", "cover": "/assets/icons/<file>" }` to `src/static/data/albums.json` — nothing else needs to change. Get the embed id from the album's Bandcamp page: "Share / Embed" → "Embed this album" → copy the `<iframe>` code and take the number after `album=` in its `src`. The cover image has to be provided manually; Bandcamp doesn't expose the artwork file for a given album id without scraping the page (which its bot protection blocks).
+
+The `assets/music/` pipeline (metadata parsing, `/api/media` `music` key, `track_play` analytics) still exists in the backend but nothing in the frontend renders it right now.
+
+The music section lists the same albums as cards; clicking one loads it in the footer player instead of opening a new page. Below them are plain links to Bandcamp and YouTube, deliberately kept small so the records stay the focus.
+
+## Zines
+
+A zine here is a standard one-sheet zine: a single landscape A4 printed on one side, holding a 4x2 grid of panels with the top row upside down, folded and cut into an eight page booklet. `make prepare-zines` renders that sheet, trims the printed cut guides, slices the panels, turns the top row the right way up and writes the eight pages in reading order to `assets/zines/`, plus a manifest.
+
+```bash
+make prepare-zines                      # reads ~/Documents/zines
+make prepare-zines ZINES_SRC=/other/dir
+```
+
+Which zines get published is `src/static/data/zines.json`, one entry per zine:
+
+```json
+{ "slug": "la-tormenta", "title": "la tormenta", "source": "tormenta/la-tormenta.pdf", "page": 1 }
+```
+
+`source` is relative to the PDF folder. Add `"download": "tormenta/tormenta-bp.pdf"` if the file people should print is a different one, for instance the version with the back page merged in; otherwise the sheet being sliced is the one offered. After editing the list, rerun `make prepare-zines` and then `make sync KIND=zines SRC=assets/zines`. Pages no longer listed are removed from `assets/zines/` on the next run.
+
+The reader opens a zine like a booklet: the cover alone, then pages 2-3, 4-5 and 6-7 as spreads, then the back cover. That matters because these zines often carry one photo drawn across two panels, and those panels are exactly the ones that end up facing each other. Turning a page swings the sheet you are leaving about the spine. Arrow keys work too.
+
+A toggle switches between one page and a spread and remembers your choice; a spread is the default on any screen size. Each zine also offers its PDF for download, so anyone can print and fold their own copy.
+
+If you change how the sheet is sliced, bump `PREPARE_VERSION` in `scripts/zine_prepare.py`; page URLs are cached as immutable and are versioned from that number plus the source PDF.
 
 ## Basic Analytics
 
@@ -142,6 +176,7 @@ Use one command and change `KIND=`:
 ```bash
 make upload KIND=photos SRC=assets/photos
 make upload KIND=music SRC=assets/music
+make upload KIND=zines SRC=assets/zines
 ```
 
 You can also upload a different directory or a specific file by changing `SRC=`.
@@ -155,6 +190,7 @@ To make the remote volume match your local folders, deleting files on Fly that n
 ```bash
 make sync KIND=photos SRC=assets/photos
 make sync KIND=music SRC=assets/music
+make sync KIND=zines SRC=assets/zines
 ```
 
 Or both at once:
@@ -193,6 +229,25 @@ files actually served in production
         v
 /api/media
 list of public photo sources plus responsive `srcset` metadata
+```
+
+Zines start as PDFs outside the repo and are sliced into page images:
+
+```text
+~/Documents/zines/*.pdf
+        |
+        v
+make prepare-zines
+        |
+        v
+assets/zines
+page images plus .zine-manifest.json
+        |
+        v
+/data/zines on Fly
+        |
+        v
+/api/zines
 ```
 
 Music is simpler because it is not recompressed:

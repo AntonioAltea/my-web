@@ -19,6 +19,7 @@ PROJECT_ROOT = ROOT.parent
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", PROJECT_ROOT / "assets")).resolve()
 PHOTOS_DIR = MEDIA_ROOT / "photos"
 MUSIC_DIR = MEDIA_ROOT / "music"
+ZINES_DIR = MEDIA_ROOT / "zines"
 ANALYTICS_FILE = MEDIA_ROOT / "analytics.json"
 CANONICAL_HOST = os.environ.get("CANONICAL_HOST", "").strip()
 REDIRECT_HOSTS = {
@@ -35,6 +36,8 @@ PHOTO_SLOT_SIZES = (
 )
 PHOTO_VARIANT_PATTERN = re.compile(r"^(?P<stem>.+)--w(?P<max_dim>\d+)$")
 MUSIC_EXTENSIONS = {".mp3", ".wav", ".ogg", ".m4a", ".flac"}
+ZINE_MANIFEST_NAME = ".zine-manifest.json"
+ZINE_PAGE_SLOT_SIZES = "(max-width: 720px) calc(100vw - 36px), 44vw"
 ANALYTICS_LOCK = threading.Lock()
 ANALYTICS_SESSION_RETENTION = timedelta(days=30)
 
@@ -362,8 +365,133 @@ def responsive_photo_entry(
     return payload
 
 
+def zine_manifest_path() -> Path:
+    return ZINES_DIR / ZINE_MANIFEST_NAME
+
+
+def load_zine_manifest() -> list[dict[str, object]]:
+    path = zine_manifest_path()
+    if not path.exists():
+        return []
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+
+    zines = payload.get("zines") if isinstance(payload, dict) else None
+    if not isinstance(zines, list):
+        return []
+
+    return [zine for zine in zines if isinstance(zine, dict)]
+
+
+def versioned_zine_url(file_name: str, version: str | None) -> str:
+    base_url = f"/assets/zines/{file_name}"
+    if not version:
+        return base_url
+    return f"{base_url}?v={version}"
+
+
+def zine_page_entry(page: dict[str, object], version: str | None) -> dict[str, object]:
+    raw_sources = page.get("sources")
+    sources: list[dict[str, object]] = []
+    if isinstance(raw_sources, list):
+        for source in raw_sources:
+            if not isinstance(source, dict):
+                continue
+            name = source.get("name")
+            if not isinstance(name, str) or not name:
+                continue
+            width = source.get("width")
+            sources.append(
+                {
+                    "name": name,
+                    "width": width if isinstance(width, int) and width > 0 else 0,
+                }
+            )
+
+    sources.sort(key=lambda item: (int(item["width"]), str(item["name"]).lower()))
+    if not sources:
+        return {}
+
+    entry: dict[str, object] = {
+        "number": page.get("number"),
+        "src": versioned_zine_url(str(sources[-1]["name"]), version),
+    }
+
+    srcset_candidates = [
+        f"{versioned_zine_url(str(source['name']), version)} {source['width']}w"
+        for source in sources
+        if int(source["width"]) > 0
+    ]
+    if len(srcset_candidates) >= 2:
+        entry["sizes"] = ZINE_PAGE_SLOT_SIZES
+        entry["srcset"] = ", ".join(srcset_candidates)
+
+    return entry
+
+
+def zine_printable_entry(
+    zine: dict[str, object], version: str | None
+) -> dict[str, object] | None:
+    printable = zine.get("printable")
+    if not isinstance(printable, dict):
+        return None
+
+    name = printable.get("name")
+    if not isinstance(name, str) or not name:
+        return None
+
+    entry: dict[str, object] = {"url": versioned_zine_url(name, version)}
+    size = printable.get("bytes")
+    if isinstance(size, int) and size > 0:
+        entry["bytes"] = size
+    return entry
+
+
+def zines_payload() -> list[dict[str, object]]:
+    entries = []
+    for zine in load_zine_manifest():
+        slug = zine.get("slug")
+        if not isinstance(slug, str) or not slug:
+            continue
+
+        version = zine.get("version") if isinstance(zine.get("version"), str) else None
+        raw_pages = zine.get("pages")
+        pages = []
+        if isinstance(raw_pages, list):
+            for page in raw_pages:
+                if not isinstance(page, dict):
+                    continue
+                entry = zine_page_entry(page, version)
+                if entry:
+                    pages.append(entry)
+
+        if not pages:
+            continue
+
+        entry: dict[str, object] = {
+            "slug": slug,
+            "title": str(zine.get("title") or slug.replace("-", " ")),
+            "pages": pages,
+        }
+
+        printable = zine_printable_entry(zine, version)
+        if printable:
+            entry["printable"] = printable
+
+        entries.append(entry)
+
+    return entries
+
+
 def is_media_request(path: str) -> bool:
     return urlparse(path).path == "/api/media"
+
+
+def is_zines_request(path: str) -> bool:
+    return urlparse(path).path == "/api/zines"
 
 
 def is_analytics_event_request(path: str) -> bool:
@@ -609,6 +737,7 @@ def media_payload() -> dict[str, list[object]]:
 def ensure_media_dirs() -> None:
     PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
     MUSIC_DIR.mkdir(parents=True, exist_ok=True)
+    ZINES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def asset_disk_path(request_path: str) -> Path | None:
@@ -621,6 +750,10 @@ def asset_disk_path(request_path: str) -> Path | None:
     if parsed_path.startswith("/assets/music/"):
         file_name = Path(parsed_path).name
         return MUSIC_DIR / file_name
+
+    if parsed_path.startswith("/assets/zines/"):
+        file_name = Path(parsed_path).name
+        return ZINES_DIR / file_name
 
     if parsed_path.startswith("/assets/icons/"):
         file_name = Path(parsed_path).name
@@ -701,10 +834,13 @@ class MediaHandler(SimpleHTTPRequestHandler):
             in {"/", "/index.html", "/favicon.ico", "/stats", "/stats/", "/stats.html"}
             or request_path.startswith("/static/css/")
             or request_path.startswith("/static/js/")
+            or request_path.startswith("/static/data/")
             or request_path.startswith("/assets/icons/")
         ):
             self.send_header("Cache-Control", "no-store, max-age=0")
-        elif request_path.startswith("/assets/photos/"):
+        elif request_path.startswith("/assets/photos/") or request_path.startswith(
+            "/assets/zines/"
+        ):
             if "v=" in request_query:
                 self.send_header("Cache-Control", "public, max-age=31536000, immutable")
             else:
@@ -728,6 +864,10 @@ class MediaHandler(SimpleHTTPRequestHandler):
         if is_media_request(self.path):
             payload = media_payload()
             self._send_json_response(payload)
+            return
+
+        if is_zines_request(self.path):
+            self._send_json_response({"zines": zines_payload()})
             return
 
         if is_analytics_summary_request(self.path):

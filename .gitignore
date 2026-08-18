@@ -6,9 +6,11 @@ __pycache__/
 
 assets/photos/*
 assets/music/*
+assets/zines/*
 assets/analytics.json
 !assets/photos/.gitkeep
 !assets/music/.gitkeep
+!assets/zines/.gitkeep
 
 .env
 .cache/

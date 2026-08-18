@@ -1,7 +1,7 @@
 (function (global) {
   const THEME_STORAGE_KEY = "manturon-theme";
 
-  function createThemeController({ button, label }) {
+  function createThemeController({ button, label, onChange = () => {} }) {
     const themePreference = global.window.matchMedia("(prefers-color-scheme: dark)");
 
     function storedThemePreference() {
@@ -19,6 +19,8 @@
     }
 
     function sync() {
+      onChange(effectiveTheme());
+
       if (!button || !label) {
         return;
       }

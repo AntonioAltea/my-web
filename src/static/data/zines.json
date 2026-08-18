@@ -1,0 +1,26 @@
+[
+  {
+    "slug": "riscos-y-trincheras",
+    "title": "riscos y trincheras",
+    "source": "ryt.pdf",
+    "page": 1
+  },
+  {
+    "slug": "la-tormenta",
+    "title": "la tormenta",
+    "source": "tormenta/la-tormenta-2026-07-31.pdf",
+    "page": 1
+  },
+  {
+    "slug": "nueva-york",
+    "title": "nueva york",
+    "source": "ny/nueva-york-2026-07-01.pdf",
+    "page": 1
+  },
+  {
+    "slug": "san-juan",
+    "title": "san juan",
+    "source": "san-juan/san-juan-2026-08-05.pdf",
+    "page": 1
+  }
+]

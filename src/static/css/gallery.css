@@ -24,7 +24,6 @@
   justify-self: center;
   align-self: center;
   background: var(--paper-strong);
-  border: 1px solid var(--panel-line);
 }
 
 .gallery-meta {
