@@ -33,40 +33,88 @@
 </head>
 <body>
   <div class="page">
+    <button
+      id="theme-toggle"
+      class="theme-toggle"
+      type="button"
+      aria-label="Tema automatico. Cambiar a modo oscuro"
+      aria-pressed="false"
+    >
+      <span class="theme-toggle-badge" aria-hidden="true"></span>
+      <span id="theme-toggle-label">auto</span>
+    </button>
+    <a id="back-link" class="back-link" href="#/" aria-label="Volver" hidden>
+      <span aria-hidden="true">&lt;</span>
+    </a>
+
     <header class="site-header">
-      <button
-        id="theme-toggle"
-        class="theme-toggle"
-        type="button"
-        aria-label="Tema automatico. Cambiar a modo oscuro"
-        aria-pressed="false"
-      >
-        <span class="theme-toggle-badge" aria-hidden="true"></span>
-        <span id="theme-toggle-label">auto</span>
-      </button>
-      <h1>manturón</h1>
+      <h1><a id="home-link" class="home-link" href="#/">manturón</a></h1>
     </header>
 
-    <main class="gallery-shell">
-      <figure class="gallery-stage">
-        <div id="photo-loader" class="photo-loader" hidden>cargando...</div>
-        <img id="main-photo" class="main-photo" src="" alt="" hidden>
+    <main class="view-shell">
+      <section id="view-inicio" class="view view-inicio" aria-label="Inicio">
+        <nav class="home-menu">
+          <a class="home-menu-item" href="#/fotos">fotos</a>
+          <a class="home-menu-item" href="#/musica">música</a>
+          <a class="home-menu-item" href="#/fanzines">fanzines</a>
+        </nav>
+      </section>
 
-        <figcaption class="gallery-meta">
-          <div class="gallery-nav-row">
-            <button id="prev-photo" class="gallery-nav gallery-nav-prev" type="button" aria-label="Foto anterior">
+      <section id="view-fotos" class="view gallery-shell" aria-label="Fotos" hidden>
+        <figure class="gallery-stage">
+          <div id="photo-loader" class="photo-loader" hidden>cargando...</div>
+          <img id="main-photo" class="main-photo" src="" alt="" hidden>
+
+          <figcaption class="gallery-meta">
+            <div class="gallery-nav-row">
+              <button id="prev-photo" class="gallery-nav gallery-nav-prev" type="button" aria-label="Foto anterior">
+                <span aria-hidden="true">anterior</span>
+              </button>
+              <button id="photo-random" class="gallery-nav gallery-nav-mode" type="button" aria-label="Ir a una foto aleatoria">
+                azar
+              </button>
+              <button id="next-photo" class="gallery-nav gallery-nav-next" type="button" aria-label="Foto siguiente">
+                <span aria-hidden="true">siguiente</span>
+              </button>
+            </div>
+            <span id="photo-caption" class="photo-caption">No hay fotos todavia.</span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section id="view-musica" class="view view-scroll" aria-label="Música" hidden>
+        <h2 class="section-title">discos</h2>
+        <ul id="album-grid" class="album-grid"></ul>
+
+        <p class="section-links">
+          <a href="https://manturon.bandcamp.com" target="_blank" rel="noopener">bandcamp</a>
+          <a href="https://www.youtube.com/@manturon" target="_blank" rel="noopener">youtube</a>
+        </p>
+      </section>
+
+      <section id="view-fanzines" class="view" aria-label="Fanzines" hidden>
+        <div id="zine-index" class="zine-index">
+          <p id="zine-status" class="section-note">cargando...</p>
+          <ul id="zine-grid" class="zine-grid"></ul>
+        </div>
+
+        <div id="zine-reader" class="zine-reader" hidden>
+          <div id="zine-spread" class="zine-spread"></div>
+          <div class="zine-nav-row">
+            <button id="zine-prev" class="gallery-nav" type="button" aria-label="Página anterior">
               <span aria-hidden="true">anterior</span>
             </button>
-            <button id="photo-random" class="gallery-nav gallery-nav-mode" type="button" aria-label="Ir a una foto aleatoria">
-              azar
-            </button>
-            <button id="next-photo" class="gallery-nav gallery-nav-next" type="button" aria-label="Foto siguiente">
+            <span id="zine-progress" class="zine-progress" aria-live="polite"></span>
+            <button id="zine-next" class="gallery-nav" type="button" aria-label="Página siguiente">
               <span aria-hidden="true">siguiente</span>
             </button>
           </div>
-          <span id="photo-caption" class="photo-caption">No hay fotos todavia.</span>
-        </figcaption>
-      </figure>
+          <div class="zine-tools">
+            <button id="zine-layout" class="zine-tool" type="button" aria-pressed="false"></button>
+            <a id="zine-download" class="zine-tool" href="" download hidden>descargar pdf</a>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -103,7 +151,10 @@
   <script src="/static/js/media-api.js"></script>
   <script src="/static/js/analytics.js"></script>
   <script src="/static/js/theme.js"></script>
+  <script src="/static/js/router.js"></script>
   <script src="/static/js/gallery.js"></script>
+  <script src="/static/js/music.js"></script>
+  <script src="/static/js/zines.js"></script>
   <script src="/static/js/bandcamp.js"></script>
   <script src="/static/js/main.js"></script>
 </body>

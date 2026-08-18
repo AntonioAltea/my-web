@@ -146,6 +146,7 @@
 
     return {
       init,
+      selectAlbum,
       setTheme,
     };
   }

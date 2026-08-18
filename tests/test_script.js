@@ -126,9 +126,15 @@ class FakeElement {
 
   querySelectorAll(selector) {
     const matches = [];
+    const matchesSelector = (node) => {
+      if (selector.startsWith(".")) {
+        return node.classList.contains(selector.slice(1));
+      }
+      return selector === node.name || selector === node.tagName;
+    };
     const visit = (node) => {
       for (const child of node.children) {
-        if (selector === child.name || selector === child.tagName) {
+        if (matchesSelector(child)) {
           matches.push(child);
         }
         visit(child);
@@ -136,6 +142,17 @@ class FakeElement {
     };
     visit(this);
     return matches;
+  }
+
+  remove() {
+    if (!this.parentNode) {
+      return;
+    }
+
+    this.parentNode.children = this.parentNode.children.filter(
+      (child) => child !== this,
+    );
+    this.parentNode = null;
   }
 
   setAttribute(name, value) {
@@ -154,7 +171,16 @@ class FakeElement {
   }
 
   getBoundingClientRect() {
-    return { width: 320, height: 180 };
+    return {
+      width: 320,
+      height: 180,
+      left: 0,
+      top: 0,
+      right: 320,
+      bottom: 180,
+      x: 0,
+      y: 0,
+    };
   }
 
   set className(value) {
@@ -222,9 +248,31 @@ const DEFAULT_ALBUMS = [
   },
 ];
 
+const DEFAULT_ZINES = [
+  {
+    slug: "la-tormenta",
+    title: "la tormenta",
+    printable: { url: "/assets/zines/la-tormenta.pdf?v=2-1-1", bytes: 5471400 },
+    pages: Array.from({ length: 8 }, (_, index) => ({
+      number: index + 1,
+      src: `/assets/zines/la-tormenta-p${index + 1}.jpg?v=2-1-1`,
+      sizes: "(max-width: 720px) calc(100vw - 36px), 44vw",
+      srcset:
+        `/assets/zines/la-tormenta-p${index + 1}--w440.jpg?v=2-1-1 440w, ` +
+        `/assets/zines/la-tormenta-p${index + 1}.jpg?v=2-1-1 877w`,
+    })),
+  },
+];
+
 function createEnvironment(
   mediaPayload,
-  { randomValues = [], connection = null, albums = DEFAULT_ALBUMS } = {},
+  {
+    randomValues = [],
+    connection = null,
+    albums = DEFAULT_ALBUMS,
+    zines = DEFAULT_ZINES,
+    initialHash = "#/fotos",
+  } = {},
 ) {
   FakeImage.reset();
   const selectors = {
@@ -242,6 +290,22 @@ function createEnvironment(
     "#album-toggle-current": new FakeElement("album-toggle-current"),
     "#album-list": new FakeElement("album-list"),
     ".player-bar": new FakeElement("player-bar"),
+    "#back-link": new FakeElement("back-link"),
+    "#view-inicio": new FakeElement("view-inicio"),
+    "#view-fotos": new FakeElement("view-fotos"),
+    "#view-musica": new FakeElement("view-musica"),
+    "#view-fanzines": new FakeElement("view-fanzines"),
+    "#album-grid": new FakeElement("album-grid"),
+    "#zine-grid": new FakeElement("zine-grid"),
+    "#zine-status": new FakeElement("zine-status"),
+    "#zine-index": new FakeElement("zine-index"),
+    "#zine-reader": new FakeElement("zine-reader"),
+    "#zine-spread": new FakeElement("zine-spread"),
+    "#zine-prev": new FakeElement("zine-prev"),
+    "#zine-next": new FakeElement("zine-next"),
+    "#zine-progress": new FakeElement("zine-progress"),
+    "#zine-layout": new FakeElement("zine-layout"),
+    "#zine-download": new FakeElement("zine-download"),
   };
 
   selectors["#theme-toggle"].dataset = {};
@@ -285,6 +349,7 @@ function createEnvironment(
   };
 
   const windowObject = {
+    location: { hash: initialHash },
     localStorage: {
       getItem(key) {
         return localStorageStore.has(key) ? localStorageStore.get(key) : null;
@@ -384,6 +449,15 @@ function createEnvironment(
       };
     }
 
+    if (String(url).startsWith("/api/zines")) {
+      return {
+        ok: zines !== null,
+        async json() {
+          return { zines };
+        },
+      };
+    }
+
     if (url === "/api/activity" || url === "/api/analytics/event") {
       return {
         ok: true,
@@ -476,6 +550,13 @@ function createEnvironment(
         callback();
       }
     },
+    async navigate(hash) {
+      windowObject.location.hash = hash;
+      windowObject.dispatchEvent({ type: "hashchange" });
+      for (let index = 0; index < 10; index += 1) {
+        await Promise.resolve();
+      }
+    },
     setColorSchemeMatches(matches) {
       const query = "(prefers-color-scheme: dark)";
       const mediaQuery = mediaQueryObjects.get(query);
@@ -507,7 +588,10 @@ async function loadApp(options = {}) {
     "media-api.js",
     "analytics.js",
     "theme.js",
+    "router.js",
     "gallery.js",
+    "music.js",
+    "zines.js",
     "bandcamp.js",
     "main.js",
   ];
@@ -525,7 +609,7 @@ async function loadApp(options = {}) {
     vm.runInNewContext(code, env.sandbox, { filename: scriptName });
   }
 
-  for (let index = 0; index < 6; index += 1) {
+  for (let index = 0; index < 10; index += 1) {
     await Promise.resolve();
   }
 
@@ -805,6 +889,273 @@ async function testUsesResponsivePhotoCandidatesFromMediaPayload() {
   );
 }
 
+function routerModule() {
+  const code = fs.readFileSync(
+    path.join(__dirname, "..", "src", "static", "js", "router.js"),
+    "utf8",
+  );
+  const sandbox = {};
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(code, sandbox, { filename: "router.js" });
+  return sandbox.ManturonRouter;
+}
+
+function zinesModule() {
+  const code = fs.readFileSync(
+    path.join(__dirname, "..", "src", "static", "js", "zines.js"),
+    "utf8",
+  );
+  const sandbox = {};
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(code, sandbox, { filename: "zines.js" });
+  return sandbox.ManturonZines;
+}
+
+async function testRouteParsingFallsBackToHome() {
+  const { parseRoute, routeHash, parentHash } = routerModule();
+
+  assert.deepEqual(parseRoute(""), { route: "inicio", param: "" });
+  assert.deepEqual(parseRoute("#/"), { route: "inicio", param: "" });
+  assert.deepEqual(parseRoute("#/pepinillos"), { route: "inicio", param: "" });
+  assert.deepEqual(parseRoute("#/fotos"), { route: "fotos", param: "" });
+  assert.deepEqual(parseRoute("#/fanzines/la-tormenta"), {
+    route: "fanzines",
+    param: "la-tormenta",
+  });
+  assert.deepEqual(parseRoute("#/fanzines/%E2%98%85"), {
+    route: "fanzines",
+    param: "★",
+  });
+  // A malformed escape should not throw, just come back as written.
+  assert.deepEqual(parseRoute("#/fanzines/%E0%A4%A"), {
+    route: "fanzines",
+    param: "%E0%A4%A",
+  });
+
+  assert.equal(routeHash("inicio", ""), "#/");
+  assert.equal(routeHash("musica", ""), "#/musica");
+  assert.equal(routeHash("fanzines", "san juan"), "#/fanzines/san%20juan");
+
+  assert.equal(parentHash({ route: "inicio", param: "" }), "#/");
+  assert.equal(parentHash({ route: "musica", param: "" }), "#/");
+  assert.equal(parentHash({ route: "fanzines", param: "la-tormenta" }), "#/fanzines");
+}
+
+async function testSectionsSwapWithoutTouchingThePlayer() {
+  const env = await loadApp({ initialHash: "#/" });
+  const { selectors, navigate } = env;
+
+  assert.equal(selectors["#view-inicio"].hidden, false);
+  assert.equal(selectors["#view-fotos"].hidden, true);
+  assert.equal(selectors["#back-link"].hidden, true);
+
+  const playerSrcOnHome = selectors["#bandcamp-player"].src;
+
+  await navigate("#/fanzines/la-tormenta");
+  assert.equal(selectors["#view-inicio"].hidden, true);
+  assert.equal(selectors["#view-fanzines"].hidden, false);
+  assert.equal(selectors["#back-link"].hidden, false);
+  // Backing out of a zine lands on the zine list, not on the home menu.
+  assert.equal(selectors["#back-link"].getAttribute("href"), "#/fanzines");
+
+  await navigate("#/musica");
+  assert.equal(selectors["#back-link"].getAttribute("href"), "#/");
+
+  // Changing section must never re-point the embed, or playback restarts.
+  assert.equal(selectors["#bandcamp-player"].src, playerSrcOnHome);
+}
+
+async function testZineSpreadsKeepFacingPagesTogether() {
+  const { buildSpreads, spreadIndexForPage, progressLabel } = zinesModule();
+
+  assert.deepEqual(buildSpreads(8, true), [[1], [2, 3], [4, 5], [6, 7], [8]]);
+  assert.deepEqual(buildSpreads(8, false), [[1], [2], [3], [4], [5], [6], [7], [8]]);
+  assert.deepEqual(buildSpreads(0, true), []);
+
+  const spreads = buildSpreads(8, true);
+  assert.equal(spreadIndexForPage(spreads, 5), 2);
+  assert.equal(spreadIndexForPage(spreads, 99), 0);
+
+  assert.equal(progressLabel([4, 5], 8), "4-5 / 8");
+  assert.equal(progressLabel([1], 8), "1 / 8");
+  assert.equal(progressLabel([], 8), "");
+}
+
+async function testZineReaderPagesThroughSpreads() {
+  const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
+  const { selectors } = env;
+
+  // Two pages by default, on any screen size.
+  assert.equal(selectors["#zine-index"].hidden, true);
+  assert.equal(selectors["#zine-reader"].hidden, false);
+  assert.equal(selectors["#zine-progress"].textContent, "1 / 8");
+  assert.equal(selectors["#zine-prev"].disabled, true);
+
+  selectors["#zine-next"].click();
+  assert.equal(selectors["#zine-progress"].textContent, "2-3 / 8");
+  assert.equal(selectors["#zine-spread"].dataset.pages, "2");
+  assert.equal(selectors["#zine-prev"].disabled, false);
+
+  // Spreads: [1], [2,3], [4,5], [6,7], [8] — three more clicks reach the end.
+  selectors["#zine-next"].click();
+  selectors["#zine-next"].click();
+  selectors["#zine-next"].click();
+  assert.equal(selectors["#zine-progress"].textContent, "8 / 8");
+  assert.equal(selectors["#zine-next"].disabled, true);
+
+  selectors["#zine-next"].click();
+  assert.equal(selectors["#zine-progress"].textContent, "8 / 8");
+}
+
+async function testZineTurnLaysASheetOverTheNewPage() {
+  const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
+  const { selectors } = env;
+  const spread = selectors["#zine-spread"];
+
+  // Opening a zine has nothing to turn away from.
+  assert.equal(spread.querySelectorAll(".zine-sheet").length, 0);
+
+  selectors["#zine-next"].click();
+  const forward = spread.querySelectorAll(".zine-sheet");
+  assert.equal(forward.length, 1);
+  assert.equal(forward[0].classList.contains("zine-sheet-forward"), true);
+  // The sheet is a copy of the page you just left.
+  assert.equal(forward[0].src.includes("la-tormenta-p1.jpg"), true);
+
+  selectors["#zine-prev"].click();
+  const back = spread.querySelectorAll(".zine-sheet");
+  assert.equal(back.length, 1);
+  assert.equal(back[0].classList.contains("zine-sheet-back"), true);
+  assert.equal(back[0].src.includes("la-tormenta-p2.jpg"), true);
+
+  // The overlay is cleaned up even if no animation event ever arrives.
+  env.flushTimeouts();
+  assert.equal(spread.querySelectorAll(".zine-sheet").length, 0);
+}
+
+async function testZineLayoutTogglePersists() {
+  const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
+  const { selectors, sandbox } = env;
+  const layout = selectors["#zine-layout"];
+
+  // Two pages by default, past the cover which is on its own either way.
+  selectors["#zine-next"].click();
+  assert.equal(selectors["#zine-spread"].dataset.pages, "2");
+  assert.equal(selectors["#zine-progress"].textContent, "2-3 / 8");
+  assert.equal(layout.textContent, "ver una página");
+
+  layout.click();
+  assert.equal(selectors["#zine-spread"].dataset.pages, "1");
+  assert.equal(layout.textContent, "ver dos páginas");
+  assert.equal(
+    sandbox.window.localStorage.getItem("manturon-zine-layout"),
+    "single",
+  );
+
+  layout.click();
+  assert.equal(selectors["#zine-spread"].dataset.pages, "2");
+  assert.equal(
+    sandbox.window.localStorage.getItem("manturon-zine-layout"),
+    "spread",
+  );
+}
+
+async function testZineReaderOffersThePrintablePdf() {
+  const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
+  const download = env.selectors["#zine-download"];
+
+  assert.equal(download.hidden, false);
+  assert.equal(
+    download.getAttribute("href"),
+    "/assets/zines/la-tormenta.pdf?v=2-1-1",
+  );
+  assert.equal(download.getAttribute("download"), "la-tormenta.pdf");
+}
+
+async function testZineWithoutAPdfHidesTheDownload() {
+  const zines = [
+    {
+      slug: "sin-pdf",
+      title: "sin pdf",
+      pages: [{ number: 1, src: "/assets/zines/sin-pdf-p1.jpg" }],
+    },
+  ];
+  const env = await loadApp({ initialHash: "#/fanzines/sin-pdf", zines });
+
+  assert.equal(env.selectors["#zine-download"].hidden, true);
+}
+
+async function testZineReaderRespondsToArrowKeys() {
+  const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
+  const { selectors, sandbox } = env;
+
+  sandbox.document.dispatchEvent({ type: "keydown", key: "ArrowRight" });
+  assert.equal(selectors["#zine-progress"].textContent, "2-3 / 8");
+
+  sandbox.document.dispatchEvent({ type: "keydown", key: "ArrowLeft" });
+  assert.equal(selectors["#zine-progress"].textContent, "1 / 8");
+}
+
+async function testUnknownZineFallsBackToTheList() {
+  const env = await loadApp({ initialHash: "#/fanzines/no-existe" });
+  const { selectors } = env;
+
+  assert.equal(selectors["#zine-index"].hidden, false);
+  assert.equal(selectors["#zine-reader"].hidden, true);
+  assert.equal(selectors["#zine-grid"].children.length, 1);
+}
+
+async function testZineListReportsLoadFailures() {
+  const env = await loadApp({ initialHash: "#/fanzines", zines: null });
+  const { selectors } = env;
+
+  assert.equal(selectors["#zine-status"].hidden, false);
+  assert.equal(
+    selectors["#zine-status"].textContent,
+    "No se pudieron cargar los fanzines.",
+  );
+}
+
+async function testMusicSectionListsTheAlbums() {
+  const env = await loadApp({ initialHash: "#/musica" });
+  const { selectors } = env;
+
+  assert.equal(selectors["#album-grid"].children.length, DEFAULT_ALBUMS.length);
+}
+
+async function testMusicSectionAlbumSwitchesThePlayer() {
+  const env = await loadApp({ initialHash: "#/musica" });
+  const { selectors, sandbox } = env;
+
+  const secondAlbum = selectors["#album-grid"].children[1];
+  secondAlbum.children[0].click();
+
+  assert.equal(
+    selectors["#bandcamp-player"].src.includes(`album=${DEFAULT_ALBUMS[1].id}`),
+    true,
+  );
+  assert.equal(
+    sandbox.window.localStorage.getItem("manturon-album"),
+    DEFAULT_ALBUMS[1].id,
+  );
+}
+
+async function testPhotosOnlyLoadOnceYouOpenThatSection() {
+  const env = await loadApp({ initialHash: "#/" });
+  const { fetchCalls, navigate } = env;
+
+  const mediaCallsOnHome = fetchCalls.filter((call) =>
+    String(call.url).startsWith("/api/media"),
+  );
+  assert.equal(mediaCallsOnHome.length, 0);
+
+  await navigate("#/fotos");
+  const mediaCallsAfter = fetchCalls.filter((call) =>
+    String(call.url).startsWith("/api/media"),
+  );
+  assert.equal(mediaCallsAfter.length, 1);
+}
+
 async function run() {
   const tests = [
     ["locks photo controls while loading", testPhotoControlsLockWhileLoading],
@@ -824,6 +1175,20 @@ async function run() {
     ["shows a loaded photo immediately when revisited", testShowsLoadedPhotoImmediatelyWhenRevisited],
     ["starts a fresh load for random navigation", testRandomButtonStartsANewPhotoLoad],
     ["uses responsive photo candidates from the media payload", testUsesResponsivePhotoCandidatesFromMediaPayload],
+    ["falls back to home for unknown routes", testRouteParsingFallsBackToHome],
+    ["swaps sections without touching the player", testSectionsSwapWithoutTouchingThePlayer],
+    ["keeps facing zine pages in the same spread", testZineSpreadsKeepFacingPagesTogether],
+    ["pages through zine spreads", testZineReaderPagesThroughSpreads],
+    ["lays a turning sheet over the new page", testZineTurnLaysASheetOverTheNewPage],
+    ["lets you choose one or two pages", testZineLayoutTogglePersists],
+    ["offers the printable pdf", testZineReaderOffersThePrintablePdf],
+    ["hides the download when a zine has no pdf", testZineWithoutAPdfHidesTheDownload],
+    ["turns zine pages with the arrow keys", testZineReaderRespondsToArrowKeys],
+    ["falls back to the zine list for an unknown zine", testUnknownZineFallsBackToTheList],
+    ["reports a failed zine load", testZineListReportsLoadFailures],
+    ["lists the albums", testMusicSectionListsTheAlbums],
+    ["switches the player from the music section", testMusicSectionAlbumSwitchesThePlayer],
+    ["only loads photos once you open that section", testPhotosOnlyLoadOnceYouOpenThatSection],
   ];
 
   for (const [name, testFn] of tests) {

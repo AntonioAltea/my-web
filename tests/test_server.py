@@ -992,5 +992,167 @@ class AnalyticsTests(unittest.TestCase):
         self.assertEqual(third["top_tracks"][0]["title"], "dos")
 
 
+class ZineManifestTests(unittest.TestCase):
+    def build_manifest(self, temp_dir: str, payload: object) -> Path:
+        zines_dir = Path(temp_dir)
+        (zines_dir / server.ZINE_MANIFEST_NAME).write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
+        return zines_dir
+
+    def test_zines_payload_builds_versioned_urls_and_srcset(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            zines_dir = self.build_manifest(
+                temp_dir,
+                {
+                    "schema_version": 1,
+                    "zines": [
+                        {
+                            "slug": "la-tormenta",
+                            "title": "la tormenta",
+                            "version": "2-1-1",
+                            "printable": {
+                                "name": "la-tormenta.pdf",
+                                "bytes": 5471400,
+                            },
+                            "pages": [
+                                {
+                                    "number": 1,
+                                    "sources": [
+                                        {"name": "la-tormenta-p1.jpg", "width": 877},
+                                        {
+                                            "name": "la-tormenta-p1--w440.jpg",
+                                            "width": 440,
+                                        },
+                                    ],
+                                }
+                            ],
+                        }
+                    ],
+                },
+            )
+
+            with mock.patch.object(server, "ZINES_DIR", zines_dir):
+                payload = server.zines_payload()
+
+        self.assertEqual(len(payload), 1)
+        page = payload[0]["pages"][0]
+        self.assertEqual(page["src"], "/assets/zines/la-tormenta-p1.jpg?v=2-1-1")
+        self.assertEqual(page["sizes"], server.ZINE_PAGE_SLOT_SIZES)
+        self.assertEqual(
+            page["srcset"],
+            "/assets/zines/la-tormenta-p1--w440.jpg?v=2-1-1 440w, "
+            "/assets/zines/la-tormenta-p1.jpg?v=2-1-1 877w",
+        )
+        self.assertEqual(
+            payload[0]["printable"],
+            {"url": "/assets/zines/la-tormenta.pdf?v=2-1-1", "bytes": 5471400},
+        )
+
+    def test_zines_payload_omits_an_unusable_printable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            zines_dir = self.build_manifest(
+                temp_dir,
+                {
+                    "zines": [
+                        {
+                            "slug": "sin-pdf",
+                            "printable": {"bytes": 10},
+                            "pages": [
+                                {"number": 1, "sources": [{"name": "a.jpg"}]},
+                            ],
+                        }
+                    ]
+                },
+            )
+
+            with mock.patch.object(server, "ZINES_DIR", zines_dir):
+                payload = server.zines_payload()
+
+        self.assertNotIn("printable", payload[0])
+
+    def test_zines_payload_skips_broken_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            zines_dir = self.build_manifest(
+                temp_dir,
+                {
+                    "zines": [
+                        {"title": "sin slug", "pages": []},
+                        {"slug": "sin-paginas", "version": "1", "pages": []},
+                        {"slug": "paginas-rotas", "pages": [{"number": 1}, "nope"]},
+                        {
+                            "slug": "solo-una-fuente",
+                            "pages": [
+                                {"number": 1, "sources": [{"name": "a.jpg"}]},
+                            ],
+                        },
+                    ]
+                },
+            )
+
+            with mock.patch.object(server, "ZINES_DIR", zines_dir):
+                payload = server.zines_payload()
+
+        self.assertEqual([zine["slug"] for zine in payload], ["solo-una-fuente"])
+        page = payload[0]["pages"][0]
+        # A single candidate is not enough to build a srcset.
+        self.assertEqual(page["src"], "/assets/zines/a.jpg")
+        self.assertNotIn("srcset", page)
+        self.assertEqual(payload[0]["title"], "solo una fuente")
+
+    def test_load_zine_manifest_tolerates_missing_and_broken_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing = Path(temp_dir) / "nope"
+            with mock.patch.object(server, "ZINES_DIR", missing):
+                self.assertEqual(server.load_zine_manifest(), [])
+
+            zines_dir = Path(temp_dir)
+            (zines_dir / server.ZINE_MANIFEST_NAME).write_text("{not json", "utf-8")
+            with mock.patch.object(server, "ZINES_DIR", zines_dir):
+                self.assertEqual(server.load_zine_manifest(), [])
+
+            (zines_dir / server.ZINE_MANIFEST_NAME).write_text("[]", "utf-8")
+            with mock.patch.object(server, "ZINES_DIR", zines_dir):
+                self.assertEqual(server.load_zine_manifest(), [])
+
+    def test_is_zines_request_matches_only_the_api_path(self) -> None:
+        self.assertTrue(server.is_zines_request("/api/zines?t=1"))
+        self.assertFalse(server.is_zines_request("/api/zines/extra"))
+
+    def test_asset_disk_path_maps_zine_urls(self) -> None:
+        self.assertEqual(
+            server.asset_disk_path("/assets/zines/la-tormenta-p1.jpg?v=1"),
+            server.ZINES_DIR / "la-tormenta-p1.jpg",
+        )
+        # Directory parts are dropped, so a traversal cannot leave the folder.
+        self.assertEqual(
+            server.asset_disk_path("/assets/zines/../../etc/passwd"),
+            server.ZINES_DIR / "passwd",
+        )
+
+    def test_end_headers_uses_long_cache_for_versioned_zine_pages(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/assets/zines/la-tormenta-p1.jpg?v=2-1-1"
+        handler._headers_buffer = []
+        handler.wfile = io.BytesIO()
+        handler.request_version = "HTTP/1.1"
+        handler.command = "GET"
+
+        with mock.patch.object(
+            server.SimpleHTTPRequestHandler, "end_headers", autospec=True
+        ):
+            server.MediaHandler.end_headers(handler)
+
+        cache_headers = [
+            header.decode("latin-1")
+            for header in handler._headers_buffer
+            if b"Cache-Control" in header
+        ]
+        self.assertEqual(
+            cache_headers,
+            ["Cache-Control: public, max-age=31536000, immutable\r\n"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,8 @@
-.PHONY: run test test-python format-python lint-python test-python-coverage check-python-coverage test-front deploy upload delete sync sync-all prepare-web-photos clean-photos clean-photos-dry
+.PHONY: run test test-python format-python lint-python test-python-coverage check-python-coverage test-front deploy upload delete sync sync-all prepare-web-photos prepare-zines clean-photos clean-photos-dry
 
 APP ?= manturon
 COVERAGE_MIN ?= 90
+ZINES_SRC ?= $(HOME)/Documents/zines
 
 run:
 	python3 -m src.server
@@ -51,11 +52,15 @@ sync:
 sync-all:
 	bash scripts/sync-media.sh "$(APP)" photos assets/photos
 	bash scripts/sync-media.sh "$(APP)" music assets/music
+	bash scripts/sync-media.sh "$(APP)" zines assets/zines
 
 prepare-web-photos:
 	@test -n "$(SRC)" || (echo "Usage: make prepare-web-photos SRC=source-folder OUT=target-folder"; exit 1)
 	@test -n "$(OUT)" || (echo "Usage: make prepare-web-photos SRC=source-folder OUT=target-folder"; exit 1)
 	python3 scripts/prepare-web-photos.py "$(SRC)" "$(OUT)"
+
+prepare-zines:
+	python3 scripts/prepare-zines.py "$(ZINES_SRC)"
 
 clean-photos:
 	python3 scripts/clean-broken-photos.py $(if $(SRC),"$(SRC)",)

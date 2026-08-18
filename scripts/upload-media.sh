@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 3 ]]; then
-  echo "Usage: $0 <app> <photos|music> <local-path>"
+  echo "Usage: $0 <app> <photos|music|zines> <local-path>"
   exit 1
 fi
 
@@ -24,8 +24,8 @@ if [[ -n "${MACHINE_ID:-}" ]]; then
   MACHINE_ARGS=(--machine "$MACHINE_ID")
 fi
 
-if [[ "$MEDIA_KIND" != "photos" && "$MEDIA_KIND" != "music" ]]; then
-  echo "The second argument must be 'photos' or 'music'."
+if [[ "$MEDIA_KIND" != "photos" && "$MEDIA_KIND" != "music" && "$MEDIA_KIND" != "zines" ]]; then
+  echo "The second argument must be 'photos', 'music' or 'zines'."
   exit 1
 fi
 
