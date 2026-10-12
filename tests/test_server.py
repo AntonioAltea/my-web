@@ -1156,3 +1156,118 @@ class ZineManifestTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HiddenPagesTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.hidden = Path(self.temp_dir.name) / "hidden"
+        page = self.hidden / "secret-page"
+        (page / "sub").mkdir(parents=True)
+        (page / "index.html").write_text("page")
+        (page / "app.wasm").write_bytes(b"\0asm")
+        (page / "sub" / "index.html").write_text("sub")
+        (page / "empty").mkdir()
+        (Path(self.temp_dir.name) / "outside.txt").write_text("no")
+        patcher = mock.patch.object(server, "HIDDEN_DIR", self.hidden)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(self.temp_dir.cleanup)
+
+    def make_handler(self, path: str) -> server.MediaHandler:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = path
+        handler.headers = {"Host": "www.manturon.es"}
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+        handler.send_error = mock.Mock()
+        return handler
+
+    def test_hidden_disk_path_serves_files_and_folder_indexes(self) -> None:
+        page = self.hidden.resolve() / "secret-page"
+        self.assertEqual(server.hidden_disk_path("/secret-page/"), page / "index.html")
+        self.assertEqual(
+            server.hidden_disk_path("/secret-page/app.wasm?v=1"), page / "app.wasm"
+        )
+        self.assertEqual(
+            server.hidden_disk_path("/secret-page/sub/"), page / "sub" / "index.html"
+        )
+
+    def test_hidden_disk_path_refuses_missing_and_escapes(self) -> None:
+        for path in (
+            "/",
+            "/nope/",
+            "/.hidden/",
+            "/secret-page/empty/",
+            "/secret-page/no.js",
+            "/secret-page/../../outside.txt",
+            "/secret-page/%2e%2e/%2e%2e/outside.txt",
+        ):
+            self.assertIsNone(server.hidden_disk_path(path), path)
+
+    def test_only_folders_in_hidden_are_hidden_pages(self) -> None:
+        self.assertTrue(server.is_hidden_request("/secret-page"))
+        self.assertTrue(server.is_hidden_request("/secret-page/sub/?a=1"))
+        for path in ("/", "/static/css/styles.css", "/nope/", "/stats", "/../hidden"):
+            self.assertFalse(server.is_hidden_request(path), path)
+
+    def test_hidden_folder_is_not_reachable_as_hidden(self) -> None:
+        self.assertIsNone(server.asset_disk_path("/hidden/secret-page/index.html"))
+        self.assertEqual(
+            server.static_disk_path("/hidden/secret-page/index.html"),
+            server.ROOT / "index.html",
+        )
+
+    def test_hidden_requests_never_serve_the_site_index(self) -> None:
+        self.assertFalse(server.should_serve_index("/secret-page/"))
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        self.assertEqual(
+            server.MediaHandler.translate_path(handler, "/secret-page/"),
+            str(self.hidden.resolve() / "secret-page" / "index.html"),
+        )
+        self.assertEqual(
+            server.MediaHandler.translate_path(handler, "/secret-page/no.js"),
+            str(self.hidden / ".missing"),
+        )
+
+    def test_do_get_redirects_a_folder_to_its_slash(self) -> None:
+        handler = self.make_handler("/secret-page")
+        server.MediaHandler.do_GET(handler)
+        handler.send_response.assert_called_once_with(301)
+        handler.send_header.assert_called_once_with("Location", "/secret-page/")
+        handler.send_error.assert_not_called()
+
+    def test_do_get_answers_404_for_unknown_hidden_paths(self) -> None:
+        for path in (
+            "/secret-page/no.js",
+            "/secret-page/empty/",
+            "/secret-page/../../outside.txt",
+        ):
+            handler = self.make_handler(path)
+            server.MediaHandler.do_GET(handler)
+            handler.send_error.assert_called_once_with(404, "Not Found")
+
+    def test_do_get_serves_hidden_files(self) -> None:
+        handler = self.make_handler("/secret-page/app.wasm")
+        with mock.patch.object(
+            server.SimpleHTTPRequestHandler, "do_GET", autospec=True
+        ) as do_get:
+            server.MediaHandler.do_GET(handler)
+        do_get.assert_called_once_with(handler)
+        handler.send_error.assert_not_called()
+
+    def test_end_headers_marks_hidden_pages_noindex_and_revalidated(self) -> None:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/secret-page/index.html"
+        handler._headers_buffer = []
+        handler.wfile = io.BytesIO()
+        handler.request_version = "HTTP/1.1"
+        handler.command = "GET"
+        with mock.patch.object(
+            server.SimpleHTTPRequestHandler, "end_headers", autospec=True
+        ):
+            server.MediaHandler.end_headers(handler)
+        headers = [header.decode("latin-1") for header in handler._headers_buffer]
+        self.assertIn("Cache-Control: no-cache\r\n", headers)
+        self.assertIn("X-Robots-Tag: noindex, nofollow, noarchive\r\n", headers)
