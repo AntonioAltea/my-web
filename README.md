@@ -113,12 +113,21 @@ Each folder `src/hidden/<name>/` is served at `/<name>/` and linked from nowhere
 address gets there. They carry `noindex` (meta tag and `X-Robots-Tag`), and `/hidden/...` does not reach them. This
 repository is public, so the names are visible here: unlisted, not secret.
 
-The MEL simulator and installer for the M-VAVE FM-1 (from `~/dinghy`) live at `/mel-sim/` and `/mel-install/`. After
-building MEL there (`web/emu/build.sh` and `./build.sh`), publish it again with:
+The MEL simulator and installer for the M-VAVE FM-1 (from the fmel-1 repo, `~/dinghy`) live at `/mel-sim/` and
+`/mel-install/`. They update themselves: fmel-1's GitHub workflow publishes the simulator on every push to its `main`,
+and the installer on every fmel-1 release, into `src/hidden/` here, and commits; this repo's
+`.github/workflows/deploy.yml` then deploys to Fly. To try a simulator built locally first:
 
 ```bash
-make publish-mel                    # MEL_SRC=~/dinghy
+make publish-mel                    # the simulator only, from MEL_SRC=~/dinghy (build it there: web/emu/build.sh)
 ```
+
+## Deploys From GitHub
+
+Every push to `main` deploys (`.github/workflows/deploy.yml`, with the repository secret `FLY_API_TOKEN`, a deploy
+token for `manturon` that expires on 2027-10-12: `fly tokens create deploy -a manturon -x 8760h`, then
+`gh secret set FLY_API_TOKEN`). It deploys what git has: photos, music and zines stay on the `/data` volume as before.
+The fmel-1 repository pushes here with a write deploy key ("fmel-1 actions") to update MEL's pages.
 
 They take the site's look from `src/static/css/mel.css` (added to their `<head>` from `scripts/mel-head.html`).
 

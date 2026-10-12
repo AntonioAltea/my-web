@@ -71,4 +71,4 @@ clean-photos-dry:
 
 publish-mel:
 	python3 "$(MEL_SRC)/tools/publish_web.py" src/hidden/mel-sim src/hidden/mel-install \
-		--sim-url /mel-sim/ --install-url /mel-install/ --head "$$(cat scripts/mel-head.html)"
+		--only sim --sim-url /mel-sim/ --install-url /mel-install/ --head "$$(cat scripts/mel-head.html)"

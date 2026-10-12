@@ -1,0 +1,23 @@
+# Deploy to Fly on every push to main: yours (the pre-push hook has run the tests) and the fmel-1 bot's, which only
+# updates MEL's simulator and installer in src/hidden (fmel-1's .github/workflows/web.yml).
+# Needs the secret FLY_API_TOKEN (fly tokens create deploy -a manturon).
+name: Deploy to Fly
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only --yes -a manturon
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
