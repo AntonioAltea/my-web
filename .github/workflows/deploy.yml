@@ -1,5 +1,4 @@
-# Deploy to Fly on every push to main: yours (the pre-push hook has run the tests) and the fmel-1 bot's, which only
-# updates MEL's simulator and installer in src/hidden (fmel-1's .github/workflows/web.yml).
+# Deploy to Fly on every push to main (from your computer the pre-push hook has run the tests first).
 # Needs the secret FLY_API_TOKEN (fly tokens create deploy -a manturon).
 name: Deploy to Fly
 

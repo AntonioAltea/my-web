@@ -38,8 +38,14 @@ PHOTO_VARIANT_PATTERN = re.compile(r"^(?P<stem>.+)--w(?P<max_dim>\d+)$")
 MUSIC_EXTENSIONS = {".mp3", ".wav", ".ogg", ".m4a", ".flac"}
 ZINE_MANIFEST_NAME = ".zine-manifest.json"
 ZINE_PAGE_SLOT_SIZES = "(max-width: 720px) calc(100vw - 36px), 44vw"
-HIDDEN_DIR = ROOT / "hidden"
-HIDDEN_ROBOTS = "noindex, nofollow, noarchive"
+# Pages that live elsewhere: /<name>... -> there (MEL, an FM-1 firmware, is on GitHub Pages; /mel-sim and
+# /mel-install were its addresses here before)
+FMEL1_SITE = "https://antonioaltea.github.io/fmel-1/"
+EXTERNAL_REDIRECTS = {
+    "fmel-1": FMEL1_SITE,
+    "mel-sim": FMEL1_SITE,
+    "mel-install": FMEL1_SITE + "instalar/",
+}
 ANALYTICS_LOCK = threading.Lock()
 ANALYTICS_SESSION_RETENTION = timedelta(days=30)
 
@@ -750,32 +756,6 @@ def safe_join(base: Path, relative_path: str) -> Path | None:
     return candidate
 
 
-def hidden_page_root(request_path: str) -> Path | None:
-    """The folder of an unlisted page: /<name>/... with src/hidden/<name>/ a folder, or None."""
-    name = unquote(urlparse(request_path).path).lstrip("/").split("/", 1)[0]
-    if not name or name.startswith("."):
-        return None
-    folder = safe_join(HIDDEN_DIR, name)
-    return folder if folder is not None and folder.is_dir() else None
-
-
-def is_hidden_request(request_path: str) -> bool:
-    return hidden_page_root(request_path) is not None
-
-
-def hidden_disk_path(request_path: str) -> Path | None:
-    """A file of an unlisted page under src/hidden (a folder: its index.html), or None."""
-    if hidden_page_root(request_path) is None:
-        return None
-
-    disk_path = safe_join(HIDDEN_DIR, unquote(urlparse(request_path).path).lstrip("/"))
-    if disk_path is None:
-        return None
-    if disk_path.is_dir():
-        disk_path = disk_path / "index.html"
-    return disk_path if disk_path.is_file() else None
-
-
 def asset_disk_path(request_path: str) -> Path | None:
     parsed_path = unquote(urlparse(request_path).path)
 
@@ -811,9 +791,6 @@ def asset_disk_path(request_path: str) -> Path | None:
     if not relative_path:
         return ROOT / "index.html"
 
-    if relative_path.split("/", 1)[0] == HIDDEN_DIR.name:
-        return None  # only as /<name>/, with its headers
-
     return safe_join(ROOT, relative_path)
 
 
@@ -829,14 +806,16 @@ def should_serve_index(request_path: str) -> bool:
     if parsed_path in {"", "/"}:
         return True
 
-    if is_hidden_request(request_path):
-        return False
-
     if not parsed_path.endswith("/"):
         return False
 
     disk_path = safe_join(ROOT, parsed_path.lstrip("/"))
     return disk_path is not None and disk_path.is_dir()
+
+
+def external_redirect(request_path: str) -> str | None:
+    name = unquote(urlparse(request_path).path).lstrip("/").split("/", 1)[0]
+    return EXTERNAL_REDIRECTS.get(name)
 
 
 def redirect_target(host_header: str | None, request_path: str) -> str | None:
@@ -877,9 +856,6 @@ class MediaHandler(SimpleHTTPRequestHandler):
             or request_path.startswith("/assets/icons/")
         ):
             self.send_header("Cache-Control", "no-store, max-age=0")
-        elif is_hidden_request(request_path):
-            self.send_header("Cache-Control", "no-cache")
-            self.send_header("X-Robots-Tag", HIDDEN_ROBOTS)
         elif request_path.startswith("/assets/photos/") or request_path.startswith(
             "/assets/zines/"
         ):
@@ -891,9 +867,6 @@ class MediaHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def translate_path(self, path: str) -> str:
-        if is_hidden_request(path):
-            # a missing one maps to a path that does not exist: a plain 404
-            return str(hidden_disk_path(path) or HIDDEN_DIR / ".missing")
         if should_serve_index(path):
             return str(ROOT / "index.html")
         return str(static_disk_path(path))
@@ -906,18 +879,12 @@ class MediaHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             return
 
-        if is_hidden_request(self.path):
-            parsed = urlparse(self.path)
-            folder = safe_join(HIDDEN_DIR, unquote(parsed.path).lstrip("/"))
-            if folder is not None and folder.is_dir() and not parsed.path.endswith("/"):
-                # its pages load their files relative to the folder
-                self.send_response(301)
-                self.send_header("Location", parsed.path + "/")
-                self.end_headers()
-                return
-            if hidden_disk_path(self.path) is None:
-                self.send_error(404, "Not Found")
-                return
+        location = external_redirect(self.path)
+        if location is not None:  # temporary: where they live may change
+            self.send_response(302)
+            self.send_header("Location", location)
+            self.end_headers()
+            return
 
         if is_media_request(self.path):
             payload = media_payload()
