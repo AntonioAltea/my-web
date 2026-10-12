@@ -1,8 +1,9 @@
-.PHONY: run test test-python format-python lint-python test-python-coverage check-python-coverage test-front deploy upload delete sync sync-all prepare-web-photos prepare-zines clean-photos clean-photos-dry
+.PHONY: publish-mel run test test-python format-python lint-python test-python-coverage check-python-coverage test-front deploy upload delete sync sync-all prepare-web-photos prepare-zines clean-photos clean-photos-dry
 
 APP ?= manturon
 COVERAGE_MIN ?= 90
 ZINES_SRC ?= $(HOME)/Documents/zines
+MEL_SRC ?= $(HOME)/dinghy
 
 run:
 	python3 -m src.server
@@ -67,3 +68,7 @@ clean-photos:
 
 clean-photos-dry:
 	python3 scripts/clean-broken-photos.py $(if $(SRC),"$(SRC)",) --dry-run
+
+publish-mel:
+	python3 "$(MEL_SRC)/tools/publish_web.py" src/hidden/mel-sim src/hidden/mel-install \
+		--sim-url /mel-sim/ --install-url /mel-install/ --head "$$(cat scripts/mel-head.html)"

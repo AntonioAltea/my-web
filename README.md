@@ -107,6 +107,21 @@ A toggle switches between one page and a spread and remembers your choice; a spr
 
 If you change how the sheet is sliced, bump `PREPARE_VERSION` in `scripts/zine_prepare.py`; page URLs are cached as immutable and are versioned from that number plus the source PDF.
 
+## Unlisted Pages
+
+Each folder `src/hidden/<name>/` is served at `/<name>/` and linked from nowhere on the site: only whoever has the
+address gets there. They carry `noindex` (meta tag and `X-Robots-Tag`), and `/hidden/...` does not reach them. This
+repository is public, so the names are visible here: unlisted, not secret.
+
+The MEL simulator and installer for the M-VAVE FM-1 (from `~/dinghy`) live at `/mel-sim/` and `/mel-install/`. After
+building MEL there (`web/emu/build.sh` and `./build.sh`), publish it again with:
+
+```bash
+make publish-mel                    # MEL_SRC=~/dinghy
+```
+
+They take the site's look from `src/static/css/mel.css` (added to their `<head>` from `scripts/mel-head.html`).
+
 ## Basic Analytics
 
 The site now records a small first-party analytics summary in `analytics.json` alongside the media root.
