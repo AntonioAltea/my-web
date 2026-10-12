@@ -44,7 +44,7 @@ FMEL1_SITE = "https://antonioaltea.github.io/fmel-1/"
 EXTERNAL_REDIRECTS = {
     "fmel-1": FMEL1_SITE,
     "mel-sim": FMEL1_SITE,
-    "mel-install": FMEL1_SITE + "instalar/",
+    "mel-install": FMEL1_SITE + "install/",
 }
 ANALYTICS_LOCK = threading.Lock()
 ANALYTICS_SESSION_RETENTION = timedelta(days=30)

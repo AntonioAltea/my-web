@@ -1173,7 +1173,7 @@ class ExternalRedirectTests(unittest.TestCase):
         self.assertEqual(server.external_redirect("/fmel-1"), site)
         self.assertEqual(server.external_redirect("/fmel-1/?a=1"), site)
         self.assertEqual(server.external_redirect("/mel-sim/mel.wasm"), site)
-        self.assertEqual(server.external_redirect("/mel-install/"), site + "instalar/")
+        self.assertEqual(server.external_redirect("/mel-install/"), site + "install/")
 
     def test_external_redirect_leaves_the_site_alone(self) -> None:
         for path in ("/", "/stats", "/static/css/styles.css", "/fmel-10", "/mel"):
