@@ -103,6 +103,8 @@
 }
 
 html {
+  /* Phones flash a blue box over whatever you tap; keep it in the site green. */
+  -webkit-tap-highlight-color: rgba(var(--accent-rgb), 0.2);
   background: var(--bg);
   height: 100%;
   overflow: hidden;
