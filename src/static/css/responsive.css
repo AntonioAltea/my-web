@@ -58,6 +58,10 @@
     align-self: center;
   }
 
+  .home-photo {
+    object-position: center top;
+  }
+
   .gallery-nav-row {
     justify-content: center;
   }
