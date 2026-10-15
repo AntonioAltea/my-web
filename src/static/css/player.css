@@ -175,6 +175,12 @@
   background: var(--bg);
 }
 
+/* Its display: flex would otherwise beat the hidden attribute and keep the
+   loader over the cover once the embed has loaded. */
+.bandcamp-loader[hidden] {
+  display: none;
+}
+
 .bandcamp-player {
   position: relative;
   display: block;
