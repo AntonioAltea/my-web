@@ -953,7 +953,6 @@ async function testSectionsSwapWithoutTouchingThePlayer() {
   assert.equal(selectors["#view-fotos"].hidden, true);
   assert.equal(selectors["#back-link"].hidden, true);
   assert.equal(selectors["#nav-inicio"].getAttribute("aria-current"), "page");
-  assert.equal(env.sandbox.document.documentElement.dataset.route, "inicio");
 
   const playerSrcOnHome = selectors["#bandcamp-player"].src;
 
@@ -968,7 +967,6 @@ async function testSectionsSwapWithoutTouchingThePlayer() {
   assert.equal(selectors["#back-link"].getAttribute("href"), "#/");
   // The side menu marks only the section being shown.
   assert.equal(selectors["#nav-musica"].getAttribute("aria-current"), "page");
-  assert.equal(env.sandbox.document.documentElement.dataset.route, "seccion");
   assert.equal(selectors["#nav-inicio"].getAttribute("aria-current"), null);
   assert.equal(selectors["#nav-fanzines"].getAttribute("aria-current"), null);
 

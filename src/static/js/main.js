@@ -112,9 +112,6 @@ const router = routerModule.createRouter({
     fanzines: document.querySelector("#nav-fanzines"),
   },
   onChange: (next) => {
-    // The home page is the big centred menu; every other section gets the side menu.
-    document.documentElement.dataset.route = next.route === "inicio" ? "inicio" : "seccion";
-
     if (next.route === "fotos") {
       loadMedia();
     }
