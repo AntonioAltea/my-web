@@ -22,10 +22,6 @@
   background: var(--mark);
 }
 
-.side-nav-gap {
-  margin-top: 1rem;
-}
-
 .theme-toggle {
   margin-top: auto;
   padding: 1rem 0 0;

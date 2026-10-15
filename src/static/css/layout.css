@@ -1,5 +1,5 @@
 /* Fixed menu on the left, content on the right, player along the bottom of
-   the content column. Below 1024px the menu becomes a wrapped row on top. */
+   the content column. Below 700px (phones) the menu becomes a wrapped row on top. */
 .page {
   height: 100vh;
   height: 100dvh;
