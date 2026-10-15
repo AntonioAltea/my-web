@@ -20,6 +20,14 @@
   margin-top: 0;
 }
 
+.home-photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 1.5rem;
+  background: var(--paper-strong);
+}
+
 .section-title {
   margin: 0 0 1rem;
   font-size: 1.25rem;
