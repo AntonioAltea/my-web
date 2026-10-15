@@ -210,3 +210,11 @@
   height: 120px;
   object-fit: cover;
 }
+
+/* Next to the cover a phone leaves the embed too narrow, and Bandcamp then
+   draws nothing at all, so the player gets the full width there. */
+@media (max-width: 480px) {
+  .bandcamp-cover {
+    display: none;
+  }
+}
