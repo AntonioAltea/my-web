@@ -6,14 +6,15 @@
     return albums.find((album) => album.id === id) || albums[0];
   }
 
-  function embedSrc(albumId, theme) {
-    const { bgcol, linkcol } =
-      theme === "dark"
-        ? { bgcol: "141414", linkcol: "88b5a0" }
-        : { bgcol: "eef0ee", linkcol: "2f5f4d" };
+  // The embed is always drawn in light colours with a transparent background;
+  // dark mode inverts it with a CSS filter (see player.css). Bandcamp only
+  // takes colours in the URL, and re-pointing the iframe reloads it and stops
+  // the music, so the theme must never touch the URL. The artwork is left out
+  // because the filter would turn it into a negative; the page shows the cover.
+  function embedSrc(albumId) {
     return (
       `https://bandcamp.com/EmbeddedPlayer/album=${albumId}/size=large/` +
-      `bgcol=${bgcol}/linkcol=${linkcol}/tracklist=false/artwork=small/transparent=true/`
+      `bgcol=eef0ee/linkcol=2f5f4d/tracklist=false/artwork=none/transparent=true/`
     );
   }
 
@@ -31,7 +32,7 @@
     }
   }
 
-  function createBandcampPlayer({ iframe, loader, toggleButton, toggleCurrent, list }) {
+  function createBandcampPlayer({ iframe, cover, loader, toggleButton, toggleCurrent, list }) {
     let theme = "light";
     let albums = [];
     let album = null;
@@ -43,13 +44,16 @@
         return;
       }
 
-      const nextSrc = embedSrc(album.id, theme);
+      const nextSrc = embedSrc(album.id);
       if (iframe.src !== nextSrc) {
         if (loader) {
           loader.hidden = false;
         }
         iframe.src = nextSrc;
-        iframe.dataset.theme = theme;
+      }
+
+      if (cover) {
+        cover.src = album.cover;
       }
     }
 
@@ -73,12 +77,9 @@
       });
     }
 
-    // Bandcamp only takes its colours in the embed URL, and re-pointing the
-    // iframe reloads it and stops the music. So a theme change waits for the
-    // next time the player loads anyway (another album, or the next visit);
-    // until then the player keeps the backdrop of the colours it was drawn with.
     function setTheme(nextTheme) {
       theme = nextTheme === "dark" ? "dark" : "light";
+      iframe.dataset.theme = theme;
     }
 
     function selectAlbum(id) {
