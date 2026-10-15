@@ -23,7 +23,7 @@
 .section-title {
   margin: 0 0 1rem;
   font-size: 1.25rem;
-  font-weight: 700;
+  font-style: italic;
 }
 
 .section-note {
@@ -84,7 +84,7 @@
 }
 
 .album-card-title {
-  font-weight: 700;
+  font-style: italic;
   text-decoration: underline;
   text-underline-offset: 0.12em;
 }
