@@ -1,7 +1,8 @@
 /* The cover list scrolls, but the reader has to fit the viewport so the page
    images stay whole between the header and the player. */
 .zine-index {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 4px 2px 24px;
@@ -41,8 +42,8 @@
 }
 
 .zine-card-title {
-  font-size: 0.86rem;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  text-decoration: underline;
 }
 
 .zine-card-link:focus-visible {
@@ -84,9 +85,9 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto auto;
   gap: 10px;
-  height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
-  padding: 4px 0 8px;
+  padding: 0 0 8px;
 }
 
 .zine-reader[hidden] {
@@ -191,8 +192,7 @@
 
 .zine-progress {
   color: var(--muted);
-  font-size: 0.76rem;
-  letter-spacing: 0.1em;
+  font-size: 0.875rem;
   min-width: 5ch;
   text-align: center;
 }
@@ -209,12 +209,10 @@
   border: 0;
   background: transparent;
   padding: 0;
-  color: var(--muted);
+  color: var(--accent);
   cursor: pointer;
-  font-size: 0.74rem;
-  letter-spacing: 0.09em;
-  text-transform: lowercase;
-  text-decoration: none;
+  font-size: 0.875rem;
+  text-decoration: underline;
   transition: color 120ms ease;
 }
 

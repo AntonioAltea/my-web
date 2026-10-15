@@ -105,6 +105,12 @@ const router = routerModule.createRouter({
     fanzines: document.querySelector("#view-fanzines"),
   },
   backLink,
+  navLinks: {
+    inicio: document.querySelector("#nav-inicio"),
+    fotos: document.querySelector("#nav-fotos"),
+    musica: document.querySelector("#nav-musica"),
+    fanzines: document.querySelector("#nav-fanzines"),
+  },
   onChange: (next) => {
     if (next.route === "fotos") {
       loadMedia();

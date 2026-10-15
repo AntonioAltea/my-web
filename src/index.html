@@ -13,14 +13,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png?v=3">
   <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=3">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png?v=3">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://bandcamp.com">
   <link rel="preconnect" href="https://f4.bcbits.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400&display=swap"
-    rel="stylesheet"
-  >
   <script>
     (() => {
       const savedTheme = window.localStorage.getItem("manturon-theme");
@@ -33,31 +27,39 @@
 </head>
 <body>
   <div class="page">
-    <button
-      id="theme-toggle"
-      class="theme-toggle"
-      type="button"
-      aria-label="Tema automatico. Cambiar a modo oscuro"
-      aria-pressed="false"
-    >
-      <span class="theme-toggle-badge" aria-hidden="true"></span>
-      <span id="theme-toggle-label">auto</span>
-    </button>
-    <a id="back-link" class="back-link" href="#/" aria-label="Volver" hidden>
-      <span aria-hidden="true">&lt;</span>
-    </a>
-
-    <header class="site-header">
-      <h1><a id="home-link" class="home-link" href="#/">manturón</a></h1>
-    </header>
+    <nav class="side-nav" aria-label="Secciones">
+      <a id="home-link" class="side-nav-title" href="#/">manturón</a>
+      <a id="nav-inicio" class="side-nav-item" href="#/">inicio</a>
+      <a id="nav-fotos" class="side-nav-item" href="#/fotos">fotos</a>
+      <a id="nav-musica" class="side-nav-item" href="#/musica">música</a>
+      <a id="nav-fanzines" class="side-nav-item" href="#/fanzines">fanzines</a>
+      <a class="side-nav-item side-nav-gap" href="https://manturon.bandcamp.com" target="_blank" rel="noopener">bandcamp</a>
+      <a class="side-nav-item" href="https://www.youtube.com/@manturon" target="_blank" rel="noopener">youtube</a>
+      <button
+        id="theme-toggle"
+        class="theme-toggle"
+        type="button"
+        aria-label="Tema automatico. Cambiar a modo oscuro"
+        aria-pressed="false"
+      >
+        tema: <span id="theme-toggle-label">auto</span>
+      </button>
+    </nav>
 
     <main class="view-shell">
-      <section id="view-inicio" class="view view-inicio" aria-label="Inicio">
-        <nav class="home-menu">
-          <a class="home-menu-item" href="#/fotos">fotos</a>
-          <a class="home-menu-item" href="#/musica">música</a>
-          <a class="home-menu-item" href="#/fanzines">fanzines</a>
-        </nav>
+      <section id="view-inicio" class="view view-scroll view-inicio" aria-label="Inicio">
+        <div class="prose">
+          <p>Bienvenido a mi web :)</p>
+          <p>
+            Aquí puedes encontrar <a href="#/fotos">fotos</a>,
+            <a href="#/musica">música</a> y <a href="#/fanzines">fanzines</a>.
+            Los discos también están en
+            <a href="https://manturon.bandcamp.com" target="_blank" rel="noopener">bandcamp</a>
+            y hay vídeos en
+            <a href="https://www.youtube.com/@manturon" target="_blank" rel="noopener">youtube</a>.
+          </p>
+          <p>Abajo tienes el reproductor; la música sigue sonando mientras te mueves por la web.</p>
+        </div>
       </section>
 
       <section id="view-fotos" class="view gallery-shell" aria-label="Fotos" hidden>
@@ -93,6 +95,7 @@
       </section>
 
       <section id="view-fanzines" class="view" aria-label="Fanzines" hidden>
+        <a id="back-link" class="back-link" href="#/" hidden>&lt; volver</a>
         <div id="zine-index" class="zine-index">
           <p id="zine-status" class="section-note">cargando...</p>
           <ul id="zine-grid" class="zine-grid"></ul>
