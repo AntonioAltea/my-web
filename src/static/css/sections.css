@@ -20,12 +20,37 @@
   margin-top: 0;
 }
 
+/* Home always fits the screen: the text keeps its height and the photo
+   shrinks into whatever is left above it. */
+.home {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.home > * {
+  flex: 0 0 auto;
+}
+
 .home-photo {
   display: block;
+  flex: 0 1 auto;
+  min-height: 0;
   width: 100%;
   height: auto;
-  margin-top: 1.5rem;
-  background: var(--paper-strong);
+  margin-bottom: 1rem;
+  object-fit: contain;
+  object-position: left top;
+}
+
+.home p {
+  margin: 0 0 0.75rem;
+}
+
+.home-links {
+  margin: 0 0 0.75rem;
+  padding: 0;
+  list-style: none;
 }
 
 .section-title {
