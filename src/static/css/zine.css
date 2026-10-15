@@ -59,15 +59,42 @@
 }
 
 @media (max-width: 640px) {
-  /* Two columns on a phone: at four the covers and titles were too small to
-     read. The current four zines take two rows. */
+  /* Two columns on a phone (at four the covers and titles were too small to
+     read), and the two rows share the height that is left between the menu
+     and the player, so the four zines show whole without scrolling. The
+     covers size from that height, not from the column width. A fifth zine
+     would start a third row and the list would scroll again. */
+  .zine-index {
+    padding-bottom: 0;
+  }
+
   .zine-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
+    height: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .zine-card {
+    min-height: 0;
   }
 
   .zine-card-link {
+    height: 100%;
+    grid-template-rows: minmax(0, 1fr) auto;
+    justify-items: center;
     gap: 4px;
+  }
+
+  .zine-card-cover {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    min-height: 0;
+  }
+
+  .zine-card-title {
+    text-align: center;
   }
 }
 
