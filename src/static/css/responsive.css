@@ -71,4 +71,51 @@
   .photo-caption {
     display: none;
   }
+
+  /* Music fits a phone screen like the zine list: the album row and the video
+     share the height left between the menu and the player, and both size
+     from that height rather than from the width. */
+  #view-musica:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  #view-musica .section-title {
+    flex: 0 0 auto;
+    margin-bottom: 0.5rem;
+  }
+
+  #view-musica .album-grid {
+    flex: 1 1 0;
+    min-height: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+    gap: 12px;
+    margin-bottom: 1rem;
+  }
+
+  #view-musica .album-card {
+    min-height: 0;
+  }
+
+  #view-musica .album-card-button {
+    height: 100%;
+    grid-template-rows: minmax(0, 1fr) auto;
+    justify-items: center;
+  }
+
+  #view-musica .album-card-cover {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    min-height: 0;
+  }
+
+  .latest-video {
+    flex: 1 1 0;
+    min-height: 0;
+    width: auto;
+    max-width: 100%;
+    align-self: center;
+  }
 }
