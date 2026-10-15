@@ -62,6 +62,14 @@
     object-position: center top;
   }
 
+  /* The text stays left-aligned, but as a narrower block in the middle,
+     under the photo. */
+  .home-text {
+    width: 100%;
+    max-width: 17rem;
+    margin-inline: auto;
+  }
+
   .gallery-nav-row {
     justify-content: center;
   }
