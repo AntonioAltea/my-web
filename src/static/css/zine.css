@@ -59,25 +59,15 @@
 }
 
 @media (max-width: 640px) {
-  /* Fixed at four columns (instead of auto-fill) so the current four zines
-     sit in a single row without scrolling on a phone screen. */
+  /* Two columns on a phone: at four the covers and titles were too small to
+     read. The current four zines take two rows. */
   .zine-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
   }
 
   .zine-card-link {
     gap: 4px;
-  }
-
-  .zine-card-title {
-    font-size: 0.62rem;
-    line-height: 1.2;
-    text-align: center;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
   }
 }
 
