@@ -14,16 +14,16 @@
   font-display: swap;
 }
 
-/* Plain and fast: white page, blue underlined links and a pink
+/* Plain and fast: white page, green underlined links and a pink
    marker for the current section. */
 :root {
   color-scheme: light;
   --bg: #ffffff;
   --ink: #111111;
   --muted: #475569;
-  --accent: #1d4ed8;
-  --accent-hover: #3b82f6;
-  --accent-rgb: 29, 78, 216;
+  --accent: #2f5f4d;
+  --accent-hover: #4a8a70;
+  --accent-rgb: 47, 95, 77;
   --mark: #fca5a5;
   --mark-soft: #fecaca;
   --line: #f3f4f6;
@@ -44,9 +44,9 @@
   --bg: #111111;
   --ink: #e5e5e5;
   --muted: #9ca3af;
-  --accent: #93c5fd;
-  --accent-hover: #bfdbfe;
-  --accent-rgb: 147, 197, 253;
+  --accent: #88b5a0;
+  --accent-hover: #b5d6c6;
+  --accent-rgb: 136, 181, 160;
   --mark: #7f1d1d;
   --mark-soft: #450a0a;
   --line: #262626;
@@ -64,9 +64,9 @@
     --bg: #111111;
     --ink: #e5e5e5;
     --muted: #9ca3af;
-    --accent: #93c5fd;
-    --accent-hover: #bfdbfe;
-    --accent-rgb: 147, 197, 253;
+    --accent: #88b5a0;
+    --accent-hover: #b5d6c6;
+    --accent-rgb: 136, 181, 160;
     --mark: #7f1d1d;
     --mark-soft: #450a0a;
     --line: #262626;
