@@ -100,3 +100,73 @@
   gap: 1rem;
   margin: 0;
 }
+
+/* The home page keeps the old centred title and menu; the side menu only
+   shows up once you are inside a section (only the theme toggle stays). */
+:root[data-route="inicio"] .page {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:root[data-route="inicio"] .side-nav {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 20;
+  border: 0;
+}
+
+:root[data-route="inicio"] .side-nav > :not(.theme-toggle) {
+  display: none;
+}
+
+:root[data-route="inicio"] .theme-toggle {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+:root[data-route="inicio"] .player-bar {
+  left: 0;
+}
+
+.view-inicio:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1.4rem, 5vh, 3rem);
+  padding-bottom: 6vh;
+}
+
+.home-title {
+  margin: 0;
+  color: var(--accent);
+  font-size: clamp(2.55rem, 6.2vw, 5.2rem);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 0.94;
+  letter-spacing: -0.026em;
+}
+
+.home-menu {
+  display: grid;
+  gap: clamp(0.6rem, 2.4vh, 1.4rem);
+  justify-items: center;
+}
+
+.home-menu-item {
+  color: var(--accent);
+  font-size: clamp(1.6rem, 5.4vw, 2.6rem);
+  font-style: italic;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  text-decoration: none;
+  transition: transform 140ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .home-menu-item:hover {
+    color: var(--ink);
+    transform: translateY(-1px);
+  }
+}

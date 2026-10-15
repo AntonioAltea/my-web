@@ -21,6 +21,9 @@
       if (savedTheme === "light" || savedTheme === "dark") {
         document.documentElement.dataset.theme = savedTheme;
       }
+      // Set before first paint so the home page never flashes the side menu.
+      document.documentElement.dataset.route =
+        /^#?\/?$/.test(window.location.hash) ? "inicio" : "seccion";
     })();
   </script>
   <link rel="stylesheet" href="/static/css/styles.css">
@@ -45,19 +48,13 @@
     </nav>
 
     <main class="view-shell">
-      <section id="view-inicio" class="view view-scroll view-inicio" aria-label="Inicio">
-        <div class="prose">
-          <p>Bienvenido a mi web :)</p>
-          <p>
-            Aquí puedes encontrar <a href="#/fotos">fotos</a>,
-            <a href="#/musica">música</a> y <a href="#/fanzines">fanzines</a>.
-            Los discos también están en
-            <a href="https://manturon.bandcamp.com" target="_blank" rel="noopener">bandcamp</a>
-            y hay vídeos en
-            <a href="https://www.youtube.com/@manturon" target="_blank" rel="noopener">youtube</a>.
-          </p>
-          <p>Abajo tienes el reproductor; la música sigue sonando mientras te mueves por la web.</p>
-        </div>
+      <section id="view-inicio" class="view view-inicio" aria-label="Inicio">
+        <h1 class="home-title">manturón</h1>
+        <nav class="home-menu">
+          <a class="home-menu-item" href="#/fotos">fotos</a>
+          <a class="home-menu-item" href="#/musica">música</a>
+          <a class="home-menu-item" href="#/fanzines">fanzines</a>
+        </nav>
       </section>
 
       <section id="view-fotos" class="view gallery-shell" aria-label="Fotos" hidden>
