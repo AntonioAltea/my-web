@@ -9,7 +9,9 @@
 .side-nav-title {
   margin-bottom: 1rem;
   color: var(--ink);
+  font-size: 2rem;
   font-style: italic;
+  line-height: 1.1;
   text-decoration: none;
 }
 
