@@ -43,7 +43,8 @@
     left: 0;
   }
 
-  /* On a phone the photo and its controls sit in the middle. */
+  /* On a phone the photo sits in the middle of its space, both ways, and its
+     controls are centred under it. */
   .gallery-stage {
     justify-items: center;
   }
@@ -51,6 +52,10 @@
   .main-photo,
   .gallery-meta {
     justify-self: center;
+  }
+
+  .main-photo {
+    align-self: center;
   }
 
   .gallery-nav-row {
