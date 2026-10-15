@@ -286,6 +286,7 @@ function createEnvironment(
     "#theme-toggle-label": new FakeElement("theme-toggle-label"),
     "#bandcamp-player": new FakeElement("bandcamp-player"),
     "#bandcamp-loader": new FakeElement("bandcamp-loader"),
+    "#bandcamp-cover": new FakeElement("bandcamp-cover"),
     "#album-toggle": new FakeElement("album-toggle"),
     "#album-toggle-current": new FakeElement("album-toggle-current"),
     "#album-list": new FakeElement("album-list"),
@@ -683,6 +684,9 @@ async function testBandcampPlayerUsesLightColorsByDefault() {
   assert.equal(src.includes("album=356629898"), true);
   assert.equal(src.includes("bgcol=eef0ee"), true);
   assert.equal(src.includes("linkcol=2f5f4d"), true);
+  // The embed's own artwork would come out negative under the dark-mode filter.
+  assert.equal(src.includes("artwork=none"), true);
+  assert.equal(selectors["#bandcamp-cover"].src, "/assets/icons/la-tormenta-portada.jpg");
 }
 
 async function testBandcampLoaderHidesOnceTheEmbedLoads() {
@@ -704,15 +708,16 @@ async function testBandcampPlayerKeepsPlayingWhenThemeToggled() {
 
   selectors["#theme-toggle"].click();
 
-  // Re-pointing the embed would reload it and stop the music.
+  // Re-pointing the embed would reload it and stop the music, so dark mode
+  // is a CSS filter keyed off data-theme instead.
   assert.equal(player.src, srcBeforeToggle);
-  assert.equal(player.dataset.theme, "light");
-
-  // The next album picks up the new colours.
-  selectors["#album-list"].querySelectorAll("button")[1].click();
-  assert.equal(player.src.includes("bgcol=141414"), true);
-  assert.equal(player.src.includes("linkcol=88b5a0"), true);
   assert.equal(player.dataset.theme, "dark");
+
+  // Another album keeps the same light colours and the dark filter.
+  selectors["#album-list"].querySelectorAll("button")[1].click();
+  assert.equal(player.src.includes("bgcol=eef0ee"), true);
+  assert.equal(player.dataset.theme, "dark");
+  assert.equal(selectors["#bandcamp-cover"].src, "/assets/icons/ola-de-incendios-portada.jpg");
 }
 
 async function testBandcampPlayerKeepsPlayingWhenSystemThemeChanges() {
@@ -724,6 +729,7 @@ async function testBandcampPlayerKeepsPlayingWhenSystemThemeChanges() {
   setColorSchemeMatches(true);
 
   assert.equal(player.src, srcBeforeChange);
+  assert.equal(player.dataset.theme, "dark");
 }
 
 async function testBandcampPlayerTileArtUsesAlbumCoverImages() {
