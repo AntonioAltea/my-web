@@ -297,6 +297,7 @@ function createEnvironment(
     "#view-musica": new FakeElement("view-musica"),
     "#view-fanzines": new FakeElement("view-fanzines"),
     "#album-grid": new FakeElement("album-grid"),
+    "#latest-video": new FakeElement("latest-video"),
     "#zine-grid": new FakeElement("zine-grid"),
     "#zine-status": new FakeElement("zine-status"),
     "#zine-index": new FakeElement("zine-index"),
@@ -1137,6 +1138,26 @@ async function testMusicSectionListsTheAlbums() {
   assert.equal(selectors["#album-grid"].children.length, DEFAULT_ALBUMS.length);
 }
 
+async function testLatestVideoOnlyLoadsOnceYouOpenMusic() {
+  const env = await loadApp({ initialHash: "#/" });
+  const { selectors, navigate } = env;
+  const video = selectors["#latest-video"];
+
+  assert.equal(video.src, "");
+
+  await navigate("#/musica");
+  assert.equal(
+    video.src,
+    "https://www.youtube-nocookie.com/embed/videoseries?list=UUVjNdPxE-IB14UBWkS5Glww",
+  );
+
+  // Coming back must not reload it, or a playing video would restart.
+  video.src = `${video.src}#playing`;
+  await navigate("#/fotos");
+  await navigate("#/musica");
+  assert.equal(video.src.endsWith("#playing"), true);
+}
+
 async function testMusicSectionAlbumSwitchesThePlayer() {
   const env = await loadApp({ initialHash: "#/musica" });
   const { selectors, sandbox } = env;
@@ -1202,6 +1223,7 @@ async function run() {
     ["reports a failed zine load", testZineListReportsLoadFailures],
     ["lists the albums", testMusicSectionListsTheAlbums],
     ["switches the player from the music section", testMusicSectionAlbumSwitchesThePlayer],
+    ["only loads the latest video once you open music", testLatestVideoOnlyLoadsOnceYouOpenMusic],
     ["only loads photos once you open that section", testPhotosOnlyLoadOnceYouOpenThatSection],
   ];
 
