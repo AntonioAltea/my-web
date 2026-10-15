@@ -82,7 +82,7 @@ To add another album, drop a square cover image in `assets/icons/` and add `{ "i
 
 The `assets/music/` pipeline (metadata parsing, `/api/media` `music` key, `track_play` analytics) still exists in the backend but nothing in the frontend renders it right now.
 
-The music section lists the same albums as cards; clicking one loads it in the footer player instead of opening a new page. Below them are plain links to Bandcamp and YouTube, deliberately kept small so the records stay the focus.
+The music section lists the same albums as cards; clicking one loads it in the footer player instead of opening a new page. The section is headed by a link to Bandcamp, and below the albums a link to YouTube heads an embed of the channel's latest video (the uploads playlist, loaded the first time the section opens).
 
 ## Zines
 
