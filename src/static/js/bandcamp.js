@@ -49,6 +49,7 @@
           loader.hidden = false;
         }
         iframe.src = nextSrc;
+        iframe.dataset.theme = theme;
       }
     }
 
@@ -72,9 +73,12 @@
       });
     }
 
+    // Bandcamp only takes its colours in the embed URL, and re-pointing the
+    // iframe reloads it and stops the music. So a theme change waits for the
+    // next time the player loads anyway (another album, or the next visit);
+    // until then the player keeps the backdrop of the colours it was drawn with.
     function setTheme(nextTheme) {
       theme = nextTheme === "dark" ? "dark" : "light";
-      renderIframe();
     }
 
     function selectAlbum(id) {

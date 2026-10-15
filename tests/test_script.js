@@ -692,26 +692,34 @@ async function testBandcampLoaderHidesOnceTheEmbedLoads() {
   assert.equal(selectors["#bandcamp-loader"].hidden, true);
 }
 
-async function testBandcampPlayerSwitchesColorsWhenThemeToggled() {
+async function testBandcampPlayerKeepsPlayingWhenThemeToggled() {
   const env = await loadApp();
   const { selectors } = env;
+  const player = selectors["#bandcamp-player"];
+  const srcBeforeToggle = player.src;
 
   selectors["#theme-toggle"].click();
 
-  const src = selectors["#bandcamp-player"].src;
-  assert.equal(src.includes("bgcol=141414"), true);
-  assert.equal(src.includes("linkcol=88b5a0"), true);
+  // Re-pointing the embed would reload it and stop the music.
+  assert.equal(player.src, srcBeforeToggle);
+  assert.equal(player.dataset.theme, "light");
+
+  // The next album picks up the new colours.
+  selectors["#album-list"].querySelectorAll("button")[1].click();
+  assert.equal(player.src.includes("bgcol=141414"), true);
+  assert.equal(player.src.includes("linkcol=88b5a0"), true);
+  assert.equal(player.dataset.theme, "dark");
 }
 
-async function testBandcampPlayerFollowsSystemThemeInAutoMode() {
+async function testBandcampPlayerKeepsPlayingWhenSystemThemeChanges() {
   const env = await loadApp();
   const { selectors, setColorSchemeMatches } = env;
+  const player = selectors["#bandcamp-player"];
+  const srcBeforeChange = player.src;
 
   setColorSchemeMatches(true);
 
-  const src = selectors["#bandcamp-player"].src;
-  assert.equal(src.includes("bgcol=141414"), true);
-  assert.equal(src.includes("linkcol=88b5a0"), true);
+  assert.equal(player.src, srcBeforeChange);
 }
 
 async function testBandcampPlayerTileArtUsesAlbumCoverImages() {
@@ -1163,8 +1171,8 @@ async function run() {
     ["retries a timed out photo when you come back to it", testTimedOutPhotoCanBeRetried],
     ["uses light bandcamp embed colors by default", testBandcampPlayerUsesLightColorsByDefault],
     ["hides the bandcamp loader once the embed loads", testBandcampLoaderHidesOnceTheEmbedLoads],
-    ["switches bandcamp embed colors when the theme is toggled", testBandcampPlayerSwitchesColorsWhenThemeToggled],
-    ["follows the system theme for the bandcamp embed in auto mode", testBandcampPlayerFollowsSystemThemeInAutoMode],
+    ["keeps the bandcamp embed playing when the theme is toggled", testBandcampPlayerKeepsPlayingWhenThemeToggled],
+    ["keeps the bandcamp embed playing when the system theme changes", testBandcampPlayerKeepsPlayingWhenSystemThemeChanges],
     ["uses each album's cover image for its tile art", testBandcampPlayerTileArtUsesAlbumCoverImages],
     ["shows the current album in the toggle", testBandcampPlayerShowsCurrentAlbumInToggle],
     ["toggles the album list open and closed", testBandcampPlayerTogglesAlbumListOpenAndClosed],
