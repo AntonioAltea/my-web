@@ -42,6 +42,20 @@
   .player-bar {
     left: 0;
   }
+
+  /* On a phone the photo and its controls sit in the middle. */
+  .gallery-stage {
+    justify-items: center;
+  }
+
+  .main-photo,
+  .gallery-meta {
+    justify-self: center;
+  }
+
+  .gallery-nav-row {
+    justify-content: center;
+  }
 }
 
 @media (max-width: 640px) {
