@@ -110,7 +110,6 @@ const router = routerModule.createRouter({
   },
   backLink,
   navLinks: {
-    inicio: document.querySelector("#nav-inicio"),
     fotos: document.querySelector("#nav-fotos"),
     musica: document.querySelector("#nav-musica"),
     fanzines: document.querySelector("#nav-fanzines"),

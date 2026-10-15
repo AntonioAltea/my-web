@@ -292,7 +292,6 @@ function createEnvironment(
     "#album-list": new FakeElement("album-list"),
     ".player-bar": new FakeElement("player-bar"),
     "#back-link": new FakeElement("back-link"),
-    "#nav-inicio": new FakeElement("nav-inicio"),
     "#nav-fotos": new FakeElement("nav-fotos"),
     "#nav-musica": new FakeElement("nav-musica"),
     "#nav-fanzines": new FakeElement("nav-fanzines"),
@@ -967,7 +966,8 @@ async function testSectionsSwapWithoutTouchingThePlayer() {
   assert.equal(selectors["#view-inicio"].hidden, false);
   assert.equal(selectors["#view-fotos"].hidden, true);
   assert.equal(selectors["#back-link"].hidden, true);
-  assert.equal(selectors["#nav-inicio"].getAttribute("aria-current"), "page");
+  // Home has no menu entry (the site name links there), so nothing is marked.
+  assert.equal(selectors["#nav-musica"].getAttribute("aria-current"), null);
 
   const playerSrcOnHome = selectors["#bandcamp-player"].src;
 
@@ -982,7 +982,7 @@ async function testSectionsSwapWithoutTouchingThePlayer() {
   assert.equal(selectors["#back-link"].getAttribute("href"), "#/");
   // The side menu marks only the section being shown.
   assert.equal(selectors["#nav-musica"].getAttribute("aria-current"), "page");
-  assert.equal(selectors["#nav-inicio"].getAttribute("aria-current"), null);
+  assert.equal(selectors["#nav-fotos"].getAttribute("aria-current"), null);
   assert.equal(selectors["#nav-fanzines"].getAttribute("aria-current"), null);
 
   // Changing section must never re-point the embed, or playback restarts.
