@@ -1,105 +1,139 @@
-@media (max-width: 980px) {
+@media (max-width: 700px) {
   .page {
-    width: min(100%, calc(100% - 18px));
-    padding-top: 14px;
-    padding-bottom: calc(var(--player-bar-height) + 10px);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
-  .gallery-stage {
-    min-height: 0;
+  .side-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    column-gap: 4px;
+    padding: 8px 8px 4px;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.875rem;
+    overflow: visible;
   }
 
-  .main-photo {
-    max-height: 100%;
+  .side-nav-title,
+  .side-nav-item {
+    margin: 0;
+    padding: 2px 4px;
   }
 
-}
-
-@media (max-width: 640px) {
-  .page {
-    padding-top: 12px;
-    padding-bottom: calc(var(--player-bar-height) + 10px);
+  .side-nav {
+    align-items: baseline;
   }
 
-  .site-header h1 {
-    font-size: clamp(2.2rem, 12vw, 3.5rem);
+  .side-nav-title {
+    margin-right: 8px;
+    font-size: 1.6rem;
   }
 
   .theme-toggle {
-    top: 10px;
-    right: 10px;
-    min-width: 0;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border-radius: 999px;
-    font-size: 0.68rem;
-    gap: 0;
-  }
-
-  .theme-toggle-badge {
-    position: absolute;
-    right: 50%;
-    bottom: 50%;
-    display: none;
-    font-size: 0.56rem;
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: 0;
-    color: currentColor;
-    text-transform: uppercase;
-    transform: translate(calc(50% + 1px), 50%);
-  }
-
-  .theme-toggle[data-theme-mode="auto"] .theme-toggle-badge {
-    display: block;
-  }
-
-  .theme-toggle[data-theme-mode="auto"] .theme-toggle-badge::before {
-    content: "A";
-  }
-
-  #theme-toggle-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
+    margin: 0 0 0 auto;
+    padding: 2px 4px;
     border: 0;
   }
 
+  .view-shell {
+    padding: 16px 16px calc(var(--player-bar-height) + 8px);
+    transition: padding-bottom 220ms ease;
+  }
+
+  /* The page makes room for whatever part of the player is showing. */
+  body:has(.player-bar[data-folded="true"]) .view-shell {
+    padding-bottom: calc(var(--player-peek) + 8px);
+  }
+
+  .player-bar {
+    left: 0;
+  }
+
+  /* On a phone the photo sits in the middle of its space, both ways, and its
+     controls are centred under it. */
   .gallery-stage {
-    min-height: 0;
-    height: 100%;
-    padding: 8px 8px 10px;
-    grid-template-columns: 1fr 1fr;
-    grid-template-areas:
-      "photo photo"
-      "meta meta"
-      "prev next";
-    gap: 10px;
+    justify-items: center;
+  }
+
+  .main-photo,
+  .gallery-meta {
+    justify-self: center;
   }
 
   .main-photo {
-    max-height: 100%;
+    align-self: center;
   }
 
-  .gallery-meta {
-    margin-top: 0;
+  .home-photo {
+    object-position: center top;
+  }
+
+  /* The text stays left-aligned, but as a narrower block in the middle,
+     under the photo. */
+  .home-text {
+    width: 100%;
+    max-width: 95%;
+    margin-inline: auto;
   }
 
   .gallery-nav-row {
-    gap: 2rem;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .gallery-nav-row {
+    gap: 1.25rem;
   }
 
   .photo-caption {
     display: none;
   }
 
-  .gallery-nav {
-    font-size: 0.72rem;
+  /* Music fits a phone screen like the zine list: the album row and the video
+     share the height left between the menu and the player, and both size
+     from that height rather than from the width. */
+  #view-musica:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  #view-musica .section-title {
+    flex: 0 0 auto;
+    margin-bottom: 0.5rem;
+  }
+
+  #view-musica .album-grid {
+    flex: 1 1 0;
+    min-height: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+    gap: 12px;
+    margin-bottom: 1rem;
+  }
+
+  #view-musica .album-card {
+    min-height: 0;
+  }
+
+  #view-musica .album-card-button {
+    height: 100%;
+    grid-template-rows: minmax(0, 1fr) auto;
+    justify-items: center;
+  }
+
+  #view-musica .album-card-cover {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    min-height: 0;
+  }
+
+  .featured-video {
+    flex: 1 1 0;
+    min-height: 0;
+    width: auto;
+    max-width: 100%;
+    align-self: center;
   }
 }

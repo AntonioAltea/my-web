@@ -20,11 +20,13 @@ const bandcampLoader = document.querySelector("#bandcamp-loader");
 const bandcampCover = document.querySelector("#bandcamp-cover");
 const albumToggle = document.querySelector("#album-toggle");
 const albumToggleCurrent = document.querySelector("#album-toggle-current");
+const albumToggleCover = document.querySelector("#album-toggle-cover");
+const playerFoldButton = document.querySelector("#player-fold");
 const albumList = document.querySelector("#album-list");
 const playerBar = document.querySelector(".player-bar");
 const backLink = document.querySelector("#back-link");
 const albumGrid = document.querySelector("#album-grid");
-const latestVideo = document.querySelector("#latest-video");
+const featuredVideo = document.querySelector("#featured-video");
 const zineGrid = document.querySelector("#zine-grid");
 const zineStatus = document.querySelector("#zine-status");
 const zineIndex = document.querySelector("#zine-index");
@@ -33,7 +35,6 @@ const zineSpread = document.querySelector("#zine-spread");
 const zinePrevButton = document.querySelector("#zine-prev");
 const zineNextButton = document.querySelector("#zine-next");
 const zineProgress = document.querySelector("#zine-progress");
-const zineLayoutButton = document.querySelector("#zine-layout");
 const zineDownloadLink = document.querySelector("#zine-download");
 
 function syncPlayerBarHeight() {
@@ -72,12 +73,15 @@ const bandcamp = bandcampModule.createBandcampPlayer({
   loader: bandcampLoader,
   toggleButton: albumToggle,
   toggleCurrent: albumToggleCurrent,
+  toggleCover: albumToggleCover,
+  foldButton: playerFoldButton,
+  bar: playerBar,
   list: albumList,
 });
 
 const music = musicModule.createMusic({
   albumGrid,
-  latestVideo,
+  featuredVideo,
   onSelectAlbum: (albumId) => bandcamp.selectAlbum(albumId),
 });
 
@@ -90,7 +94,6 @@ const zines = zinesModule.createZines({
   prevButton: zinePrevButton,
   nextButton: zineNextButton,
   progress: zineProgress,
-  layoutButton: zineLayoutButton,
   downloadLink: zineDownloadLink,
   fetchFn: fetch,
 });
@@ -109,13 +112,18 @@ const router = routerModule.createRouter({
     fanzines: document.querySelector("#view-fanzines"),
   },
   backLink,
+  navLinks: {
+    fotos: document.querySelector("#nav-fotos"),
+    musica: document.querySelector("#nav-musica"),
+    fanzines: document.querySelector("#nav-fanzines"),
+  },
   onChange: (next) => {
     if (next.route === "fotos") {
       loadMedia();
     }
 
     if (next.route === "musica") {
-      music.showLatestVideo();
+      music.showFeaturedVideo();
     }
 
     if (next.route === "fanzines") {

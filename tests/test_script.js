@@ -78,6 +78,16 @@ class FakeElement {
     this.parentNode = null;
     this.type = "";
     this._className = "";
+    this.animations = [];
+  }
+
+  animate(keyframes, timing) {
+    const animation = { cancelled: false, keyframes, timing };
+    animation.cancel = () => {
+      animation.cancelled = true;
+    };
+    this.animations.push(animation);
+    return animation;
   }
 
   addEventListener(type, listener) {
@@ -272,6 +282,8 @@ function createEnvironment(
     albums = DEFAULT_ALBUMS,
     zines = DEFAULT_ZINES,
     initialHash = "#/fotos",
+    reducedMotion = false,
+    narrowScreen = false,
   } = {},
 ) {
   FakeImage.reset();
@@ -289,15 +301,20 @@ function createEnvironment(
     "#bandcamp-cover": new FakeElement("bandcamp-cover"),
     "#album-toggle": new FakeElement("album-toggle"),
     "#album-toggle-current": new FakeElement("album-toggle-current"),
+    "#album-toggle-cover": new FakeElement("album-toggle-cover"),
+    "#player-fold": new FakeElement("player-fold"),
     "#album-list": new FakeElement("album-list"),
     ".player-bar": new FakeElement("player-bar"),
     "#back-link": new FakeElement("back-link"),
+    "#nav-fotos": new FakeElement("nav-fotos"),
+    "#nav-musica": new FakeElement("nav-musica"),
+    "#nav-fanzines": new FakeElement("nav-fanzines"),
     "#view-inicio": new FakeElement("view-inicio"),
     "#view-fotos": new FakeElement("view-fotos"),
     "#view-musica": new FakeElement("view-musica"),
     "#view-fanzines": new FakeElement("view-fanzines"),
     "#album-grid": new FakeElement("album-grid"),
-    "#latest-video": new FakeElement("latest-video"),
+    "#featured-video": new FakeElement("featured-video"),
     "#zine-grid": new FakeElement("zine-grid"),
     "#zine-status": new FakeElement("zine-status"),
     "#zine-index": new FakeElement("zine-index"),
@@ -306,7 +323,6 @@ function createEnvironment(
     "#zine-prev": new FakeElement("zine-prev"),
     "#zine-next": new FakeElement("zine-next"),
     "#zine-progress": new FakeElement("zine-progress"),
-    "#zine-layout": new FakeElement("zine-layout"),
     "#zine-download": new FakeElement("zine-download"),
   };
 
@@ -377,7 +393,9 @@ function createEnvironment(
     matchMedia(query) {
       const mediaQuery = {
         media: query,
-        matches: false,
+        matches:
+          (reducedMotion && query.includes("prefers-reduced-motion")) ||
+          (narrowScreen && query.includes("max-width")),
         addEventListener(type, listener) {
           if (type !== "change") {
             return;
@@ -757,6 +775,50 @@ async function testBandcampPlayerShowsCurrentAlbumInToggle() {
   assert.equal(items[1].getAttribute("aria-pressed"), "false");
 }
 
+async function testBandcampPlayerShowsTheCoverInTheFoldedBar() {
+  const { selectors } = await loadApp({ narrowScreen: true });
+
+  assert.equal(selectors["#album-toggle-cover"].src, "/assets/icons/la-tormenta-portada.jpg");
+  selectors["#album-list"].querySelectorAll("button")[1].click();
+  assert.equal(selectors["#album-toggle-cover"].src, "/assets/icons/ola-de-incendios-portada.jpg");
+}
+
+async function testBandcampPlayerFoldsWithoutTouchingTheEmbed() {
+  const { selectors } = await loadApp({ narrowScreen: true });
+  const player = selectors["#bandcamp-player"];
+  const srcBeforeFolding = player.src;
+
+  selectors["#player-fold"].click();
+  assert.equal(selectors[".player-bar"].dataset.folded, "false");
+  assert.equal(selectors["#player-fold"].getAttribute("aria-expanded"), "true");
+
+  selectors["#player-fold"].click();
+  assert.equal(selectors[".player-bar"].dataset.folded, "true");
+  assert.equal(player.src, srcBeforeFolding);
+}
+
+async function testBandcampPlayerUnfoldsBeforeOpeningTheAlbumList() {
+  const { selectors } = await loadApp({ narrowScreen: true });
+
+  selectors["#album-toggle"].click();
+  assert.equal(selectors[".player-bar"].dataset.folded, "false");
+  assert.equal(selectors["#album-list"].dataset.state, "closed");
+
+  selectors["#album-toggle"].click();
+  assert.equal(selectors["#album-list"].dataset.state, "open");
+
+  // Folding again takes the open list with it.
+  selectors["#player-fold"].click();
+  assert.equal(selectors["#album-list"].dataset.state, "closed");
+}
+
+async function testBandcampPlayerUnfoldsWhenTheAlbumChanges() {
+  const { selectors } = await loadApp({ narrowScreen: true });
+
+  selectors["#album-list"].querySelectorAll("button")[1].click();
+  assert.equal(selectors[".player-bar"].dataset.folded, "false");
+}
+
 async function testBandcampPlayerTogglesAlbumListOpenAndClosed() {
   const env = await loadApp();
   const { selectors } = env;
@@ -963,6 +1025,8 @@ async function testSectionsSwapWithoutTouchingThePlayer() {
   assert.equal(selectors["#view-inicio"].hidden, false);
   assert.equal(selectors["#view-fotos"].hidden, true);
   assert.equal(selectors["#back-link"].hidden, true);
+  // Home has no menu entry (the site name links there), so nothing is marked.
+  assert.equal(selectors["#nav-musica"].getAttribute("aria-current"), null);
 
   const playerSrcOnHome = selectors["#bandcamp-player"].src;
 
@@ -975,6 +1039,10 @@ async function testSectionsSwapWithoutTouchingThePlayer() {
 
   await navigate("#/musica");
   assert.equal(selectors["#back-link"].getAttribute("href"), "#/");
+  // The side menu marks only the section being shown.
+  assert.equal(selectors["#nav-musica"].getAttribute("aria-current"), "page");
+  assert.equal(selectors["#nav-fotos"].getAttribute("aria-current"), null);
+  assert.equal(selectors["#nav-fanzines"].getAttribute("aria-current"), null);
 
   // Changing section must never re-point the embed, or playback restarts.
   assert.equal(selectors["#bandcamp-player"].src, playerSrcOnHome);
@@ -983,11 +1051,10 @@ async function testSectionsSwapWithoutTouchingThePlayer() {
 async function testZineSpreadsKeepFacingPagesTogether() {
   const { buildSpreads, spreadIndexForPage, progressLabel } = zinesModule();
 
-  assert.deepEqual(buildSpreads(8, true), [[1], [2, 3], [4, 5], [6, 7], [8]]);
-  assert.deepEqual(buildSpreads(8, false), [[1], [2], [3], [4], [5], [6], [7], [8]]);
-  assert.deepEqual(buildSpreads(0, true), []);
+  assert.deepEqual(buildSpreads(8), [[1], [2, 3], [4, 5], [6, 7], [8]]);
+  assert.deepEqual(buildSpreads(0), []);
 
-  const spreads = buildSpreads(8, true);
+  const spreads = buildSpreads(8);
   assert.equal(spreadIndexForPage(spreads, 5), 2);
   assert.equal(spreadIndexForPage(spreads, 99), 0);
 
@@ -1000,7 +1067,6 @@ async function testZineReaderPagesThroughSpreads() {
   const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
   const { selectors } = env;
 
-  // Two pages by default, on any screen size.
   assert.equal(selectors["#zine-index"].hidden, true);
   assert.equal(selectors["#zine-reader"].hidden, false);
   assert.equal(selectors["#zine-progress"].textContent, "1 / 8");
@@ -1022,57 +1088,122 @@ async function testZineReaderPagesThroughSpreads() {
   assert.equal(selectors["#zine-progress"].textContent, "8 / 8");
 }
 
-async function testZineTurnLaysASheetOverTheNewPage() {
-  const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
-  const { selectors } = env;
-  const spread = selectors["#zine-spread"];
-
-  // Opening a zine has nothing to turn away from.
-  assert.equal(spread.querySelectorAll(".zine-sheet").length, 0);
-
-  selectors["#zine-next"].click();
-  const forward = spread.querySelectorAll(".zine-sheet");
-  assert.equal(forward.length, 1);
-  assert.equal(forward[0].classList.contains("zine-sheet-forward"), true);
-  // The sheet is a copy of the page you just left.
-  assert.equal(forward[0].src.includes("la-tormenta-p1.jpg"), true);
-
-  selectors["#zine-prev"].click();
-  const back = spread.querySelectorAll(".zine-sheet");
-  assert.equal(back.length, 1);
-  assert.equal(back[0].classList.contains("zine-sheet-back"), true);
-  assert.equal(back[0].src.includes("la-tormenta-p2.jpg"), true);
-
-  // The overlay is cleaned up even if no animation event ever arrives.
-  env.flushTimeouts();
-  assert.equal(spread.querySelectorAll(".zine-sheet").length, 0);
+function zineLeaves(env) {
+  return env.selectors["#zine-spread"].querySelectorAll(".zine-leaf");
 }
 
-async function testZineLayoutTogglePersists() {
+function zineBook(env) {
+  return env.selectors["#zine-spread"].querySelectorAll(".zine-book")[0];
+}
+
+async function testZineLeavesCarryAPageOnEachSide() {
+  const { buildLeaves } = zinesModule();
+
+  assert.deepEqual(JSON.parse(JSON.stringify(buildLeaves(4))), [
+    { front: 1, back: 2 },
+    { front: 3, back: 4 },
+  ]);
+  // An odd count leaves the last leaf blank on the back.
+  assert.equal(buildLeaves(3)[1].back, null);
+  assert.equal(buildLeaves(0).length, 0);
+}
+
+async function testZineBookCentresTheClosedCovers() {
+  const { bookShift, buildSpreads } = zinesModule();
+  const spreads = buildSpreads(8);
+
+  assert.equal(bookShift(spreads, 0), -25);
+  assert.equal(bookShift(spreads, 1), 0);
+  assert.equal(bookShift(spreads, 4), 25);
+
+  // An odd count ends on an open spread, not on a closed back cover.
+  const odd = buildSpreads(7);
+  assert.equal(bookShift(odd, odd.length - 1), 0);
+}
+
+async function testZineTurnSwingsTheLeafAboutTheSpine() {
   const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
-  const { selectors, sandbox } = env;
-  const layout = selectors["#zine-layout"];
+  const { selectors } = env;
 
-  // Two pages by default, past the cover which is on its own either way.
+  // Opening a zine has nothing to turn away from, but the book rises in.
+  const leaves = zineLeaves(env);
+  const book = zineBook(env);
+  assert.equal(leaves.length, 4);
+  assert.equal(leaves[0].animations.length, 0);
+  assert.equal(selectors["#zine-spread"].animations.length, 1);
+  assert.equal(book.style.transform, "translateX(-25%)");
+
   selectors["#zine-next"].click();
-  assert.equal(selectors["#zine-spread"].dataset.pages, "2");
+  const [turn] = leaves[0].animations;
+  assert.equal(leaves[0].animations.length, 1);
+  assert.equal(turn.keyframes[0].transform.includes("rotateY(0deg)"), true);
+  assert.equal(turn.keyframes[1].transform.includes("rotateY(-180deg)"), true);
+  assert.equal(leaves[0].style.transform.includes("rotateY(-180deg)"), true);
+  assert.equal(selectors["#zine-next"].animations.length, 1);
+
+  // Both faces darken half way through, and the book slides off the cover.
+  const shades = leaves[0].querySelectorAll(".zine-shade");
+  assert.equal(shades.length, 2);
+  assert.equal(shades[0].animations[0].keyframes[1].opacity, 0.4);
+  assert.equal(book.animations.length, 1);
+  assert.equal(book.animations[0].keyframes[0].transform, "translateX(-25%)");
+  assert.equal(book.style.transform, "translateX(0%)");
+
+  // Turning back replays the same leaf the other way, and restarts it.
+  selectors["#zine-prev"].click();
+  assert.equal(turn.cancelled, true);
+  const back = leaves[0].animations[1];
+  assert.equal(back.keyframes[0].transform.includes("rotateY(-180deg)"), true);
+  assert.equal(back.keyframes[1].transform.includes("rotateY(0deg)"), true);
+}
+
+async function testZineShowsOnlyTheLeavesAroundTheOpenPage() {
+  const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
+  const { selectors } = env;
+  const leaves = zineLeaves(env);
+  const visibility = () => leaves.map((leaf) => leaf.style.visibility);
+
+  selectors["#zine-next"].click();
+  selectors["#zine-next"].click();
+  // Mid turn the leaves either side of a turning one have to show too.
+  assert.deepEqual(visibility(), ["visible", "visible", "visible", "hidden"]);
+
+  // The timers settle it even if no animation event ever arrives.
+  env.flushTimeouts();
+  assert.deepEqual(visibility(), ["hidden", "visible", "visible", "hidden"]);
+  assert.equal(leaves[1].style.zIndex, "2");
+  assert.equal(leaves[2].style.zIndex, "2");
+}
+
+async function testZineLoadsPagesOnlyNearTheOpenOne() {
+  const env = await loadApp({ initialHash: "#/fanzines/la-tormenta" });
+  const { selectors } = env;
+  const images = () =>
+    selectors["#zine-spread"]
+      .querySelectorAll(".zine-page")
+      .map((image) => Boolean(image.src));
+
+  // The cover and the two leaves a turn would reach.
+  assert.deepEqual(images(), [true, true, true, true, false, false, false, false]);
+
+  selectors["#zine-next"].click();
+  selectors["#zine-next"].click();
+  assert.deepEqual(images(), [true, true, true, true, true, true, true, true]);
+}
+
+async function testZineTurnRespectsReducedMotion() {
+  const env = await loadApp({
+    initialHash: "#/fanzines/la-tormenta",
+    reducedMotion: true,
+  });
+  const { selectors } = env;
+  const leaves = zineLeaves(env);
+
+  selectors["#zine-next"].click();
   assert.equal(selectors["#zine-progress"].textContent, "2-3 / 8");
-  assert.equal(layout.textContent, "ver una página");
-
-  layout.click();
-  assert.equal(selectors["#zine-spread"].dataset.pages, "1");
-  assert.equal(layout.textContent, "ver dos páginas");
-  assert.equal(
-    sandbox.window.localStorage.getItem("manturon-zine-layout"),
-    "single",
-  );
-
-  layout.click();
-  assert.equal(selectors["#zine-spread"].dataset.pages, "2");
-  assert.equal(
-    sandbox.window.localStorage.getItem("manturon-zine-layout"),
-    "spread",
-  );
+  assert.equal(leaves[0].style.transform.includes("rotateY(-180deg)"), true);
+  assert.equal(leaves[0].animations.length, 0);
+  assert.equal(selectors["#zine-spread"].animations.length, 0);
 }
 
 async function testZineReaderOffersThePrintablePdf() {
@@ -1138,17 +1269,17 @@ async function testMusicSectionListsTheAlbums() {
   assert.equal(selectors["#album-grid"].children.length, DEFAULT_ALBUMS.length);
 }
 
-async function testLatestVideoOnlyLoadsOnceYouOpenMusic() {
+async function testFeaturedVideoOnlyLoadsOnceYouOpenMusic() {
   const env = await loadApp({ initialHash: "#/" });
   const { selectors, navigate } = env;
-  const video = selectors["#latest-video"];
+  const video = selectors["#featured-video"];
 
   assert.equal(video.src, "");
 
   await navigate("#/musica");
   assert.equal(
     video.src,
-    "https://www.youtube-nocookie.com/embed/videoseries?list=UUVjNdPxE-IB14UBWkS5Glww",
+    "https://www.youtube-nocookie.com/embed/gtOw5XbuhFg",
   );
 
   // Coming back must not reload it, or a playing video would restart.
@@ -1202,6 +1333,10 @@ async function run() {
     ["keeps the bandcamp embed playing when the system theme changes", testBandcampPlayerKeepsPlayingWhenSystemThemeChanges],
     ["uses each album's cover image for its tile art", testBandcampPlayerTileArtUsesAlbumCoverImages],
     ["shows the current album in the toggle", testBandcampPlayerShowsCurrentAlbumInToggle],
+    ["shows the cover in the folded bar", testBandcampPlayerShowsTheCoverInTheFoldedBar],
+    ["folds without touching the embed", testBandcampPlayerFoldsWithoutTouchingTheEmbed],
+    ["unfolds before opening the album list", testBandcampPlayerUnfoldsBeforeOpeningTheAlbumList],
+    ["unfolds when the album changes", testBandcampPlayerUnfoldsWhenTheAlbumChanges],
     ["toggles the album list open and closed", testBandcampPlayerTogglesAlbumListOpenAndClosed],
     ["switches album on select and remembers the choice", testBandcampPlayerSwitchesAlbumOnSelectAndRemembersChoice],
     ["tracks visits", testTracksVisit],
@@ -1214,8 +1349,12 @@ async function run() {
     ["swaps sections without touching the player", testSectionsSwapWithoutTouchingThePlayer],
     ["keeps facing zine pages in the same spread", testZineSpreadsKeepFacingPagesTogether],
     ["pages through zine spreads", testZineReaderPagesThroughSpreads],
-    ["lays a turning sheet over the new page", testZineTurnLaysASheetOverTheNewPage],
-    ["lets you choose one or two pages", testZineLayoutTogglePersists],
+    ["gives each zine leaf a page on either side", testZineLeavesCarryAPageOnEachSide],
+    ["centres the closed zine covers", testZineBookCentresTheClosedCovers],
+    ["swings a zine leaf about the spine", testZineTurnSwingsTheLeafAboutTheSpine],
+    ["shows only the leaves around the open page", testZineShowsOnlyTheLeavesAroundTheOpenPage],
+    ["loads zine pages near the open one", testZineLoadsPagesOnlyNearTheOpenOne],
+    ["skips zine animations with reduced motion", testZineTurnRespectsReducedMotion],
     ["offers the printable pdf", testZineReaderOffersThePrintablePdf],
     ["hides the download when a zine has no pdf", testZineWithoutAPdfHidesTheDownload],
     ["turns zine pages with the arrow keys", testZineReaderRespondsToArrowKeys],
@@ -1223,7 +1362,7 @@ async function run() {
     ["reports a failed zine load", testZineListReportsLoadFailures],
     ["lists the albums", testMusicSectionListsTheAlbums],
     ["switches the player from the music section", testMusicSectionAlbumSwitchesThePlayer],
-    ["only loads the latest video once you open music", testLatestVideoOnlyLoadsOnceYouOpenMusic],
+    ["only loads the featured video once you open music", testFeaturedVideoOnlyLoadsOnceYouOpenMusic],
     ["only loads photos once you open that section", testPhotosOnlyLoadOnceYouOpenThatSection],
   ];
 

@@ -13,14 +13,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png?v=3">
   <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=3">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png?v=3">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://bandcamp.com">
   <link rel="preconnect" href="https://f4.bcbits.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400&display=swap"
-    rel="stylesheet"
-  >
   <script>
     (() => {
       const savedTheme = window.localStorage.getItem("manturon-theme");
@@ -33,31 +27,42 @@
 </head>
 <body>
   <div class="page">
-    <button
-      id="theme-toggle"
-      class="theme-toggle"
-      type="button"
-      aria-label="Tema automatico. Cambiar a modo oscuro"
-      aria-pressed="false"
-    >
-      <span class="theme-toggle-badge" aria-hidden="true"></span>
-      <span id="theme-toggle-label">auto</span>
-    </button>
-    <a id="back-link" class="back-link" href="#/" aria-label="Volver" hidden>
-      <span aria-hidden="true">&lt;</span>
-    </a>
-
-    <header class="site-header">
-      <h1><a id="home-link" class="home-link" href="#/">manturón</a></h1>
-    </header>
+    <nav class="side-nav" aria-label="Secciones">
+      <a id="home-link" class="side-nav-title" href="#/">manturón</a>
+      <a id="nav-fotos" class="side-nav-item" href="#/fotos">fotos</a>
+      <a id="nav-musica" class="side-nav-item" href="#/musica">música</a>
+      <a id="nav-fanzines" class="side-nav-item" href="#/fanzines">fanzines</a>
+      <button
+        id="theme-toggle"
+        class="theme-toggle"
+        type="button"
+        aria-label="Tema automatico. Cambiar a modo oscuro"
+        aria-pressed="false"
+      >
+        tema: <span id="theme-toggle-label">auto</span>
+      </button>
+    </nav>
 
     <main class="view-shell">
       <section id="view-inicio" class="view view-inicio" aria-label="Inicio">
-        <nav class="home-menu">
-          <a class="home-menu-item" href="#/fotos">fotos</a>
-          <a class="home-menu-item" href="#/musica">música</a>
-          <a class="home-menu-item" href="#/fanzines">fanzines</a>
-        </nav>
+        <div class="prose home">
+          <img
+            class="home-photo"
+            src="/assets/photos/6001126579301452762.jpg"
+            alt=""
+            width="1280"
+            height="866"
+          >
+          <div class="home-text">
+            <p>hola! esta es mi web. aquí voy subiendo algunas cosas que hago.</p>
+            <ul class="home-links">
+              <li><a href="#/fotos">fotos</a></li>
+              <li><a href="#/musica">música</a></li>
+              <li><a href="#/fanzines">fanzines</a></li>
+              <li><a href="https://github.com/AntonioAltea" target="_blank" rel="noopener">programación</a></li>
+            </ul>
+          </div>
+        </div>
       </section>
 
       <section id="view-fotos" class="view gallery-shell" aria-label="Fotos" hidden>
@@ -92,15 +97,16 @@
           <a href="https://www.youtube.com/@manturon" target="_blank" rel="noopener">youtube</a>
         </h2>
         <iframe
-          id="latest-video"
-          class="latest-video"
-          title="Último vídeo de manturón en YouTube"
+          id="featured-video"
+          class="featured-video"
+          title="donde debo estar, de manturón, en YouTube"
           allow="encrypted-media; picture-in-picture; fullscreen"
           allowfullscreen
         ></iframe>
       </section>
 
       <section id="view-fanzines" class="view" aria-label="Fanzines" hidden>
+        <a id="back-link" class="back-link" href="#/" hidden>&lt; volver</a>
         <div id="zine-index" class="zine-index">
           <p id="zine-status" class="section-note">cargando...</p>
           <ul id="zine-grid" class="zine-grid"></ul>
@@ -118,7 +124,6 @@
             </button>
           </div>
           <div class="zine-tools">
-            <button id="zine-layout" class="zine-tool" type="button" aria-pressed="false"></button>
             <a id="zine-download" class="zine-tool" href="" download hidden>descargar pdf</a>
           </div>
         </div>
@@ -126,19 +131,29 @@
     </main>
   </div>
 
-  <footer class="player-bar">
+  <footer class="player-bar" data-folded="true">
     <div class="player-bar-inner">
       <div class="album-picker">
-        <button
-          id="album-toggle"
-          class="album-toggle"
-          type="button"
-          aria-expanded="false"
-          aria-controls="album-list"
-        >
-          <span class="album-toggle-label">álbum</span>
-          <span id="album-toggle-current" class="album-toggle-current"></span>
-        </button>
+        <div class="album-row">
+          <button
+            id="album-toggle"
+            class="album-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="album-list"
+          >
+            <img id="album-toggle-cover" class="album-toggle-cover" src="" alt="">
+            <span class="album-toggle-label">álbum</span>
+            <span id="album-toggle-current" class="album-toggle-current"></span>
+          </button>
+          <button
+            id="player-fold"
+            class="player-fold"
+            type="button"
+            aria-expanded="false"
+            aria-label="Mostrar u ocultar el reproductor"
+          >▾</button>
+        </div>
         <ul id="album-list" class="album-list" aria-label="Elegir álbum" hidden></ul>
       </div>
       <div class="bandcamp-player-shell">

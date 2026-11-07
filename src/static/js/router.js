@@ -45,7 +45,7 @@
     return routeHash(route, "");
   }
 
-  function createRouter({ views, backLink, onChange, win = global.window }) {
+  function createRouter({ views, backLink, navLinks = {}, onChange, win = global.window }) {
     let current = { route: HOME_ROUTE, param: "" };
 
     function apply(next) {
@@ -53,6 +53,20 @@
         const view = views[route];
         if (view) {
           view.hidden = route !== next.route;
+        }
+      }
+
+      // The side menu stays on screen, so it marks the section you are in.
+      for (const route of ROUTES) {
+        const link = navLinks[route];
+        if (!link) {
+          continue;
+        }
+
+        if (route === next.route) {
+          link.setAttribute("aria-current", "page");
+        } else {
+          link.removeAttribute("aria-current");
         }
       }
 

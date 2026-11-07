@@ -82,7 +82,7 @@ To add another album, drop a square cover image in `assets/icons/` and add `{ "i
 
 The `assets/music/` pipeline (metadata parsing, `/api/media` `music` key, `track_play` analytics) still exists in the backend but nothing in the frontend renders it right now.
 
-The music section lists the same albums as cards; clicking one loads it in the footer player instead of opening a new page. The section is headed by a link to Bandcamp, and below the albums a link to YouTube heads an embed of the channel's latest video (the uploads playlist, loaded the first time the section opens).
+The music section lists the same albums as cards; clicking one loads it in the footer player instead of opening a new page. The section is headed by a link to Bandcamp, and below the albums a link to YouTube heads an embed of one chosen video (`FEATURED_VIDEO_SRC` in `src/static/js/music.js`, loaded the first time the section opens).
 
 ## Zines
 
@@ -101,9 +101,9 @@ Which zines get published is `src/static/data/zines.json`, one entry per zine:
 
 `source` is relative to the PDF folder. Add `"download": "tormenta/tormenta-bp.pdf"` if the file people should print is a different one, for instance the version with the back page merged in; otherwise the sheet being sliced is the one offered. After editing the list, rerun `make prepare-zines` and then `make sync KIND=zines SRC=assets/zines`. Pages no longer listed are removed from `assets/zines/` on the next run.
 
-The reader opens a zine like a booklet: the cover alone, then pages 2-3, 4-5 and 6-7 as spreads, then the back cover. That matters because these zines often carry one photo drawn across two panels, and those panels are exactly the ones that end up facing each other. Turning a page swings the sheet you are leaving about the spine. Arrow keys work too.
+The reader opens a zine like a booklet: the cover alone, then pages 2-3, 4-5 and 6-7 as spreads, then the back cover. That matters because these zines often carry one photo drawn across two panels, and those panels are exactly the ones that end up facing each other. The reader is a small 3D book: each sheet has a page on either side and turns about the spine, darkening as it goes, and the closed book slides to keep its cover centred. Arrow keys work too.
 
-A toggle switches between one page and a spread and remembers your choice; a spread is the default on any screen size. Each zine also offers its PDF for download, so anyone can print and fold their own copy.
+Each zine also offers its PDF for download, so anyone can print and fold their own copy.
 
 If you change how the sheet is sliced, bump `PREPARE_VERSION` in `scripts/zine_prepare.py`; page URLs are cached as immutable and are versioned from that number plus the source PDF.
 

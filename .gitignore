@@ -20,3 +20,5 @@ src/static/app/
 .vscode/settings.json
 .codex
 future.md
+
+.claude/

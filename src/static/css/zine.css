@@ -1,7 +1,8 @@
 /* The cover list scrolls, but the reader has to fit the viewport so the page
    images stay whole between the header and the player. */
 .zine-index {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 4px 2px 24px;
@@ -41,8 +42,8 @@
 }
 
 .zine-card-title {
-  font-size: 0.86rem;
-  letter-spacing: 0.04em;
+  font-style: italic;
+  text-decoration: underline;
 }
 
 .zine-card-link:focus-visible {
@@ -58,25 +59,16 @@
 }
 
 @media (max-width: 640px) {
-  /* Fixed at four columns (instead of auto-fill) so the current four zines
-     sit in a single row without scrolling on a phone screen. */
+  /* Two columns on a phone: at four the covers and titles were too small to
+     read. Covers size from the column width, so they all match however many
+     zines there are, and the list scrolls once they no longer fit. */
   .zine-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-  }
-
-  .zine-card-link {
-    gap: 4px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 
   .zine-card-title {
-    font-size: 0.62rem;
-    line-height: 1.2;
     text-align: center;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
   }
 }
 
@@ -84,102 +76,98 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto auto;
   gap: 10px;
-  height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
-  padding: 4px 0 8px;
+  padding: 0 0 8px;
 }
 
 .zine-reader[hidden] {
   display: none;
 }
 
-/* The two pages of a spread sit flush against each other so a photo drawn
-   across both panels reads as one image. */
+/* The reader is a small 3D book. The stage is a size container so the book can
+   work out its page size from the room it has, in CSS alone. */
 .zine-spread {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0;
   min-height: 0;
   height: 100%;
-  perspective: 1600px;
+  container-type: size;
+  perspective: 2400px;
+}
+
+.zine-book {
+  --zine-page-width: min(50cqw, 100cqh * 210 / 297);
+  position: relative;
+  flex: none;
+  width: calc(var(--zine-page-width) * 2);
+  height: calc(var(--zine-page-width) * 297 / 210);
+  transform-style: preserve-3d;
+  /* A turning leaf reaches past the book; it must not eat clicks on the arrows. */
+  pointer-events: none;
+}
+
+/* Leaves hang from the spine, which is the middle of the book, and turn about
+   it. On their right hand side they show the front face; turned over, the
+   back one. The two pages meet flush so a photo drawn across both stays whole. */
+.zine-leaf {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 50%;
+  height: 100%;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+}
+
+.zine-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--paper-strong);
+  backface-visibility: hidden;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+}
+
+.zine-face-back {
+  transform: rotateY(180deg);
 }
 
 .zine-page {
   display: block;
-  width: auto;
-  height: auto;
-  max-height: 100%;
-  object-fit: contain;
-  background: var(--paper-strong);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.zine-spread[data-pages="1"] .zine-page {
-  max-width: 100%;
-}
-
-.zine-spread[data-pages="2"] .zine-page {
-  max-width: 50%;
-}
-
-/* The turning page is a copy of the sheet you are leaving, laid over the new
-   one and swung about the spine, so it reads as paper being turned rather than
-   one image being swapped for another. */
-.zine-sheet {
+/* Darkens a page as it swings away from the light, half way through a turn. */
+.zine-shade {
   position: absolute;
-  z-index: 2;
-  display: block;
-  margin: 0;
+  inset: 0;
+  background: #000;
+  opacity: 0;
   pointer-events: none;
-  backface-visibility: hidden;
-  box-shadow: 0 0 24px rgba(0, 0, 0, 0.4);
 }
 
-.zine-sheet-forward {
-  transform-origin: left center;
-  animation: zine-sheet-forward 460ms cubic-bezier(0.36, 0.06, 0.32, 0.98) forwards;
+/* The paper curving into the spine. Kept faint and narrow: these pages often
+   share one photo across the fold. */
+.zine-face-inner::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 7%;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.22), transparent);
+  pointer-events: none;
 }
 
-.zine-sheet-back {
-  transform-origin: right center;
-  animation: zine-sheet-back 460ms cubic-bezier(0.36, 0.06, 0.32, 0.98) forwards;
-}
-
-@keyframes zine-sheet-forward {
-  from {
-    transform: rotateY(0deg);
-    filter: brightness(1);
-  }
-  60% {
-    filter: brightness(0.72);
-  }
-  to {
-    transform: rotateY(-125deg);
-    filter: brightness(0.45);
-    opacity: 0;
-  }
-}
-
-@keyframes zine-sheet-back {
-  from {
-    transform: rotateY(0deg);
-    filter: brightness(1);
-  }
-  60% {
-    filter: brightness(0.72);
-  }
-  to {
-    transform: rotateY(125deg);
-    filter: brightness(0.45);
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .zine-sheet {
-    display: none;
-  }
+.zine-face-back.zine-face-inner::after {
+  right: 0;
+  left: auto;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.22), transparent);
 }
 
 .zine-nav-row {
@@ -191,8 +179,7 @@
 
 .zine-progress {
   color: var(--muted);
-  font-size: 0.76rem;
-  letter-spacing: 0.1em;
+  font-size: 0.875rem;
   min-width: 5ch;
   text-align: center;
 }
@@ -209,12 +196,10 @@
   border: 0;
   background: transparent;
   padding: 0;
-  color: var(--muted);
+  color: var(--accent);
   cursor: pointer;
-  font-size: 0.74rem;
-  letter-spacing: 0.09em;
-  text-transform: lowercase;
-  text-decoration: none;
+  font-size: 0.875rem;
+  text-decoration: underline;
   transition: color 120ms ease;
 }
 
