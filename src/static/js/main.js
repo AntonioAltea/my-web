@@ -24,7 +24,7 @@ const albumList = document.querySelector("#album-list");
 const playerBar = document.querySelector(".player-bar");
 const backLink = document.querySelector("#back-link");
 const albumGrid = document.querySelector("#album-grid");
-const latestVideo = document.querySelector("#latest-video");
+const featuredVideo = document.querySelector("#featured-video");
 const zineGrid = document.querySelector("#zine-grid");
 const zineStatus = document.querySelector("#zine-status");
 const zineIndex = document.querySelector("#zine-index");
@@ -77,7 +77,7 @@ const bandcamp = bandcampModule.createBandcampPlayer({
 
 const music = musicModule.createMusic({
   albumGrid,
-  latestVideo,
+  featuredVideo,
   onSelectAlbum: (albumId) => bandcamp.selectAlbum(albumId),
 });
 
@@ -120,7 +120,7 @@ const router = routerModule.createRouter({
     }
 
     if (next.route === "musica") {
-      music.showLatestVideo();
+      music.showFeaturedVideo();
     }
 
     if (next.route === "fanzines") {

@@ -1,11 +1,9 @@
 (function (global) {
-  // The channel's uploads playlist ("UU" + the channel id without "UC") lists
-  // the newest upload first, so embedding it always opens on the latest video
-  // without the server having to read the channel feed.
-  const LATEST_VIDEO_SRC =
-    "https://www.youtube-nocookie.com/embed/videoseries?list=UUVjNdPxE-IB14UBWkS5Glww";
+  // One hand-picked video ("donde debo estar"); new uploads do not replace it.
+  const FEATURED_VIDEO_SRC =
+    "https://www.youtube-nocookie.com/embed/gtOw5XbuhFg";
 
-  function createMusic({ albumGrid, latestVideo, onSelectAlbum }) {
+  function createMusic({ albumGrid, featuredVideo, onSelectAlbum }) {
     function buildAlbumCard(album) {
       const item = global.document.createElement("li");
       item.className = "album-card";
@@ -44,20 +42,20 @@
     }
 
     // Like the photos, the video only loads the first time the section opens.
-    function showLatestVideo() {
-      if (latestVideo && !latestVideo.src) {
-        latestVideo.src = LATEST_VIDEO_SRC;
+    function showFeaturedVideo() {
+      if (featuredVideo && !featuredVideo.src) {
+        featuredVideo.src = FEATURED_VIDEO_SRC;
       }
     }
 
     return {
       renderAlbums,
-      showLatestVideo,
+      showFeaturedVideo,
     };
   }
 
   global.ManturonMusic = {
-    LATEST_VIDEO_SRC,
+    FEATURED_VIDEO_SRC,
     createMusic,
   };
 })(globalThis);

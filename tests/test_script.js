@@ -300,7 +300,7 @@ function createEnvironment(
     "#view-musica": new FakeElement("view-musica"),
     "#view-fanzines": new FakeElement("view-fanzines"),
     "#album-grid": new FakeElement("album-grid"),
-    "#latest-video": new FakeElement("latest-video"),
+    "#featured-video": new FakeElement("featured-video"),
     "#zine-grid": new FakeElement("zine-grid"),
     "#zine-status": new FakeElement("zine-status"),
     "#zine-index": new FakeElement("zine-index"),
@@ -1147,17 +1147,17 @@ async function testMusicSectionListsTheAlbums() {
   assert.equal(selectors["#album-grid"].children.length, DEFAULT_ALBUMS.length);
 }
 
-async function testLatestVideoOnlyLoadsOnceYouOpenMusic() {
+async function testFeaturedVideoOnlyLoadsOnceYouOpenMusic() {
   const env = await loadApp({ initialHash: "#/" });
   const { selectors, navigate } = env;
-  const video = selectors["#latest-video"];
+  const video = selectors["#featured-video"];
 
   assert.equal(video.src, "");
 
   await navigate("#/musica");
   assert.equal(
     video.src,
-    "https://www.youtube-nocookie.com/embed/videoseries?list=UUVjNdPxE-IB14UBWkS5Glww",
+    "https://www.youtube-nocookie.com/embed/gtOw5XbuhFg",
   );
 
   // Coming back must not reload it, or a playing video would restart.
@@ -1232,7 +1232,7 @@ async function run() {
     ["reports a failed zine load", testZineListReportsLoadFailures],
     ["lists the albums", testMusicSectionListsTheAlbums],
     ["switches the player from the music section", testMusicSectionAlbumSwitchesThePlayer],
-    ["only loads the latest video once you open music", testLatestVideoOnlyLoadsOnceYouOpenMusic],
+    ["only loads the featured video once you open music", testFeaturedVideoOnlyLoadsOnceYouOpenMusic],
     ["only loads photos once you open that section", testPhotosOnlyLoadOnceYouOpenThatSection],
   ];
 
