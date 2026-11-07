@@ -33,7 +33,6 @@ const zineSpread = document.querySelector("#zine-spread");
 const zinePrevButton = document.querySelector("#zine-prev");
 const zineNextButton = document.querySelector("#zine-next");
 const zineProgress = document.querySelector("#zine-progress");
-const zineLayoutButton = document.querySelector("#zine-layout");
 const zineDownloadLink = document.querySelector("#zine-download");
 
 function syncPlayerBarHeight() {
@@ -90,7 +89,6 @@ const zines = zinesModule.createZines({
   prevButton: zinePrevButton,
   nextButton: zineNextButton,
   progress: zineProgress,
-  layoutButton: zineLayoutButton,
   downloadLink: zineDownloadLink,
   fetchFn: fetch,
 });

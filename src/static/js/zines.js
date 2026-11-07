@@ -1,7 +1,12 @@
 (function (global) {
   const ZINES_URL = "/api/zines";
-  const LAYOUT_STORAGE_KEY = "manturon-zine-layout";
-  const TURN_DURATION_MS = 460;
+  const TURN_DURATION_MS = 450;
+  const TURN_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+  const OPEN_DURATION_MS = 320;
+  const PRESS_DURATION_MS = 200;
+  const TURN_SHADE_OPACITY = 0.4;
+  // Gap between stacked leaves, just enough for the browser to sort them.
+  const LEAF_DEPTH_PX = 0.5;
 
   function normalizePage(page) {
     if (!page || typeof page.src !== "string" || !page.src) {
@@ -57,13 +62,9 @@
   // face each other in pairs, and the back cover stands alone again. Keeping
   // those pairs together is what stops a photo drawn across two panels from
   // being cut in half.
-  function buildSpreads(pageCount, paired) {
+  function buildSpreads(pageCount) {
     if (pageCount <= 0) {
       return [];
-    }
-
-    if (!paired) {
-      return Array.from({ length: pageCount }, (_, index) => [index + 1]);
     }
 
     const spreads = [[1]];
@@ -82,6 +83,27 @@
   function spreadIndexForPage(spreads, page) {
     const found = spreads.findIndex((spread) => spread.includes(page));
     return found >= 0 ? found : 0;
+  }
+
+  // Each leaf is one sheet of the book, with a page on either side, so turning
+  // it shows the next page on its back.
+  function buildLeaves(pageCount) {
+    const leaves = [];
+    for (let page = 1; page <= pageCount; page += 2) {
+      leaves.push({ front: page, back: page < pageCount ? page + 1 : null });
+    }
+    return leaves;
+  }
+
+  // A closed booklet sits on one side of its spine, so it slides half a page
+  // to stay centred: the cover lies right of the spine, the back cover left.
+  // The result is a percentage of the book, which is two pages wide.
+  function bookShift(spreads, index) {
+    if (index === 0) {
+      return -25;
+    }
+
+    return index === spreads.length - 1 && spreads[index].length === 1 ? 25 : 0;
   }
 
   function progressLabel(spread, pageCount) {
@@ -103,7 +125,6 @@
     prevButton,
     nextButton,
     progress,
-    layoutButton,
     downloadLink,
     fetchFn,
     win = global.window,
@@ -112,52 +133,20 @@
     let currentZine = null;
     let currentPage = 1;
     let loadPromise = null;
-    // Two pages by default, on any screen size, until you say otherwise.
-    let layoutChoice = readStoredLayout();
-
+    let book = null;
+    let leaves = [];
+    let flippedCount = 0;
+    const turningLeaves = new Set();
     const reducedMotionQuery = win.matchMedia
       ? win.matchMedia("(prefers-reduced-motion: reduce)")
       : null;
-
-    function readStoredLayout() {
-      const stored = win.localStorage
-        ? win.localStorage.getItem(LAYOUT_STORAGE_KEY)
-        : null;
-      return stored === "single" ? "single" : "spread";
-    }
-
-    function isPaired() {
-      return layoutChoice === "spread";
-    }
-
-    function syncLayoutButton() {
-      if (!layoutButton) {
-        return;
-      }
-
-      const paired = isPaired();
-      layoutButton.textContent = paired ? "ver una página" : "ver dos páginas";
-      layoutButton.setAttribute("aria-pressed", paired ? "true" : "false");
-    }
-
-    function toggleLayout() {
-      layoutChoice = isPaired() ? "single" : "spread";
-      if (win.localStorage) {
-        win.localStorage.setItem(LAYOUT_STORAGE_KEY, layoutChoice);
-      }
-
-      syncLayoutButton();
-      if (currentZine) {
-        renderSpread();
-      }
-    }
 
     function currentSpreads() {
       if (!currentZine) {
         return [];
       }
 
-      return buildSpreads(currentZine.pages.length, isPaired());
+      return buildSpreads(currentZine.pages.length);
     }
 
     function pageByNumber(number) {
@@ -166,118 +155,112 @@
         : null;
     }
 
-    function buildPageImage(page, className) {
-      const image = global.document.createElement("img");
-      image.className = className;
+    function setPageSource(image, page) {
       image.src = page.src;
-      image.alt = "";
       if (page.srcset) {
         image.setAttribute("srcset", page.srcset);
       }
       if (page.sizes) {
         image.setAttribute("sizes", page.sizes);
       }
+    }
+
+    function buildPageImage(page, className) {
+      const image = global.document.createElement("img");
+      image.className = className;
+      image.alt = "";
+      if (page) {
+        setPageSource(image, page);
+      }
       return image;
     }
 
-    function preloadSpread(pages) {
-      for (const number of pages) {
-        const page = pageByNumber(number);
-        if (!page) {
-          continue;
+    function canAnimate(element) {
+      const reduced = reducedMotionQuery && reducedMotionQuery.matches;
+      return !reduced && typeof element.animate === "function";
+    }
+
+    function buildFace(side, number) {
+      const face = global.document.createElement("div");
+      face.className = `zine-face zine-face-${side}`;
+      // The covers are the outside of the booklet, so they have no gutter.
+      if (number && number !== 1 && number !== currentZine.pages.length) {
+        face.classList.add("zine-face-inner");
+      }
+
+      const shade = global.document.createElement("div");
+      shade.className = "zine-shade";
+
+      const image = number ? buildPageImage(null, "zine-page") : null;
+      face.append(...(image ? [image, shade] : [shade]));
+      return { face, image, number, shade };
+    }
+
+    function buildLeaf({ front, back }) {
+      const element = global.document.createElement("div");
+      element.className = "zine-leaf";
+
+      const faces = [buildFace("front", front), buildFace("back", back)];
+      element.append(...faces.map(({ face }) => face));
+
+      return { animations: [], element, faces, timer: null };
+    }
+
+    function leafTransform(index, flipped) {
+      const stacked = flipped ? index : leaves.length - 1 - index;
+      const angle = flipped ? -180 : 0;
+      return `translateZ(${stacked * LEAF_DEPTH_PX}px) rotateY(${angle}deg)`;
+    }
+
+    function isLeafShowing(index) {
+      return (
+        index === flippedCount ||
+        index === flippedCount - 1 ||
+        turningLeaves.has(index - 1) ||
+        turningLeaves.has(index) ||
+        turningLeaves.has(index + 1)
+      );
+    }
+
+    function syncLeaves() {
+      leaves.forEach((leaf, index) => {
+        const flipped = index < flippedCount;
+        const { style } = leaf.element;
+        style.transform = leafTransform(index, flipped);
+        style.visibility = isLeafShowing(index) ? "visible" : "hidden";
+        if (turningLeaves.has(index)) {
+          style.zIndex = String(leaves.length + 1);
+        } else {
+          style.zIndex = String(flipped ? index + 1 : leaves.length - index);
         }
+      });
+    }
 
-        const image = new global.Image();
-        if (page.srcset) {
-          image.srcset = page.srcset;
+    // Only the leaves around the open page fetch their images: the ones you
+    // can see, plus the ones a turn either way would uncover.
+    function fillNearbyLeaves() {
+      const nearby = leaves.slice(Math.max(flippedCount - 2, 0), flippedCount + 2);
+      for (const leaf of nearby) {
+        for (const { image, number } of leaf.faces) {
+          const page = pageByNumber(number);
+          if (image && page && !image.src) {
+            setPageSource(image, page);
+          }
         }
-        image.src = page.src;
       }
     }
 
-    function removeTurningSheet() {
-      for (const sheet of spread.querySelectorAll(".zine-sheet")) {
-        sheet.remove();
-      }
-    }
-
-    // The page you leave is copied on top of the new one and swung about the
-    // spine, which is what makes it read as a sheet of paper being turned.
-    // Going forward the right hand page turns left, and the other way round.
-    function captureTurningSheet(direction) {
-      if (!direction || (reducedMotionQuery && reducedMotionQuery.matches)) {
-        return null;
-      }
-
-      const pages = spread.children;
-      const leaving = direction > 0 ? pages[pages.length - 1] : pages[0];
-      if (!leaving) {
-        return null;
-      }
-
-      const pageRect = leaving.getBoundingClientRect();
-      const stageRect = spread.getBoundingClientRect();
-      const box = {
-        left: pageRect.left - stageRect.left,
-        top: pageRect.top - stageRect.top,
-        width: pageRect.width,
-        height: pageRect.height,
-      };
-
-      if (!Object.values(box).every((value) => Number.isFinite(value))) {
-        return null;
-      }
-
-      return {
-        box,
-        direction,
-        src: leaving.currentSrc || leaving.src,
-      };
-    }
-
-    function playTurn(capture) {
-      if (!capture) {
-        return;
-      }
-
-      const sheet = global.document.createElement("img");
-      sheet.className =
-        capture.direction > 0
-          ? "zine-sheet zine-sheet-forward"
-          : "zine-sheet zine-sheet-back";
-      sheet.src = capture.src;
-      sheet.alt = "";
-      sheet.style.left = `${capture.box.left}px`;
-      sheet.style.top = `${capture.box.top}px`;
-      sheet.style.width = `${capture.box.width}px`;
-      sheet.style.height = `${capture.box.height}px`;
-
-      spread.append(sheet);
-      // animationend does not fire when the tab is hidden, so clean up anyway.
-      win.setTimeout(() => sheet.remove(), TURN_DURATION_MS + 120);
-    }
-
-    function renderSpread(direction = 0) {
-      if (!currentZine) {
-        return;
-      }
-
+    function syncReader() {
       const spreads = currentSpreads();
       const activeIndex = spreadIndexForPage(spreads, currentPage);
       const activeSpread = spreads[activeIndex] || [];
       currentPage = activeSpread[0] || 1;
+      flippedCount = activeIndex;
 
-      const capture = captureTurningSheet(direction);
-      removeTurningSheet();
-
-      const images = activeSpread
-        .map((number) => pageByNumber(number))
-        .filter(Boolean)
-        .map((page) => buildPageImage(page, "zine-page"));
-
-      spread.replaceChildren(...images);
-      spread.dataset.pages = String(images.length);
-      playTurn(capture);
+      spread.dataset.pages = String(activeSpread.length);
+      book.style.transform = `translateX(${bookShift(spreads, activeIndex)}%)`;
+      syncLeaves();
+      fillNearbyLeaves();
 
       if (progress) {
         progress.textContent = progressLabel(activeSpread, currentZine.pages.length);
@@ -285,10 +268,99 @@
 
       prevButton.disabled = activeIndex <= 0;
       nextButton.disabled = activeIndex >= spreads.length - 1;
+    }
 
-      const nextSpread = spreads[activeIndex + 1];
-      if (nextSpread) {
-        preloadSpread(nextSpread);
+    function clearBook() {
+      for (const leaf of leaves) {
+        win.clearTimeout(leaf.timer);
+      }
+      turningLeaves.clear();
+      leaves = [];
+      book = null;
+    }
+
+    function renderBook() {
+      clearBook();
+      leaves = buildLeaves(currentZine.pages.length).map(buildLeaf);
+
+      book = global.document.createElement("div");
+      book.className = "zine-book";
+      book.append(...leaves.map(({ element }) => element));
+
+      spread.replaceChildren(book);
+      syncReader();
+    }
+
+    // The leaf already holds its final transform; these animations only play
+    // the way there, so a tab that never runs them still ends up correct.
+    function playTurn(index, forward, shiftBefore, shiftAfter) {
+      const leaf = leaves[index];
+      if (!canAnimate(leaf.element)) {
+        return;
+      }
+
+      const timing = { duration: TURN_DURATION_MS, easing: TURN_EASING };
+      win.clearTimeout(leaf.timer);
+      leaf.animations.forEach((animation) => animation.cancel());
+
+      turningLeaves.add(index);
+      syncLeaves();
+
+      leaf.animations = [
+        leaf.element.animate(
+          [
+            { transform: leafTransform(index, !forward) },
+            { transform: leafTransform(index, forward) },
+          ],
+          timing,
+        ),
+        ...leaf.faces.map(({ shade }) =>
+          shade.animate(
+            [
+              { opacity: 0 },
+              { offset: 0.5, opacity: TURN_SHADE_OPACITY },
+              { opacity: 0 },
+            ],
+            timing,
+          ),
+        ),
+      ];
+
+      if (shiftBefore !== shiftAfter) {
+        book.animate(
+          [
+            { transform: `translateX(${shiftBefore}%)` },
+            { transform: `translateX(${shiftAfter}%)` },
+          ],
+          timing,
+        );
+      }
+
+      // animationend does not fire when the tab is hidden, so use a timer.
+      leaf.timer = win.setTimeout(() => {
+        turningLeaves.delete(index);
+        syncLeaves();
+      }, TURN_DURATION_MS + 120);
+    }
+
+    function playPress(button) {
+      if (canAnimate(button)) {
+        button.animate([{ transform: "scale(0.94)" }, { transform: "none" }], {
+          duration: PRESS_DURATION_MS,
+          easing: TURN_EASING,
+        });
+      }
+    }
+
+    function playOpen() {
+      if (canAnimate(spread)) {
+        spread.animate(
+          [
+            { opacity: 0, transform: "translateY(16px) scale(0.94)" },
+            { opacity: 1, transform: "none" },
+          ],
+          { duration: OPEN_DURATION_MS, easing: TURN_EASING },
+        );
       }
     }
 
@@ -305,7 +377,14 @@
       }
 
       currentPage = spreads[nextIndex][0];
-      renderSpread(nextIndex > activeIndex ? 1 : -1);
+      syncReader();
+      playPress(step > 0 ? nextButton : prevButton);
+      playTurn(
+        Math.min(activeIndex, nextIndex),
+        nextIndex > activeIndex,
+        bookShift(spreads, activeIndex),
+        bookShift(spreads, nextIndex),
+      );
     }
 
     function buildCard(zine) {
@@ -367,6 +446,7 @@
       currentZine = null;
       index.hidden = false;
       reader.hidden = true;
+      clearBook();
       spread.replaceChildren();
     }
 
@@ -390,8 +470,8 @@
         }
       }
 
-      syncLayoutButton();
-      renderSpread();
+      renderBook();
+      playOpen();
       return true;
     }
 
@@ -424,11 +504,6 @@
     function init() {
       prevButton.addEventListener("click", () => move(-1));
       nextButton.addEventListener("click", () => move(1));
-
-      if (layoutButton) {
-        layoutButton.addEventListener("click", toggleLayout);
-      }
-      syncLayoutButton();
     }
 
     return {
@@ -440,6 +515,8 @@
   }
 
   global.ManturonZines = {
+    bookShift,
+    buildLeaves,
     buildSpreads,
     createZines,
     fetchZines,
