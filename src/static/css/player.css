@@ -204,10 +204,80 @@
   object-fit: cover;
 }
 
-/* Next to the cover a phone leaves the embed too narrow, and Bandcamp then
-   draws nothing at all, so the player gets the full width there. */
-@media (max-width: 480px) {
+.album-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.album-toggle-cover,
+.player-fold {
+  display: none;
+}
+
+/* Phones: the bar rests folded down to its top row, and the page gives way as
+   it slides up (see responsive.css). Sliding is what keeps the music going:
+   the iframe is never hidden or touched. The cover moves to the
+   top row, as next to the embed it would leave the embed too narrow, and
+   Bandcamp then draws nothing at all. The rest of the bar has to come to
+   exactly --player-peek above the embed, or the embed's edge shows. */
+@media (max-width: 700px) {
+  .player-bar {
+    transition: transform 220ms ease;
+  }
+
+  .player-bar[data-folded="true"] {
+    transform: translateY(calc(100% - var(--player-peek)));
+  }
+
+  .player-bar-inner {
+    padding-top: 6px;
+  }
+
+  .album-row {
+    height: 36px;
+  }
+
+  .album-toggle {
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+  }
+
+  .album-toggle-cover {
+    display: block;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    object-fit: cover;
+  }
+
+  .player-fold {
+    display: block;
+    flex: 0 0 auto;
+    width: 44px;
+    height: 100%;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform 220ms ease;
+  }
+
+  .player-bar[data-folded="true"] .player-fold {
+    transform: rotate(180deg);
+  }
+
   .bandcamp-cover {
     display: none;
+  }
+}
+
+@media (max-width: 700px) and (prefers-reduced-motion: reduce) {
+  .player-bar,
+  .player-fold,
+  .view-shell {
+    transition: none;
   }
 }

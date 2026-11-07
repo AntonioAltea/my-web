@@ -131,19 +131,29 @@
     </main>
   </div>
 
-  <footer class="player-bar">
+  <footer class="player-bar" data-folded="true">
     <div class="player-bar-inner">
       <div class="album-picker">
-        <button
-          id="album-toggle"
-          class="album-toggle"
-          type="button"
-          aria-expanded="false"
-          aria-controls="album-list"
-        >
-          <span class="album-toggle-label">álbum</span>
-          <span id="album-toggle-current" class="album-toggle-current"></span>
-        </button>
+        <div class="album-row">
+          <button
+            id="album-toggle"
+            class="album-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="album-list"
+          >
+            <img id="album-toggle-cover" class="album-toggle-cover" src="" alt="">
+            <span class="album-toggle-label">álbum</span>
+            <span id="album-toggle-current" class="album-toggle-current"></span>
+          </button>
+          <button
+            id="player-fold"
+            class="player-fold"
+            type="button"
+            aria-expanded="false"
+            aria-label="Mostrar u ocultar el reproductor"
+          >▾</button>
+        </div>
         <ul id="album-list" class="album-list" aria-label="Elegir álbum" hidden></ul>
       </div>
       <div class="bandcamp-player-shell">

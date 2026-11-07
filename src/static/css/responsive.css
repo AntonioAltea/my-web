@@ -37,6 +37,12 @@
 
   .view-shell {
     padding: 16px 16px calc(var(--player-bar-height) + 8px);
+    transition: padding-bottom 220ms ease;
+  }
+
+  /* The page makes room for whatever part of the player is showing. */
+  body:has(.player-bar[data-folded="true"]) .view-shell {
+    padding-bottom: calc(var(--player-peek) + 8px);
   }
 
   .player-bar {

@@ -1,6 +1,7 @@
 (function (global) {
   const ALBUM_STORAGE_KEY = "manturon-album";
   const ALBUMS_URL = "/static/data/albums.json";
+  const FOLDABLE_QUERY = "(max-width: 700px)";
 
   function findAlbum(albums, id) {
     return albums.find((album) => album.id === id) || albums[0];
@@ -32,11 +33,22 @@
     }
   }
 
-  function createBandcampPlayer({ iframe, cover, loader, toggleButton, toggleCurrent, list }) {
+  function createBandcampPlayer({
+    iframe,
+    cover,
+    loader,
+    toggleButton,
+    toggleCurrent,
+    toggleCover,
+    foldButton,
+    bar,
+    list,
+  }) {
     let theme = "light";
     let albums = [];
     let album = null;
     let isOpen = false;
+    let isFolded = true;
     let tiles = [];
 
     function renderIframe() {
@@ -54,6 +66,10 @@
 
       if (cover) {
         cover.src = album.cover;
+      }
+
+      if (toggleCover) {
+        toggleCover.src = album.cover;
       }
     }
 
@@ -89,9 +105,34 @@
       renderIframe();
       syncToggle();
       syncSelection();
+      // A new album needs a press on play, so the controls have to be in view.
+      setFolded(false);
+    }
+
+    // Phones keep the bar folded down to its top row. Folding only slides the
+    // bar: the iframe stays put, so the music carries on. Wider screens ignore
+    // the state, see player.css.
+    function setFolded(nextFolded) {
+      isFolded = nextFolded;
+      if (bar) {
+        bar.dataset.folded = isFolded ? "true" : "false";
+      }
+      if (foldButton) {
+        foldButton.setAttribute("aria-expanded", isFolded ? "false" : "true");
+      }
+      if (isFolded && isOpen) {
+        isOpen = false;
+        syncToggle();
+      }
     }
 
     function toggleOpen() {
+      // As in any mini player, tapping the folded bar opens the player.
+      if (isFolded && global.window.matchMedia(FOLDABLE_QUERY).matches) {
+        setFolded(false);
+        return;
+      }
+
       isOpen = !isOpen;
       syncToggle();
     }
@@ -128,6 +169,10 @@
 
     function init(nextAlbums) {
       albums = nextAlbums;
+      if (foldButton) {
+        foldButton.addEventListener("click", () => setFolded(!isFolded));
+      }
+
       if (!albums.length) {
         return;
       }

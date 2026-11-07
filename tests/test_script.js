@@ -301,6 +301,8 @@ function createEnvironment(
     "#bandcamp-cover": new FakeElement("bandcamp-cover"),
     "#album-toggle": new FakeElement("album-toggle"),
     "#album-toggle-current": new FakeElement("album-toggle-current"),
+    "#album-toggle-cover": new FakeElement("album-toggle-cover"),
+    "#player-fold": new FakeElement("player-fold"),
     "#album-list": new FakeElement("album-list"),
     ".player-bar": new FakeElement("player-bar"),
     "#back-link": new FakeElement("back-link"),
@@ -771,6 +773,50 @@ async function testBandcampPlayerShowsCurrentAlbumInToggle() {
   assert.equal(items[0].getAttribute("aria-pressed"), "true");
   assert.equal(items[1].children[0].textContent, "ola de incendios");
   assert.equal(items[1].getAttribute("aria-pressed"), "false");
+}
+
+async function testBandcampPlayerShowsTheCoverInTheFoldedBar() {
+  const { selectors } = await loadApp({ narrowScreen: true });
+
+  assert.equal(selectors["#album-toggle-cover"].src, "/assets/icons/la-tormenta-portada.jpg");
+  selectors["#album-list"].querySelectorAll("button")[1].click();
+  assert.equal(selectors["#album-toggle-cover"].src, "/assets/icons/ola-de-incendios-portada.jpg");
+}
+
+async function testBandcampPlayerFoldsWithoutTouchingTheEmbed() {
+  const { selectors } = await loadApp({ narrowScreen: true });
+  const player = selectors["#bandcamp-player"];
+  const srcBeforeFolding = player.src;
+
+  selectors["#player-fold"].click();
+  assert.equal(selectors[".player-bar"].dataset.folded, "false");
+  assert.equal(selectors["#player-fold"].getAttribute("aria-expanded"), "true");
+
+  selectors["#player-fold"].click();
+  assert.equal(selectors[".player-bar"].dataset.folded, "true");
+  assert.equal(player.src, srcBeforeFolding);
+}
+
+async function testBandcampPlayerUnfoldsBeforeOpeningTheAlbumList() {
+  const { selectors } = await loadApp({ narrowScreen: true });
+
+  selectors["#album-toggle"].click();
+  assert.equal(selectors[".player-bar"].dataset.folded, "false");
+  assert.equal(selectors["#album-list"].dataset.state, "closed");
+
+  selectors["#album-toggle"].click();
+  assert.equal(selectors["#album-list"].dataset.state, "open");
+
+  // Folding again takes the open list with it.
+  selectors["#player-fold"].click();
+  assert.equal(selectors["#album-list"].dataset.state, "closed");
+}
+
+async function testBandcampPlayerUnfoldsWhenTheAlbumChanges() {
+  const { selectors } = await loadApp({ narrowScreen: true });
+
+  selectors["#album-list"].querySelectorAll("button")[1].click();
+  assert.equal(selectors[".player-bar"].dataset.folded, "false");
 }
 
 async function testBandcampPlayerTogglesAlbumListOpenAndClosed() {
@@ -1287,6 +1333,10 @@ async function run() {
     ["keeps the bandcamp embed playing when the system theme changes", testBandcampPlayerKeepsPlayingWhenSystemThemeChanges],
     ["uses each album's cover image for its tile art", testBandcampPlayerTileArtUsesAlbumCoverImages],
     ["shows the current album in the toggle", testBandcampPlayerShowsCurrentAlbumInToggle],
+    ["shows the cover in the folded bar", testBandcampPlayerShowsTheCoverInTheFoldedBar],
+    ["folds without touching the embed", testBandcampPlayerFoldsWithoutTouchingTheEmbed],
+    ["unfolds before opening the album list", testBandcampPlayerUnfoldsBeforeOpeningTheAlbumList],
+    ["unfolds when the album changes", testBandcampPlayerUnfoldsWhenTheAlbumChanges],
     ["toggles the album list open and closed", testBandcampPlayerTogglesAlbumListOpenAndClosed],
     ["switches album on select and remembers the choice", testBandcampPlayerSwitchesAlbumOnSelectAndRemembersChoice],
     ["tracks visits", testTracksVisit],

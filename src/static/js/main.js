@@ -20,6 +20,8 @@ const bandcampLoader = document.querySelector("#bandcamp-loader");
 const bandcampCover = document.querySelector("#bandcamp-cover");
 const albumToggle = document.querySelector("#album-toggle");
 const albumToggleCurrent = document.querySelector("#album-toggle-current");
+const albumToggleCover = document.querySelector("#album-toggle-cover");
+const playerFoldButton = document.querySelector("#player-fold");
 const albumList = document.querySelector("#album-list");
 const playerBar = document.querySelector(".player-bar");
 const backLink = document.querySelector("#back-link");
@@ -71,6 +73,9 @@ const bandcamp = bandcampModule.createBandcampPlayer({
   loader: bandcampLoader,
   toggleButton: albumToggle,
   toggleCurrent: albumToggleCurrent,
+  toggleCover: albumToggleCover,
+  foldButton: playerFoldButton,
+  bar: playerBar,
   list: albumList,
 });
 

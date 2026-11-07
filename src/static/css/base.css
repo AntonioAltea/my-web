@@ -37,6 +37,7 @@
   --control-line-strong: #6b7280;
   --side-nav-width: 12rem;
   --player-bar-height: 170px;
+  --player-peek: 49px;
 }
 
 :root[data-theme="dark"] {
