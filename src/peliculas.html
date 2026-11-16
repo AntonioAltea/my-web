@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>películas · manturón</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3" sizes="any">
+  <script>
+    (() => {
+      const savedTheme = window.localStorage.getItem("manturon-theme");
+      if (savedTheme === "light" || savedTheme === "dark") {
+        document.documentElement.dataset.theme = savedTheme;
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/peliculas.css">
+</head>
+<body>
+  <main class="movies-page">
+    <header class="movies-header">
+      <h1>películas</h1>
+      <button id="movies-logout" class="movies-link" type="button" hidden>salir</button>
+    </header>
+
+    <p id="movies-page-status" class="movies-error" role="alert" hidden></p>
+
+    <form id="movies-login" class="movies-login" hidden>
+      <label for="movies-password">contraseña</label>
+      <div class="movies-row">
+        <input id="movies-password" type="password" autocomplete="current-password" required>
+        <button type="submit">entrar</button>
+      </div>
+      <p id="movies-login-error" class="movies-error" role="alert"></p>
+    </form>
+
+    <div id="movies-app" hidden>
+      <section class="movies-who" aria-labelledby="movies-who-label">
+        <span id="movies-who-label">¿quién eres?</span>
+        <div id="movies-who-options" class="movies-chips" role="group" aria-labelledby="movies-who-label"></div>
+        <p id="movies-name-hint" class="movies-error" role="alert" hidden></p>
+      </section>
+
+      <section class="movies-search" aria-label="Añadir película">
+        <input
+          id="movies-query"
+          type="search"
+          placeholder="busca una película, un director o un actor"
+          aria-label="Buscar película, director o actor"
+          autocomplete="off"
+          enterkeyhint="search"
+        >
+        <p id="movies-search-status" class="movies-muted" aria-live="polite" hidden></p>
+        <div id="movies-results" class="movies-results"></div>
+      </section>
+
+      <section class="movies-toolbar" aria-label="Lista">
+        <div class="movies-tabs" role="group" aria-label="Qué mostrar">
+          <button type="button" data-status="pending" aria-pressed="true">pendientes <span id="movies-count-pending" class="movies-count"></span></button>
+          <button type="button" data-status="watched" aria-pressed="false">vistas <span id="movies-count-watched" class="movies-count"></span></button>
+        </div>
+        <label class="movies-by">
+          de
+          <select id="movies-by"></select>
+        </label>
+        <button id="movies-random" class="movies-random" type="button">elegir una al azar</button>
+      </section>
+
+      <section id="movies-pick" class="movies-pick" aria-live="polite" hidden>
+        <p class="movies-pick-label">esta noche toca…</p>
+        <div id="movies-pick-card"></div>
+        <div class="movies-row">
+          <button id="movies-pick-again" type="button">otra</button>
+          <button id="movies-pick-close" class="movies-link" type="button">cerrar</button>
+        </div>
+      </section>
+
+      <p id="movies-list-status" class="movies-empty" aria-live="polite" hidden></p>
+      <ul id="movies-list" class="movies-list"></ul>
+
+      <p class="movies-footer">
+        Datos e imágenes de <a href="https://www.themoviedb.org/" rel="noopener">TMDB</a>.
+        This product uses the TMDB API but is not endorsed or certified by TMDB.
+      </p>
+    </div>
+  </main>
+
+  <script src="/static/js/movies.js"></script>
+</body>
+</html>

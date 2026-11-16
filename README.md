@@ -136,6 +136,37 @@ To view the summary locally or on Fly, open:
 The stats page reads from `/api/analytics/summary`.
 The event collector endpoint is `/api/analytics/event`.
 
+## Flat Movie Watchlist
+
+`/peliculas` is a private shared watchlist for the flat: anyone with the password can add movies, mark them as watched,
+remove them and pick a random pending one (optionally among the ones a given person added). It is not linked from the site
+and carries `noindex`.
+
+- Access is one shared password, `MOVIES_PASSWORD`. Logging in sets an HttpOnly cookie derived from it, so changing the
+  password logs everyone out. Without it set, the whole API answers 503.
+- Movie data comes from TMDB (search and details in Spanish, posters hotlinked from `image.tmdb.org`). `TMDB_API_KEY` takes
+  either the v3 API key or the v4 read access token from <https://www.themoviedb.org/settings/api>. Each movie links to
+  Letterboxd through `letterboxd.com/tmdb/<id>/` and to IMDb when TMDB knows the IMDb id.
+- Search uses TMDB's `/search/multi`: matching titles, plus the films of up to two people whose name contains every
+  word typed (accents ignored), fetched with `/person/<id>/movie_credits` — as director for people known for directing,
+  as cast otherwise.
+- Who added a movie is picked from a fixed list of flatmates, `NAMES` in `src/static/js/movies.js`.
+- The list lives in `movies.json` under the media root (`assets/movies.json` locally, `/data/movies.json` on Fly).
+- API: `POST /api/movies/login` and `/logout`, `GET /api/movies`, `GET /api/movies/search?q=`, `POST /api/movies`
+  (`{tmdbId, addedBy}`), `POST /api/movies/<id>/watched` (`{watched}`), `DELETE /api/movies/<id>`.
+
+Locally:
+
+```bash
+MOVIES_PASSWORD=algo TMDB_API_KEY=... python3 -m src.server
+```
+
+On Fly:
+
+```bash
+fly secrets set -a manturon MOVIES_PASSWORD='...' TMDB_API_KEY='...'
+```
+
 ## Fly.io
 
 The app is set up for deployment on Fly.io using a persistent volume at `/data`.

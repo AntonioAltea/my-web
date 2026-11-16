@@ -8,6 +8,7 @@ assets/photos/*
 assets/music/*
 assets/zines/*
 assets/analytics.json
+assets/movies.json
 !assets/photos/.gitkeep
 !assets/music/.gitkeep
 !assets/zines/.gitkeep

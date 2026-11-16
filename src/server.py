@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from src import movies
 
 ROOT = Path(__file__).resolve().parent
 STATIC_ROOT = ROOT / "static"
@@ -21,6 +22,8 @@ PHOTOS_DIR = MEDIA_ROOT / "photos"
 MUSIC_DIR = MEDIA_ROOT / "music"
 ZINES_DIR = MEDIA_ROOT / "zines"
 ANALYTICS_FILE = MEDIA_ROOT / "analytics.json"
+MOVIES_FILE = MEDIA_ROOT / "movies.json"
+MOVIES_PAGE_PATHS = {"/peliculas", "/peliculas/", "/peliculas.html"}
 CANONICAL_HOST = os.environ.get("CANONICAL_HOST", "").strip()
 REDIRECT_HOSTS = {
     host.strip()
@@ -787,6 +790,9 @@ def asset_disk_path(request_path: str) -> Path | None:
     if parsed_path in {"/stats", "/stats/", "/stats.html"}:
         return ROOT / "stats.html"
 
+    if parsed_path in MOVIES_PAGE_PATHS:
+        return ROOT / "peliculas.html"
+
     relative_path = parsed_path.lstrip("/")
     if not relative_path:
         return ROOT / "index.html"
@@ -850,6 +856,7 @@ class MediaHandler(SimpleHTTPRequestHandler):
         if (
             request_path
             in {"/", "/index.html", "/favicon.ico", "/stats", "/stats/", "/stats.html"}
+            or request_path in MOVIES_PAGE_PATHS
             or request_path.startswith("/static/css/")
             or request_path.startswith("/static/js/")
             or request_path.startswith("/static/data/")
@@ -886,6 +893,10 @@ class MediaHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             return
 
+        if movies.is_movies_request(self.path):
+            self._handle_movies_request("GET")
+            return
+
         if is_media_request(self.path):
             payload = media_payload()
             self._send_json_response(payload)
@@ -909,6 +920,10 @@ class MediaHandler(SimpleHTTPRequestHandler):
             self._client_disconnected(error)
 
     def do_POST(self) -> None:
+        if movies.is_movies_request(self.path):
+            self._handle_movies_request("POST")
+            return
+
         if not is_analytics_event_request(self.path):
             self.send_error(404, "Not Found")
             return
@@ -935,9 +950,42 @@ class MediaHandler(SimpleHTTPRequestHandler):
 
         self._send_json_response(summary, status=202)
 
-    def _send_json_response(self, payload: object, status: int = 200) -> None:
+    def do_DELETE(self) -> None:
+        if not movies.is_movies_request(self.path):
+            self.send_error(404, "Not Found")
+            return
+        self._handle_movies_request("DELETE")
+
+    def _request_body(self) -> bytes:
+        try:
+            body_length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            body_length = 0
+        # The movie API only takes tiny JSON bodies.
+        return self.rfile.read(min(max(body_length, 0), 16_384))
+
+    def _handle_movies_request(self, method: str) -> None:
+        body = self._request_body() if method == "POST" else b""
+        status, payload, headers = movies.handle_request(
+            method,
+            self.path,
+            self.headers.get("Cookie"),
+            body,
+            MOVIES_FILE,
+            secure=self.headers.get("X-Forwarded-Proto") == "https",
+        )
+        self._send_json_response(payload, status=status, extra_headers=headers)
+
+    def _send_json_response(
+        self,
+        payload: object,
+        status: int = 200,
+        extra_headers: list[tuple[str, str]] | None = None,
+    ) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
+        for name, value in extra_headers or []:
+            self.send_header(name, value)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store, max-age=0")
         self.send_header("Pragma", "no-cache")

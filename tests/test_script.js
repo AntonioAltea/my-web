@@ -1322,8 +1322,87 @@ async function testPhotosOnlyLoadOnceYouOpenThatSection() {
   assert.equal(mediaCallsAfter.length, 1);
 }
 
+function moviesModule() {
+  const code = fs.readFileSync(
+    path.join(__dirname, "..", "src", "static", "js", "movies.js"),
+    "utf8",
+  );
+  const sandbox = {};
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(code, sandbox, { filename: "movies.js" });
+  return sandbox.ManturonMovies;
+}
+
+const MOVIES = [
+  { tmdb_id: 1, title: "Uno", added_by: "Marta", added_at: "2026-01-02", watched_at: null },
+  { tmdb_id: 2, title: "Dos", added_by: "Antonio", added_at: "2026-01-01", watched_at: null },
+  { tmdb_id: 3, title: "Tres", added_by: "Marta", added_at: "2026-01-03", watched_at: "2026-02-01" },
+  { tmdb_id: 4, title: "Cuatro", added_by: "Antonio", added_at: "2026-01-04", watched_at: "2026-03-01" },
+];
+
+async function testMoviesFilterAndSort() {
+  const { filterMovies, sortMovies, NAMES } = moviesModule();
+  const ids = (movies) => movies.map((movie) => movie.tmdb_id);
+
+  assert.deepEqual(ids(filterMovies(MOVIES, { status: "pending" })), [1, 2]);
+  assert.deepEqual(ids(filterMovies(MOVIES, { status: "watched", by: "Marta" })), [3]);
+  // Pending oldest first, so nothing sinks forever; watched latest first.
+  assert.deepEqual(ids(sortMovies(filterMovies(MOVIES, { status: "pending" }), "pending")), [2, 1]);
+  assert.deepEqual(ids(sortMovies(filterMovies(MOVIES, { status: "watched" }), "watched")), [4, 3]);
+  assert.deepEqual([...NAMES], ["Antonio", "Javi", "Jorge", "Miguel"]);
+}
+
+async function testMoviesRandomPickOnlyOffersPendingOnes() {
+  const { pickRandom } = moviesModule();
+
+  assert.equal(pickRandom(MOVIES, { random: () => 0 }).tmdb_id, 1);
+  assert.equal(pickRandom(MOVIES, { random: () => 0.99 }).tmdb_id, 2);
+  assert.equal(pickRandom(MOVIES, { by: "Marta", random: () => 0.99 }).tmdb_id, 1);
+  // "Otra" never repeats the current pick while there is something else.
+  assert.equal(pickRandom(MOVIES, { exclude: 1, random: () => 0 }).tmdb_id, 2);
+  assert.equal(pickRandom(MOVIES, { by: "Marta", exclude: 1 }).tmdb_id, 1);
+  assert.equal(pickRandom(MOVIES.slice(2)), null);
+}
+
+async function testMoviesMetaAndLinks() {
+  const { movieMeta, formatRuntime, letterboxdUrl, imdbUrl } = moviesModule();
+
+  // Non-breaking spaces keep the runtime on one line.
+  assert.equal(formatRuntime(136), "2 h 16 min");
+  assert.equal(formatRuntime(120), "2 h");
+  assert.equal(formatRuntime(45), "45 min");
+  assert.equal(formatRuntime(null), "");
+  assert.equal(movieMeta({ year: "1999", runtime: 136 }), "1999 · 2 h 16 min");
+  assert.equal(movieMeta({ year: "" }), "");
+  assert.equal(letterboxdUrl({ tmdb_id: 603 }), "https://letterboxd.com/tmdb/603/");
+  assert.equal(imdbUrl({ imdb_id: "tt0133093" }), "https://www.imdb.com/title/tt0133093/");
+  assert.equal(imdbUrl({ imdb_id: "" }), "");
+}
+
+async function testMoviesSearchPutsPeopleFirst() {
+  const { searchGroups } = moviesModule();
+  const groups = searchGroups({
+    movies: [{ tmdb_id: 9 }],
+    people: [
+      { name: "Pedro Almodóvar", role: "director", movies: [{ tmdb_id: 1 }] },
+      { name: "Penélope Cruz", role: "actor", movies: [{ tmdb_id: 2 }] },
+      { name: "Nadie", role: "actor", movies: [] },
+    ],
+  });
+
+  assert.deepEqual(
+    groups.map((group) => group.title),
+    ["dirigidas por Pedro Almodóvar", "con Penélope Cruz", "películas"],
+  );
+  assert.equal(searchGroups({ movies: [], people: [] }).length, 0);
+}
+
 async function run() {
   const tests = [
+    ["puts people first in movie search", testMoviesSearchPutsPeopleFirst],
+    ["filters and sorts the movie list", testMoviesFilterAndSort],
+    ["picks a random pending movie", testMoviesRandomPickOnlyOffersPendingOnes],
+    ["formats movie details and links", testMoviesMetaAndLinks],
     ["locks photo controls while loading", testPhotoControlsLockWhileLoading],
     ["unlocks photo controls after a stalled image times out", testPhotoLoadTimeoutUnlocksControls],
     ["retries a timed out photo when you come back to it", testTimedOutPhotoCanBeRetried],
