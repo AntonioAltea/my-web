@@ -231,17 +231,40 @@ class ListTests(MovieApiTestCase):
         )
         self.assertEqual(payload["movie"]["wanted_by"], ["Antonio", "Miguel"])
 
+        # null: no opinion either way.
         _, payload, _ = self.call(
-            "POST", "/api/movies/603/wanted", {"name": "Antonio", "want": False}
+            "POST", "/api/movies/603/wanted", {"name": "Antonio", "want": None}
         )
         self.assertEqual(payload["movie"]["wanted_by"], ["Miguel"])
+        self.assertEqual(payload["movie"]["not_wanted_by"], [])
         stored = self.call("GET", "/api/movies")[1]["movies"][0]
         self.assertEqual(stored["wanted_by"], ["Miguel"])
         self.assertEqual(stored["added_by"], "Antonio")
 
+    def test_saying_no_takes_you_off_the_yes_list(self) -> None:
+        self.add(added_by="Antonio")
+
+        _, payload, _ = self.call(
+            "POST", "/api/movies/603/wanted", {"name": "Antonio", "want": False}
+        )
+        self.assertEqual(payload["movie"]["wanted_by"], [])
+        self.assertEqual(payload["movie"]["not_wanted_by"], ["Antonio"])
+
+        # Changing your mind moves you back.
+        _, payload, _ = self.call(
+            "POST", "/api/movies/603/wanted", {"name": "Antonio", "want": True}
+        )
+        self.assertEqual(payload["movie"]["wanted_by"], ["Antonio"])
+        self.assertEqual(payload["movie"]["not_wanted_by"], [])
+
     def test_wanting_validates_input(self) -> None:
         self.add()
-        for body in ({"want": True}, {"name": "Miguel"}, {"name": "Miguel", "want": 1}):
+        for body in (
+            {"want": True},
+            {"name": "Miguel"},
+            {"name": "Miguel", "want": 1},
+            {"name": "Miguel", "want": "no"},
+        ):
             status, _, _ = self.call("POST", "/api/movies/603/wanted", body)
             self.assertEqual(status, 400, body)
         status, _, _ = self.call(
@@ -258,6 +281,7 @@ class ListTests(MovieApiTestCase):
         )
         stored = self.call("GET", "/api/movies")[1]["movies"]
         self.assertEqual([movie["wanted_by"] for movie in stored], [["Javi"], []])
+        self.assertEqual([movie["not_wanted_by"] for movie in stored], [[], []])
 
     def test_removing(self) -> None:
         self.add()

@@ -1376,19 +1376,46 @@ async function testMoviesFilterByWhoWantsItDurationAndGenre() {
   // Javi added the second one but dropped out of it.
   assert.deepEqual(ids(filterMovies(movies, { people: ["Javi"] })), [4]);
 
-  assert.deepEqual(ids(filterMovies(movies, { duration: "90" })), [1]);
-  assert.deepEqual(ids(filterMovies(movies, { duration: "120" })), [1, 2]);
-  assert.deepEqual(ids(filterMovies(movies, { duration: "120+" })), [3]);
-  // Unknown runtime only shows when duration doesn't matter.
-  assert.deepEqual(ids(filterMovies(movies, { duration: "" })), [1, 2, 3, 4]);
+  // "Yo no" keeps a movie off while that person is home, even if others want it.
+  const vetoed = [
+    { tmdb_id: 7, wanted_by: ["Antonio"], not_wanted_by: ["Miguel"] },
+    { tmdb_id: 8, wanted_by: ["Antonio", "Miguel"], not_wanted_by: [] },
+  ];
+  assert.deepEqual(ids(filterMovies(vetoed, { people: ["Antonio"] })), [7, 8]);
+  assert.deepEqual(ids(filterMovies(vetoed, { people: ["Antonio", "Miguel"] })), [8]);
+  // Nobody ticked: everything shows.
+  assert.deepEqual(ids(filterMovies(vetoed, { people: [] })), [7, 8]);
 
-  assert.deepEqual(ids(filterMovies(movies, { genre: "Drama" })), [2, 3]);
-  assert.deepEqual(ids(filterMovies(movies, { genre: "Drama", duration: "120" })), [2]);
+  assert.deepEqual(ids(filterMovies(movies, { maxRuntime: 90 })), [1]);
+  assert.deepEqual(ids(filterMovies(movies, { maxRuntime: 120 })), [1, 2]);
+  // Unknown runtime only shows when there is no limit.
+  assert.deepEqual(ids(filterMovies(movies, { maxRuntime: null })), [1, 2, 3, 4]);
+
+  // Several genres: anything in any of them.
+  assert.deepEqual(ids(filterMovies(movies, { genres: ["Drama"] })), [2, 3]);
+  assert.deepEqual(ids(filterMovies(movies, { genres: ["Terror", "Comedia"] })), [1, 2]);
+  assert.deepEqual(ids(filterMovies(movies, { genres: ["Drama"], maxRuntime: 120 })), [2]);
   assert.deepEqual([...genresOf(movies)], ["Comedia", "Drama", "Terror"]);
 
   // The random pick honours every filter.
-  assert.equal(pickRandom(movies, { genre: "Drama", duration: "120+" }).tmdb_id, 3);
-  assert.equal(pickRandom(movies, { genre: "Terror", people: ["Miguel"] }), null);
+  assert.equal(pickRandom(movies, { genres: ["Drama"], maxRuntime: 120 }).tmdb_id, 2);
+  assert.equal(pickRandom(movies, { genres: ["Terror"], people: ["Miguel"] }), null);
+}
+
+async function testMoviesRuntimeSliderAndSummary() {
+  const { runtimeLimit, runtimeLimitLabel, filterSummary, RUNTIME_SLIDER } = moviesModule();
+
+  // The last stop of the slider means no limit.
+  assert.equal(runtimeLimit(String(RUNTIME_SLIDER.max)), null);
+  assert.equal(runtimeLimit("105"), 105);
+  assert.equal(runtimeLimitLabel(null), "sin límite");
+  assert.equal(runtimeLimitLabel(105), "hasta 1 h 45 min");
+
+  assert.equal(filterSummary({}), "");
+  assert.equal(
+    filterSummary({ people: ["Antonio", "Miguel"], maxRuntime: 120, genres: ["Drama"] }),
+    "en casa: Antonio, Miguel · hasta 2 h · Drama",
+  );
 }
 
 async function testMoviesRandomPickOnlyOffersPendingOnes() {
@@ -1444,6 +1471,7 @@ async function run() {
   const tests = [
     ["puts people first in movie search", testMoviesSearchPutsPeopleFirst],
     ["filters movies by who wants them, duration and genre", testMoviesFilterByWhoWantsItDurationAndGenre],
+    ["reads the runtime slider and sums up the filters", testMoviesRuntimeSliderAndSummary],
     ["filters and sorts the movie list", testMoviesFilterAndSort],
     ["picks a random pending movie", testMoviesRandomPickOnlyOffersPendingOnes],
     ["formats movie details and links", testMoviesMetaAndLinks],

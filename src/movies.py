@@ -120,6 +120,8 @@ def with_wanted_by(movie: dict[str, object]) -> dict[str, object]:
         movie["wanted_by"] = (
             [added_by] if isinstance(added_by, str) and added_by else []
         )
+    if not isinstance(movie.get("not_wanted_by"), list):
+        movie["not_wanted_by"] = []
     return movie
 
 
@@ -330,6 +332,7 @@ def add_movie(path: Path, payload: dict[str, object]) -> dict[str, object]:
             **details,
             "added_by": added_by,
             "wanted_by": [added_by],
+            "not_wanted_by": [],
             "added_at": utc_now_iso(),
             "watched_at": None,
         }
@@ -357,19 +360,24 @@ def set_watched(
 def set_wanted(
     path: Path, tmdb_id: int, payload: dict[str, object]
 ) -> dict[str, object]:
-    """Add or drop one person from the people who want to see a movie."""
+    """Say whether one person wants to see a movie.
+
+    `want` is true ("yo también"), false ("yo no", so it stays off the list
+    while they are home) or null (no opinion either way).
+    """
     name = clean_name(payload.get("name"))
-    want = payload.get("want")
+    want = payload.get("want", "missing")
     if not name:
         raise MovieError(400, "Dinos quién eres.")
-    if not isinstance(want, bool):
+    if want is not None and not isinstance(want, bool):
         raise MovieError(400, "Falta indicar si quieres verla.")
     with MOVIES_LOCK:
         movies = load_movies(path)
         for movie in movies:
             if movie.get("tmdb_id") == tmdb_id:
-                others = [person for person in movie["wanted_by"] if person != name]
-                movie["wanted_by"] = [*others, name] if want else others
+                for key, wanted in (("wanted_by", True), ("not_wanted_by", False)):
+                    others = [person for person in movie[key] if person != name]
+                    movie[key] = [*others, name] if want is wanted else others
                 save_movies(path, movies)
                 return movie
     raise MovieError(404, "Esa película no está en la lista.")

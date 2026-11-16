@@ -15,36 +15,57 @@
     return movie.added_by ? [movie.added_by] : [];
   }
 
-  // Duration filter: each option is an upper (or lower) bound in minutes.
-  const DURATIONS = [
-    { value: "", label: "cualquier duración" },
-    { value: "90", label: "hasta 1 h 30", test: (minutes) => minutes <= 90 },
-    { value: "120", label: "hasta 2 h", test: (minutes) => minutes <= 120 },
-    { value: "120+", label: "más de 2 h", test: (minutes) => minutes > 120 },
-  ];
+  function notWantedBy(movie) {
+    return Array.isArray(movie.not_wanted_by) ? movie.not_wanted_by : [];
+  }
 
-  function matchesDuration(movie, duration) {
-    const option = DURATIONS.find((item) => item.value === duration);
-    if (!option || !option.test) return true;
-    // Without a known runtime we can't promise it fits.
-    return Boolean(movie.runtime) && option.test(movie.runtime);
+  // Whoever is home: something at least one of them wants to see, and that
+  // none of them said "yo no" to.
+  function suitsPeople(movie, people) {
+    if (!people.length) return true;
+    return (
+      wantedBy(movie).some((person) => people.includes(person)) &&
+      !notWantedBy(movie).some((person) => people.includes(person))
+    );
+  }
+
+  // The duration slider runs from one hour to three in quarter hours; its
+  // last stop means no limit.
+  const RUNTIME_SLIDER = { min: 60, max: 180, step: 15 };
+
+  function runtimeLimit(sliderValue) {
+    const minutes = Number(sliderValue);
+    return minutes >= RUNTIME_SLIDER.max ? null : minutes;
+  }
+
+  function runtimeLimitLabel(maxRuntime) {
+    return maxRuntime ? `hasta ${formatRuntime(maxRuntime)}` : "sin límite";
   }
 
   function filterMovies(
     movies,
-    { status = "pending", people = [], duration = "", genre = "" } = {},
+    { status = "pending", people = [], maxRuntime = null, genres = [] } = {},
   ) {
     return movies.filter((movie) => {
       if (status === "pending" && isWatched(movie)) return false;
       if (status === "watched" && !isWatched(movie)) return false;
-      // Whoever is home: show what any of them wants to see.
-      if (people.length && !wantedBy(movie).some((person) => people.includes(person))) {
+      if (!suitsPeople(movie, people)) return false;
+      // Without a known runtime we can't promise it fits.
+      if (maxRuntime && !(movie.runtime && movie.runtime <= maxRuntime)) return false;
+      if (genres.length && !(movie.genres || []).some((genre) => genres.includes(genre))) {
         return false;
       }
-      if (!matchesDuration(movie, duration)) return false;
-      if (genre && !(movie.genres || []).includes(genre)) return false;
       return true;
     });
+  }
+
+  // A one-line description of the active filters, for when the panel is shut.
+  function filterSummary({ people = [], maxRuntime = null, genres = [] } = {}) {
+    const parts = [];
+    if (people.length) parts.push(`en casa: ${people.join(", ")}`);
+    if (maxRuntime) parts.push(runtimeLimitLabel(maxRuntime));
+    if (genres.length) parts.push(genres.join(", "));
+    return parts.join(" · ");
   }
 
   function genresOf(movies) {
@@ -108,8 +129,12 @@
 
   global.ManturonMovies = {
     NAMES,
-    DURATIONS,
+    RUNTIME_SLIDER,
+    runtimeLimit,
+    runtimeLimitLabel,
+    filterSummary,
     wantedBy,
+    notWantedBy,
     filterMovies,
     genresOf,
     sortMovies,
@@ -143,8 +168,14 @@
   const searchStatus = $("#movies-search-status");
   const results = $("#movies-results");
   const byOptions = $("#movies-by");
-  const durationSelect = $("#movies-duration");
-  const genreSelect = $("#movies-genre");
+  const filtersToggle = $("#movies-filters-toggle");
+  const filtersCount = $("#movies-filters-count");
+  const filtersPanel = $("#movies-filters");
+  const filtersSummary = $("#movies-filters-summary");
+  const filtersSummaryText = $("#movies-filters-summary-text");
+  const durationSlider = $("#movies-duration");
+  const durationValue = $("#movies-duration-value");
+  const genreOptions = $("#movies-genres");
   const statusButtons = [...document.querySelectorAll(".movies-tabs button")];
   const randomButton = $("#movies-random");
   const pickSection = $("#movies-pick");
@@ -159,8 +190,9 @@
     movies: [],
     status: "pending",
     people: [],
-    duration: "",
-    genre: "",
+    maxRuntime: null,
+    genres: [],
+    filtersOpen: false,
     picked: null,
     searchTimer: null,
     searchSeq: 0,
@@ -279,54 +311,59 @@
     );
   }
 
-  function renderToolbar() {
-    // Tick whoever is home tonight; nobody ticked means everyone.
-    const toggle = (name) => {
-      state.people = state.people.includes(name)
-        ? state.people.filter((person) => person !== name)
-        : [...state.people, name];
-      state.picked = null;
-      renderList();
-    };
-    byOptions.replaceChildren(
-      el("button", {
-        type: "button",
-        textContent: "todos",
-        ariaPressed: String(!state.people.length),
-        onclick: () => {
-          state.people = [];
-          state.picked = null;
-          renderList();
-        },
-      }),
-      ...NAMES.map((name) =>
+  function toggled(list, value) {
+    return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
+  }
+
+  function filtersChanged() {
+    state.picked = null;
+    renderList();
+  }
+
+  function tags(container, values, selected, onToggle) {
+    container.replaceChildren(
+      ...values.map((value) =>
         el("button", {
           type: "button",
-          textContent: name,
-          ariaPressed: String(state.people.includes(name)),
-          onclick: () => toggle(name),
+          className: "movies-tag",
+          textContent: value,
+          ariaPressed: String(selected.includes(value)),
+          onclick: () => onToggle(value),
         }),
       ),
     );
+  }
+
+  function renderToolbar() {
     for (const button of statusButtons) {
       button.setAttribute("aria-pressed", String(button.dataset.status === state.status));
     }
 
-    if (!durationSelect.options.length) {
-      durationSelect.append(
-        ...DURATIONS.map((item) => el("option", { value: item.value, textContent: item.label })),
-      );
-    }
-    durationSelect.value = state.duration;
+    // Tick whoever is home tonight; nobody ticked means everyone.
+    tags(byOptions, NAMES, state.people, (name) => {
+      state.people = toggled(state.people, name);
+      filtersChanged();
+    });
 
-    // Genres come from the movies on the list, so the menu never offers an empty one.
+    // Genres come from the movies on the list, so there is never an empty one.
     const genres = genresOf(state.movies);
-    if (state.genre && !genres.includes(state.genre)) state.genre = "";
-    genreSelect.replaceChildren(
-      el("option", { value: "", textContent: "cualquier género" }),
-      ...genres.map((genre) => el("option", { value: genre, textContent: genre })),
-    );
-    genreSelect.value = state.genre;
+    state.genres = state.genres.filter((genre) => genres.includes(genre));
+    tags(genreOptions, genres, state.genres, (genre) => {
+      state.genres = toggled(state.genres, genre);
+      filtersChanged();
+    });
+
+    durationSlider.value = String(state.maxRuntime || RUNTIME_SLIDER.max);
+    durationValue.textContent = runtimeLimitLabel(state.maxRuntime);
+
+    const active = [state.people.length, state.maxRuntime, state.genres.length].filter(Boolean).length;
+    filtersCount.textContent = active ? String(active) : "";
+    filtersToggle.setAttribute("aria-expanded", String(state.filtersOpen));
+    filtersPanel.hidden = !state.filtersOpen;
+    // Shut, the panel still says what it is filtering by.
+    const summary = filterSummary(activeFilters());
+    filtersSummaryText.textContent = summary;
+    filtersSummary.hidden = !summary || state.filtersOpen;
 
     const matching = filterMovies(state.movies, { ...activeFilters(), status: "all" });
     $("#movies-count-pending").textContent = filterMovies(matching, { status: "pending" }).length;
@@ -335,11 +372,18 @@
   }
 
   function activeFilters() {
-    return { people: state.people, duration: state.duration, genre: state.genre };
+    return { people: state.people, maxRuntime: state.maxRuntime, genres: state.genres };
   }
 
   function filtering() {
-    return Boolean(state.people.length || state.duration || state.genre);
+    return Boolean(filterSummary(activeFilters()));
+  }
+
+  function clearFilters() {
+    state.people = [];
+    state.maxRuntime = null;
+    state.genres = [];
+    filtersChanged();
   }
 
   function linkList(movie) {
@@ -353,7 +397,9 @@
 
   function wantedLine(movie) {
     const people = wantedBy(movie);
-    const who = people.length ? `quieren verla: ${people.join(", ")}` : "ya no la quiere ver nadie";
+    const against = notWantedBy(movie);
+    let who = people.length ? `quieren verla: ${people.join(", ")}` : "no la quiere ver nadie";
+    if (against.length) who += ` · ${against.length > 1 ? "no quieren" : "no quiere"}: ${against.join(", ")}`;
     if (!movie.watched_at) return who;
     const date = new Date(movie.watched_at).toLocaleDateString("es-ES", {
       day: "numeric",
@@ -363,15 +409,31 @@
     return `vista el ${date} · ${who}`;
   }
 
-  function wantButton(movie) {
-    const wanted = Boolean(state.name) && wantedBy(movie).includes(state.name);
-    return el("button", {
-      type: "button",
-      className: wanted ? "movies-want movies-wanted" : "movies-want",
-      textContent: wanted ? "✓ yo también" : "+ yo también",
-      title: wanted ? "Quitarte de quienes quieren verla" : "Apuntarte para verla",
-      onclick: () => toggleWanted(movie, !wanted),
-    });
+  // "yo también" and "yo no" exclude each other; pressing the one already on
+  // goes back to no opinion.
+  function wantButtons(movie) {
+    const yes = Boolean(state.name) && wantedBy(movie).includes(state.name);
+    const no = Boolean(state.name) && notWantedBy(movie).includes(state.name);
+    return el("span", { className: "movies-want-group" }, [
+      el("button", {
+        type: "button",
+        className: "movies-want",
+        textContent: "yo también",
+        ariaPressed: String(yes),
+        title: yes ? "Quitarte de quienes quieren verla" : "Apuntarte para verla",
+        onclick: () => toggleWanted(movie, yes ? null : true),
+      }),
+      el("button", {
+        type: "button",
+        className: "movies-want movies-want-no",
+        textContent: "yo no",
+        ariaPressed: String(no),
+        title: no
+          ? "Volver a dejar que salga cuando estés en casa"
+          : "Que no salga cuando estés en casa",
+        onclick: () => toggleWanted(movie, no ? null : false),
+      }),
+    ]);
   }
 
   function movieCard(movie, { pick = false } = {}) {
@@ -401,7 +463,7 @@
       overview,
       el("p", { className: "movies-added" }, [
         wantedLine(movie),
-        pick || watched ? null : wantButton(movie),
+        pick || watched ? null : wantButtons(movie),
       ]),
       linkList(movie),
     ]);
@@ -414,12 +476,7 @@
             textContent: watched ? "desmarcar vista" : "ya la vimos",
             onclick: () => toggleWatched(movie, !watched),
           }),
-          el("button", {
-            type: "button",
-            className: "movies-link movies-remove",
-            textContent: "quitar",
-            onclick: () => removeMovie(movie),
-          }),
+          removeControl(movie),
         ]),
       );
     }
@@ -527,8 +584,44 @@
     }
   }
 
+  // "quitar" asks again in place ("¿seguro? sí · no") rather than with a
+  // browser dialog.
+  function removeControl(movie) {
+    const wrapper = el("span", { className: "movies-remove-wrap" });
+    const ask = el("button", {
+      type: "button",
+      className: "movies-link movies-remove",
+      textContent: "quitar",
+    });
+    const confirmBox = el("span", { className: "movies-confirm", hidden: true }, [
+      el("span", { textContent: "¿quitarla?" }),
+      el("button", {
+        type: "button",
+        className: "movies-link movies-confirm-yes",
+        textContent: "sí",
+        onclick: () => removeMovie(movie),
+      }),
+      el("button", {
+        type: "button",
+        className: "movies-link",
+        textContent: "no",
+        onclick: () => {
+          confirmBox.hidden = true;
+          ask.hidden = false;
+          ask.focus();
+        },
+      }),
+    ]);
+    ask.addEventListener("click", () => {
+      ask.hidden = true;
+      confirmBox.hidden = false;
+      confirmBox.querySelector("button").focus();
+    });
+    wrapper.append(ask, confirmBox);
+    return wrapper;
+  }
+
   async function removeMovie(movie) {
-    if (!global.confirm(`¿Quitar «${movie.title}» de la lista?`)) return;
     try {
       await api("DELETE", `/api/movies/${movie.tmdb_id}`);
       state.movies = state.movies.filter((item) => item.tmdb_id !== movie.tmdb_id);
@@ -663,17 +756,23 @@
     });
   }
 
-  durationSelect.addEventListener("change", () => {
-    state.duration = durationSelect.value;
-    state.picked = null;
-    renderList();
+  filtersToggle.addEventListener("click", () => {
+    state.filtersOpen = !state.filtersOpen;
+    renderToolbar();
   });
 
-  genreSelect.addEventListener("change", () => {
-    state.genre = genreSelect.value;
-    state.picked = null;
-    renderList();
+  // Label follows the thumb while dragging; the list updates as it moves.
+  durationSlider.min = String(RUNTIME_SLIDER.min);
+  durationSlider.max = String(RUNTIME_SLIDER.max);
+  durationSlider.step = String(RUNTIME_SLIDER.step);
+  durationSlider.addEventListener("input", () => {
+    state.maxRuntime = runtimeLimit(durationSlider.value);
+    filtersChanged();
   });
+
+  for (const button of document.querySelectorAll(".movies-clear-filters")) {
+    button.addEventListener("click", clearFilters);
+  }
 
   randomButton.addEventListener("click", choose);
   $("#movies-pick-again").addEventListener("click", choose);

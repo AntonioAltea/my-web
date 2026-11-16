@@ -65,15 +65,41 @@
           <button type="button" data-status="pending" aria-pressed="true">pendientes <span id="movies-count-pending" class="movies-count"></span></button>
           <button type="button" data-status="watched" aria-pressed="false">vistas <span id="movies-count-watched" class="movies-count"></span></button>
         </div>
-        <div class="movies-by">
-          <span id="movies-by-label">en casa</span>
-          <div id="movies-by" class="movies-by-options" role="group" aria-labelledby="movies-by-label"></div>
-        </div>
-        <div class="movies-selects">
-          <select id="movies-duration" aria-label="Duración"></select>
-          <select id="movies-genre" aria-label="Género"></select>
-        </div>
+        <button
+          id="movies-filters-toggle"
+          class="movies-filters-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="movies-filters"
+        >filtros <span id="movies-filters-count" class="movies-badge"></span></button>
         <button id="movies-random" class="movies-random" type="button">elegir una al azar</button>
+      </section>
+
+      <p id="movies-filters-summary" class="movies-filters-summary" hidden>
+        <span id="movies-filters-summary-text"></span>
+        <button class="movies-link movies-clear-filters" type="button">quitar filtros</button>
+      </p>
+
+      <section id="movies-filters" class="movies-filters" aria-label="Filtros" hidden>
+        <div class="movies-filter">
+          <p class="movies-filter-label" id="movies-by-label">en casa</p>
+          <div id="movies-by" class="movies-tags" role="group" aria-labelledby="movies-by-label"></div>
+        </div>
+        <div class="movies-filter">
+          <p class="movies-filter-label">
+            <label for="movies-duration">duración</label>
+            <output id="movies-duration-value" for="movies-duration"></output>
+          </p>
+          <input id="movies-duration" class="movies-slider" type="range">
+          <div class="movies-slider-scale" aria-hidden="true">
+            <span>1 h</span><span>2 h</span><span>sin límite</span>
+          </div>
+        </div>
+        <div class="movies-filter">
+          <p class="movies-filter-label" id="movies-genres-label">género</p>
+          <div id="movies-genres" class="movies-tags" role="group" aria-labelledby="movies-genres-label"></div>
+        </div>
+        <button class="movies-link movies-clear-filters" type="button">quitar filtros</button>
       </section>
 
       <section id="movies-pick" class="movies-pick" aria-live="polite" hidden>

@@ -140,10 +140,14 @@ The event collector endpoint is `/api/analytics/event`.
 
 `/peliculas` is a private shared watchlist for the flat: anyone with the password can add movies, mark them as watched,
 remove them and pick a random pending one. Each movie keeps `wanted_by`, the flatmates who want to see it: whoever added it, plus
-anyone who pressed "yo también" (older entries without the field count as wanted by whoever added them). The list
-and the random pick can be narrowed to what any of the ticked flatmates wants to see (whoever is home that night;
-nobody ticked means everyone), by duration (a movie without a known runtime only shows with "cualquier duración")
-and by genre (the menu lists the genres of the movies on the list). It is not linked from the site
+anyone who pressed "yo también" (older entries without the field count as wanted by whoever added them), and
+`not_wanted_by`, those who pressed "yo no". The two exclude each other. A "filtros"
+panel (shut by default; shut, one line sums up what is active) narrows the list and the random pick to what any of
+the ticked flatmates wants to see and none of them said "yo no" to (whoever is home that night; nobody ticked means
+everyone), to a maximum runtime
+picked on a slider (its last stop is no limit; a movie without a known runtime only shows then) and to any of the
+ticked genres (the tags come from the movies on the list). The page uses no native menus or browser dialogs:
+removing a movie asks again inside its card. It is not linked from the site
 and carries `noindex`.
 
 - Access is one shared password, `MOVIES_PASSWORD`. Logging in sets an HttpOnly cookie derived from it, so changing the
@@ -157,7 +161,7 @@ and carries `noindex`.
 - Who added a movie is picked from a fixed list of flatmates, `NAMES` in `src/static/js/movies.js`.
 - The list lives in `movies.json` under the media root (`assets/movies.json` locally, `/data/movies.json` on Fly).
 - API: `POST /api/movies/login` and `/logout`, `GET /api/movies`, `GET /api/movies/search?q=`, `POST /api/movies`
-  (`{tmdbId, addedBy}`), `POST /api/movies/<id>/watched` (`{watched}`), `POST /api/movies/<id>/wanted` (`{name, want}`), `DELETE /api/movies/<id>`.
+  (`{tmdbId, addedBy}`), `POST /api/movies/<id>/watched` (`{watched}`), `POST /api/movies/<id>/wanted` (`{name, want}`: `true` "yo también", `false` "yo no", `null` neither), `DELETE /api/movies/<id>`.
 
 Locally:
 
