@@ -825,3 +825,77 @@ class CommentTests(MovieApiTestCase):
         self.path.write_text(json.dumps({"movies": [{"tmdb_id": 9}]}), encoding="utf-8")
         stored = self.call("GET", "/api/movies")[1]["movies"][0]
         self.assertEqual(stored["comments"], [])
+
+
+class SpellingTests(MovieApiTestCase):
+    MATCH = {"results": [{"media_type": "movie", "id": 872585, "title": "Oppenheimer"}]}
+
+    def test_typos_are_corrected_through_wikipedia(self) -> None:
+        def tmdb(endpoint, params):
+            return self.MATCH if params["query"] == "oppenheimer" else {"results": []}
+
+        with (
+            mock.patch.object(movies, "tmdb_get", side_effect=tmdb),
+            mock.patch.object(
+                movies, "spelling_suggestion", return_value="oppenheimer"
+            ) as suggest,
+        ):
+            status, payload, _ = self.call("GET", "/api/movies/search?q=oppenhaimer")
+
+        self.assertEqual(status, 200)
+        suggest.assert_called_once_with("oppenhaimer")
+        self.assertEqual(payload["corrected"], "oppenheimer")
+        self.assertEqual([m["title"] for m in payload["movies"]], ["Oppenheimer"])
+
+    def test_no_correction_when_tmdb_already_finds_it(self) -> None:
+        with (
+            mock.patch.object(movies, "tmdb_get", return_value=self.MATCH),
+            mock.patch.object(movies, "spelling_suggestion") as suggest,
+        ):
+            result = movies.search_movies("oppenheimer")
+        suggest.assert_not_called()
+        self.assertNotIn("corrected", result)
+
+    def test_nothing_either_way_stays_empty(self) -> None:
+        empty = {"results": []}
+        for suggestion in ("", "otra cosa"):
+            with (
+                mock.patch.object(movies, "tmdb_get", return_value=empty),
+                mock.patch.object(
+                    movies, "spelling_suggestion", return_value=suggestion
+                ),
+            ):
+                result = movies.search_movies("xqzt")
+            self.assertEqual(result, {"movies": [], "people": []})
+
+    def fake_wikipedia(self, body: bytes) -> mock.MagicMock:
+        response = mock.MagicMock()
+        response.read.return_value = body
+        response.__enter__.return_value = response
+        return response
+
+    def test_reads_wikipedias_suggestion(self) -> None:
+        body = b'{"query": {"searchinfo": {"suggestion": "oppenheimer"}, "search": []}}'
+        with mock.patch.object(
+            movies, "urlopen", return_value=self.fake_wikipedia(body)
+        ) as urlopen:
+            self.assertEqual(movies.spelling_suggestion("oppenhaimer"), "oppenheimer")
+        request = urlopen.call_args.args[0]
+        self.assertIn("srsearch=oppenhaimer", request.full_url)
+        self.assertIn("srinfo=suggestion", request.full_url)
+        self.assertEqual(request.get_header("User-agent"), movies.WIKIPEDIA_USER_AGENT)
+
+    def test_no_suggestion_or_wikipedia_down(self) -> None:
+        cases = [
+            self.fake_wikipedia(b'{"query": {"searchinfo": {}, "search": []}}'),
+            self.fake_wikipedia(
+                b'{"query": {"searchinfo": {"suggestion": "Oppenhaimer"}}}'
+            ),
+            self.fake_wikipedia(b"[]"),
+            self.fake_wikipedia(b"not json"),
+        ]
+        for response in cases:
+            with mock.patch.object(movies, "urlopen", return_value=response):
+                self.assertEqual(movies.spelling_suggestion("oppenhaimer"), "")
+        with mock.patch.object(movies, "urlopen", side_effect=URLError("down")):
+            self.assertEqual(movies.spelling_suggestion("oppenhaimer"), "")

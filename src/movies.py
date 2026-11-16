@@ -274,11 +274,67 @@ def person_credits(person: dict[str, object]) -> dict[str, object] | None:
     }
 
 
-def search_movies(query: str) -> dict[str, list[dict[str, object]]]:
-    """Movies whose title matches, plus the films of matching people."""
+# TMDB's search doesn't forgive typos ("oppenhaimer" finds nothing), so when
+# it comes back empty we ask Wikipedia's search for its "did you mean" and
+# search TMDB again with that. Only the typed text goes to Wikipedia.
+WIKIPEDIA_API = "https://es.wikipedia.org/w/api.php"
+WIKIPEDIA_TIMEOUT_SECONDS = 4
+WIKIPEDIA_USER_AGENT = "manturon-peliculas/1.0 (private watchlist)"
+
+
+def spelling_suggestion(query: str) -> str:
+    """Wikipedia's correction for a misspelt query, or "" if it has none."""
+    params = urlencode(
+        {
+            "action": "query",
+            "list": "search",
+            "srsearch": query[:100],
+            "srinfo": "suggestion",
+            "srlimit": "1",
+            "format": "json",
+        }
+    )
+    request = Request(
+        f"{WIKIPEDIA_API}?{params}", headers={"User-Agent": WIKIPEDIA_USER_AGENT}
+    )
+    try:
+        with urlopen(request, timeout=WIKIPEDIA_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, ValueError):
+        return ""
+    info = (
+        payload.get("query", {}).get("searchinfo", {})
+        if isinstance(payload, dict)
+        else {}
+    )
+    suggestion = info.get("suggestion") if isinstance(info, dict) else None
+    if not isinstance(suggestion, str) or folded(suggestion) == folded(query):
+        return ""
+    return suggestion.strip()
+
+
+def search_movies(query: str) -> dict[str, object]:
+    """Movies whose title matches, plus the films of matching people.
+
+    If nothing matches, retries once with Wikipedia's spelling correction and
+    says so in "corrected".
+    """
     query = query.strip()
     if not query:
         return {"movies": [], "people": []}
+    found = search_tmdb(query)
+    if found["movies"] or found["people"]:
+        return found
+    suggestion = spelling_suggestion(query)
+    if not suggestion:
+        return found
+    corrected = search_tmdb(suggestion)
+    if not (corrected["movies"] or corrected["people"]):
+        return found
+    return {**corrected, "corrected": suggestion}
+
+
+def search_tmdb(query: str) -> dict[str, list[dict[str, object]]]:
     payload = tmdb_get(
         "/search/multi",
         {"query": query[:100], "language": TMDB_LANGUAGE, "include_adult": "false"},

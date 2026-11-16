@@ -156,13 +156,66 @@
     return `★ ${rating.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
   }
 
+  // Someone who wants to see it, hasn't yet, and isn't home tonight: picking
+  // it at random would leave them out.
+  function leavesSomeoneOut(movie, people) {
+    return wantedBy(movie).some(
+      (person) => !people.includes(person) && !seenBy(movie).includes(person),
+    );
+  }
+
   function pickRandom(movies, { exclude = null, random = Math.random, ...filters } = {}) {
     let pool = filterMovies(movies, filters);
+    // With people ticked as home, the random pick only offers movies that
+    // nobody absent is still waiting to see. The list itself shows them all.
+    const people = filters.people || [];
+    if (people.length) pool = pool.filter((movie) => !leavesSomeoneOut(movie, people));
     if (pool.length > 1 && exclude != null) {
       pool = pool.filter((movie) => movie.tmdb_id !== exclude);
     }
     if (!pool.length) return null;
     return pool[Math.floor(random() * pool.length)];
+  }
+
+  // Reveal animation: the poster starts as a grid of tiles in a random order
+  // and tiles swap into place a few at a time. order[slot] is the tile shown
+  // in that slot; the poster is whole when order[slot] === slot everywhere.
+  function scrambledOrder(count, random = Math.random) {
+    const order = [...Array(count).keys()];
+    for (let i = count - 1; i > 0; i -= 1) {
+      const j = Math.floor(random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    return order;
+  }
+
+  // Puts up to `fixes` misplaced tiles in their slots by swapping, and says
+  // how many are still out of place.
+  function settleTiles(order, fixes, random = Math.random) {
+    for (let done = 0; done < fixes; done += 1) {
+      const wrong = order.flatMap((tile, slot) => (tile === slot ? [] : [slot]));
+      if (!wrong.length) break;
+      const slot = wrong[Math.floor(random() * wrong.length)];
+      const from = order.indexOf(slot);
+      [order[slot], order[from]] = [order[from], order[slot]];
+    }
+    return order.filter((tile, slot) => tile !== slot).length;
+  }
+
+  // Slot machine: what one reel shows from top to bottom while it spins.
+  // Random posters from the list, never the same one twice in a row, ending
+  // on the winner (the reel stops there).
+  function reelItems(posters, winner, length, random = Math.random) {
+    const others = posters.filter((poster) => poster !== winner);
+    const pool = others.length ? others : [winner];
+    const items = [];
+    for (let i = 0; i < length - 1; i += 1) {
+      const last = items[items.length - 1];
+      const choices = pool.length > 1 ? pool.filter((poster) => poster !== last) : pool;
+      items.push(choices[Math.floor(random() * choices.length)]);
+    }
+    items.push(winner);
+    return items;
   }
 
   function formatRuntime(minutes) {
@@ -267,6 +320,10 @@
     formatRating,
     sortMovies,
     pickRandom,
+    scrambledOrder,
+    settleTiles,
+    reelItems,
+    leavesSomeoneOut,
     formatRuntime,
     movieMeta,
     humanList,
@@ -332,6 +389,7 @@
     sort: { key: "added", dir: -1 },
     filtersOpen: false,
     picked: null,
+    revealing: null,
     searchTimer: null,
     searchSeq: 0,
     lastSearch: null,
@@ -747,16 +805,24 @@
         ),
       ),
       pick ? overview : null,
-      lookUpRow(movie, pick ? {} : { synopsis: overview, comments, commentsLabel, where }),
-      pick ? null : overview,
-      pick ? null : comments,
-      pick ? null : where,
-      pick ? null : myButtons(movie),
     ]);
+
+    // The foot (links, what they open, your buttons) sits under the text on
+    // wide screens and spans the whole card, under the poster, on phones.
+    const foot = pick
+      ? null
+      : el("div", { className: "movies-card-foot" }, [
+          lookUpRow(movie, { synopsis: overview, comments, commentsLabel, where }),
+          overview,
+          comments,
+          where,
+          myButtons(movie),
+        ]);
 
     return el("article", { className: pick ? "movies-card movies-card-pick" : "movies-card" }, [
       pick ? poster(movie, "movies-poster") : posterWithRemove(movie),
       body,
+      foot,
     ]);
   }
 
@@ -798,15 +864,190 @@
       pickSection.hidden = true;
       return;
     }
+    // Mid-reveal, a redraw (say, a live update) would cut the animation short.
+    if (state.revealing === current.tmdb_id) return;
     pickCard.replaceChildren(movieCard(current, { pick: true }));
     pickSection.hidden = false;
   }
 
+  // The reveal: the chosen poster starts as a scrambled, coarse grid of tiles
+  // that swap into place while the pixels sharpen; then the details fade in.
+  const REVEAL = { cols: 6, rows: 9, settleMs: 1200, sharpenMs: 1350, holdMs: 150, startPixel: 18 };
+
+  function prefersReducedMotion() {
+    return Boolean(global.matchMedia && global.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+
+  function loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = reject;
+      image.src = src;
+    });
+  }
+
+  async function revealPick(movie) {
+    const card = pickCard.querySelector(".movies-card");
+    const img = card && card.querySelector("img.movies-poster");
+    if (!img || prefersReducedMotion()) return;
+
+    state.revealing = movie.tmdb_id;
+    card.classList.add("movies-revealing");
+    const box = img.getBoundingClientRect();
+    const scale = global.devicePixelRatio || 1;
+    const canvas = el("canvas", { className: "movies-poster movies-reveal-canvas" });
+    canvas.width = Math.round(box.width * scale);
+    canvas.height = Math.round(box.height * scale);
+    img.replaceWith(canvas);
+    const done = () => {
+      canvas.replaceWith(img);
+      card.classList.remove("movies-revealing");
+      state.revealing = null;
+    };
+
+    let image;
+    try {
+      image = await loadImage(movie.poster);
+    } catch {
+      done();
+      return;
+    }
+
+    const ctx = canvas.getContext("2d");
+    const small = document.createElement("canvas");
+    const smallCtx = small.getContext("2d");
+    const { cols, rows } = REVEAL;
+    const order = scrambledOrder(cols * rows);
+    const total = order.length;
+    const tileW = canvas.width / cols;
+    const tileH = canvas.height / rows;
+    const start = performance.now();
+    let left = total;
+
+    const frame = (now) => {
+      if (state.revealing !== movie.tmdb_id) return; // another pick took over
+      const t = now - start;
+      // Fix tiles at a steady pace so the last one lands at settleMs.
+      const shouldBeFixed = Math.min(total, Math.round((t / REVEAL.settleMs) * total));
+      if (total - left < shouldBeFixed) left = settleTiles(order, shouldBeFixed - (total - left));
+
+      // Draw the poster small, then scale it up without smoothing: chunky
+      // pixels that shrink to nothing by sharpenMs.
+      const progress = Math.min(1, t / REVEAL.sharpenMs);
+      const pixel = Math.max(1, Math.round(REVEAL.startPixel * scale * (1 - progress) ** 2));
+      small.width = Math.max(1, Math.round(canvas.width / pixel));
+      small.height = Math.max(1, Math.round(canvas.height / pixel));
+      smallCtx.drawImage(image, 0, 0, small.width, small.height);
+      ctx.imageSmoothingEnabled = pixel === 1;
+      const sw = small.width / cols;
+      const sh = small.height / rows;
+      for (let slot = 0; slot < total; slot += 1) {
+        const tile = order[slot];
+        ctx.drawImage(
+          small,
+          (tile % cols) * sw, Math.floor(tile / cols) * sh, sw, sh,
+          (slot % cols) * tileW, Math.floor(slot / cols) * tileH, tileW, tileH,
+        );
+      }
+
+      if (t < REVEAL.sharpenMs + REVEAL.holdMs) {
+        requestAnimationFrame(frame);
+      } else {
+        done();
+      }
+    };
+    requestAnimationFrame(frame);
+  }
+
+  // Reels: a quiet take on a slot machine, drawn inside the card itself.
+  // Three reels of posters from the list spin and stop one after another on
+  // the winner. The first spins in the poster's own place and stays there as
+  // the poster; the other two, over where the text goes, then slide onto it
+  // and stack, leaving one, while the details fade in. Phases run on timers, which keep going in a background
+  // tab where animations pause.
+  const REELS = { stops: [900, 1150, 1400], settleMs: 200, stackMs: 380 };
+
+  function spinReels(movie, posters) {
+    const card = pickCard.querySelector(".movies-card");
+    const img = card && card.querySelector("img.movies-poster");
+    if (!img) return;
+    state.revealing = movie.tmdb_id;
+    card.classList.add("movies-revealing", "movies-reeling");
+
+    // Same box as the poster, one poster tall: where the first reel stops is
+    // exactly where the poster sits afterwards.
+    const box = img.getBoundingClientRect();
+    const cardBox = card.getBoundingClientRect();
+    const itemH = box.height;
+    const gap = parseFloat(getComputedStyle(card).columnGap) || 14;
+    const reels = REELS.stops.map((stop, index) => {
+      const items = reelItems(posters, movie.poster, 10 + index * 3);
+      const strip = el(
+        "div",
+        { className: "movies-reel-strip" },
+        items.map((src) => el("img", { className: "movies-reel-item", src, alt: "", decoding: "async" })),
+      );
+      const reel = el("div", { className: "movies-reel" }, [strip]);
+      reel.style.left = `${box.left - cardBox.left + index * (box.width + gap)}px`;
+      reel.style.top = `${box.top - cardBox.top}px`;
+      reel.style.width = `${box.width}px`;
+      reel.style.height = `${itemH}px`;
+      reel.style.setProperty("--item-h", `${itemH}px`);
+      card.append(reel);
+      strip.animate(
+        [
+          { transform: "translateY(0)", filter: "blur(0)" },
+          { filter: "blur(1.5px)", offset: 0.2 },
+          { filter: "blur(1px)", offset: 0.8 },
+          { transform: `translateY(${-(items.length - 1) * itemH}px)`, filter: "blur(0)" },
+        ],
+        { duration: stop, easing: "cubic-bezier(.2,.65,.3,1)", fill: "forwards" },
+      );
+      return reel;
+    });
+    img.style.visibility = "hidden";
+
+    let finished = false;
+    const finish = () => {
+      if (finished || state.revealing !== movie.tmdb_id) return;
+      finished = true;
+      // The other two reels slide left and stack on the first, so only one
+      // poster is left, in its own place; the details fade in meanwhile.
+      reels.slice(1).forEach((reel, i) => {
+        reel.animate(
+          [
+            { transform: "translateX(0)", boxShadow: "0 0 0 rgba(0,0,0,0)" },
+            { boxShadow: "0 6px 18px rgba(0,0,0,.35)", offset: 0.5 },
+            { transform: `translateX(${-(i + 1) * (box.width + gap)}px)`, boxShadow: "0 0 0 rgba(0,0,0,0)" },
+          ],
+          { duration: REELS.stackMs, delay: i * 70, easing: "cubic-bezier(.5,0,.2,1)", fill: "forwards" },
+        );
+      });
+      card.classList.remove("movies-revealing");
+      global.setTimeout(() => {
+        img.style.visibility = "";
+        for (const reel of reels) reel.remove();
+        card.classList.remove("movies-reeling");
+        if (state.revealing === movie.tmdb_id) state.revealing = null;
+      }, REELS.stackMs + 70 + 40);
+    };
+    card.addEventListener("click", finish, { once: true });
+    global.setTimeout(finish, REELS.stops[REELS.stops.length - 1] + REELS.settleMs);
+  }
+
   function choose() {
     const movie = pickRandom(state.movies, { ...activeFilters(), exclude: state.picked });
+    state.revealing = null;
     state.picked = movie ? movie.tmdb_id : null;
     renderPick();
-    if (movie) pickSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (!movie) return;
+    pickSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (prefersReducedMotion() || !movie.poster) return;
+    // Two ways to unveil it, chosen at random each time.
+    const posters = [...new Set(state.movies.map((item) => item.poster).filter(Boolean))];
+    if (posters.length > 1 && Math.random() < 0.5) spinReels(movie, posters);
+    else revealPick(movie);
   }
 
   async function loadMovies() {
@@ -1101,7 +1342,10 @@
       const data = await api("GET", `/api/movies/search?q=${encodeURIComponent(query.trim())}`);
       if (seq !== state.searchSeq) return;
       state.lastSearch = data;
-      setMessage(searchStatus, searchGroups(data).length ? "" : "No sale nada con eso.");
+      let note = searchGroups(data).length ? "" : "No sale nada con eso.";
+      // The server fixed a typo through Wikipedia: say what it searched.
+      if (data.corrected && !note) note = `Mostrando resultados para «${data.corrected}».`;
+      setMessage(searchStatus, note);
       renderResults(data);
     } catch (error) {
       if (seq !== state.searchSeq) return;

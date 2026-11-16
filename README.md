@@ -160,6 +160,9 @@ and carries `noindex`.
 - Search uses TMDB's `/search/multi`: matching titles, plus the films of up to two people whose name contains every
   word typed (accents ignored), fetched with `/person/<id>/movie_credits` — as director for people known for directing,
   as cast otherwise.
+- TMDB's search does not forgive typos, so when a search finds nothing the server asks Wikipedia's search API
+  (`es.wikipedia.org`, `srinfo=suggestion`, no key) for its "did you mean" and searches TMDB again with it; the page
+  then says which spelling it used. Only the typed text goes to Wikipedia.
 - Who added a movie is picked from a fixed list of flatmates, `NAMES` in `src/static/js/movies.js`.
 - Live updates use Server-Sent Events: `GET /api/movies/events` keeps a stream open and sends `changed` whenever
   the list is saved (with a heartbeat comment every 25 s so Fly's proxy keeps it), and the page fetches the list
@@ -173,6 +176,13 @@ and carries `noindex`.
 - The page reads in Literata (self-hosted in `src/static/fonts/`, OFL licence in `licenses/`); its title keeps IM Fell.
 - "dónde verla" opens, next to the synopsis and comments, two link bubbles with each site's icon (favicons self-hosted in
   `src/static/icons/`): JustWatch (its Spanish search by title) and the Stremio app (`stremio:///detail/movie/<imdb id>/<imdb id>`, only when TMDB knows the IMDb id).
+- With people ticked as home, the random pick also skips movies that someone not at home wants and hasn't seen,
+  so nobody misses one they were waiting for. The list still shows them.
+- The random pick is unveiled with one of two quiet animations, chosen at random each time: the poster as a
+  scrambled, coarse grid of tiles on a canvas that swap into place while the pixels sharpen (about 1.4 s), or three
+  reels of posters from the list, drawn inside the card, that stop one after another on the winner (about 1.6 s). The
+  first reel spins in the poster's own place and becomes the poster; the other two then slide left and stack on it,
+  leaving one, while the details fade in. A tap skips it. Both are skipped with reduced motion or when the movie has no poster.
 - The list lives in `movies.json` under the media root (`assets/movies.json` locally, `/data/movies.json` on Fly).
 - API: `POST /api/movies/login` and `/logout`, `GET /api/movies`, `GET /api/movies/events` (SSE), `GET /api/movies/search?q=`, `POST /api/movies`
   (`{tmdbId, addedBy}`), `POST /api/movies/<id>/seen` (`{name, seen}`), `POST /api/movies/<id>/comment` (`{name, text}`), `DELETE /api/movies/<id>/comment?name=`, `POST /api/movies/<id>/wanted` (`{name, want}`: `true` "yo también", `false` "yo no", `null` neither), `DELETE /api/movies/<id>`.

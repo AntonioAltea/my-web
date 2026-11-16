@@ -1484,6 +1484,73 @@ async function testMoviesRuntimeSliderAndSummary() {
   );
 }
 
+async function testMoviesReelsEndOnTheWinner() {
+  const { reelItems } = moviesModule();
+  const posters = ["a", "b", "c", "win"];
+
+  for (const random of [() => 0, () => 0.999, Math.random]) {
+    const items = reelItems(posters, "win", 20, random);
+    assert.equal(items.length, 20);
+    assert.equal(items[items.length - 1], "win");
+    // The winner only shows where the reel stops.
+    assert.equal(items.filter((item) => item === "win").length, 1);
+    // Never the same poster twice in a row.
+    items.forEach((item, i) => assert.notEqual(item, items[i + 1]));
+  }
+  // A one-poster list still spins (on that poster).
+  assert.deepEqual([...reelItems(["win"], "win", 3)], ["win", "win", "win"]);
+}
+
+async function testMoviesRevealSettlesEveryTile() {
+  const { scrambledOrder, settleTiles } = moviesModule();
+  let seed = 7;
+  const random = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+
+  const order = scrambledOrder(54, random);
+  // A permutation of every tile, and actually scrambled.
+  assert.deepEqual([...order].sort((a, b) => a - b), [...Array(54).keys()]);
+  const misplaced = order.filter((tile, slot) => tile !== slot).length;
+  assert.ok(misplaced > 40);
+
+  // Each fix puts at least one tile home and never moves one out of place.
+  let left = misplaced;
+  while (left) {
+    const before = left;
+    left = settleTiles(order, 3, random);
+    assert.ok(left < before);
+  }
+  assert.deepEqual([...order], [...Array(54).keys()]);
+  // Already whole: nothing to do.
+  assert.equal(settleTiles(order, 5, random), 0);
+}
+
+async function testMoviesRandomPickWaitsForAbsentFlatmates() {
+  const { pickRandom, leavesSomeoneOut } = moviesModule();
+  const movies = [
+    // Antonio and Javi want it; Javi is out tonight.
+    { tmdb_id: 1, wanted_by: ["Antonio", "Javi"], seen_by: [] },
+    // Same, but Javi has already seen it.
+    { tmdb_id: 2, wanted_by: ["Antonio", "Javi"], seen_by: ["Javi"] },
+    // Only Miguel wants it.
+    { tmdb_id: 3, wanted_by: ["Miguel"], seen_by: [] },
+  ];
+  const home = ["Antonio", "Miguel"];
+
+  assert.equal(leavesSomeoneOut(movies[0], home), true);
+  assert.equal(leavesSomeoneOut(movies[1], home), false);
+  assert.equal(leavesSomeoneOut(movies[2], home), false);
+  // Only 2 and 3 can come up.
+  assert.equal(pickRandom(movies, { people: home, random: () => 0 }).tmdb_id, 2);
+  assert.equal(pickRandom(movies, { people: home, random: () => 0.99 }).tmdb_id, 3);
+  // Nothing fair left: no pick.
+  assert.equal(pickRandom([movies[0]], { people: home }), null);
+  // Nobody ticked: anything goes.
+  assert.equal(pickRandom(movies, { random: () => 0 }).tmdb_id, 1);
+}
+
 async function testMoviesRandomPickHonoursWhoIsHome() {
   const { pickRandom } = moviesModule();
 
@@ -1549,6 +1616,9 @@ async function run() {
     ["says who a movie is for, one line per kind", testMoviesPeopleLine],
     ["filters and sorts the movie list", testMoviesFilterAndSort],
     ["picks a random movie for whoever is home", testMoviesRandomPickHonoursWhoIsHome],
+    ["leaves out movies someone absent still wants", testMoviesRandomPickWaitsForAbsentFlatmates],
+    ["settles every tile of the reveal", testMoviesRevealSettlesEveryTile],
+    ["stops every slot reel on the winner", testMoviesReelsEndOnTheWinner],
     ["formats movie details and links", testMoviesMetaAndLinks],
     ["locks photo controls while loading", testPhotoControlsLockWhileLoading],
     ["unlocks photo controls after a stalled image times out", testPhotoLoadTimeoutUnlocksControls],

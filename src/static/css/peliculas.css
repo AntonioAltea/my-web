@@ -586,6 +586,56 @@ body {
   background: var(--mark-soft);
 }
 
+/* While the poster reveals itself, the details wait, then fade in. */
+.movies-reveal-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  background: var(--paper-strong);
+}
+
+.movies-card-pick .movies-card-body {
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+/* Hidden at once when the reveal starts; only the way back fades. */
+.movies-revealing .movies-card-body {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .movies-card-pick .movies-card-body {
+    transition: none;
+  }
+}
+
+/* Reels in the pick card: no frame, just posters spinning in place. */
+.movies-reeling {
+  position: relative;
+  overflow: hidden;
+}
+
+.movies-reel {
+  position: absolute;
+  overflow: hidden;
+  background: var(--paper-strong);
+}
+
+.movies-reel-strip {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+}
+
+.movies-reel-item {
+  display: block;
+  width: 100%;
+  height: var(--item-h);
+  object-fit: cover;
+}
+
 .movies-pick-label {
   margin: 0 0 12px;
   font-style: italic;
@@ -619,11 +669,28 @@ body {
   border-top: 1px solid var(--line-strong);
 }
 
+/* Poster on the left; text and, under it, the foot (links, what they open,
+   your buttons) on the right. Extra height goes to the foot's row, so the
+   foot follows the text even when the poster is taller. */
 .movies-card {
   display: grid;
   grid-template-columns: 110px minmax(0, 1fr);
-  gap: 16px;
+  grid-template-rows: auto 1fr;
+  gap: 0 16px;
   align-items: start;
+}
+
+.movies-card > :first-child {
+  grid-row: 1 / span 2;
+}
+
+.movies-card-body {
+  grid-column: 2;
+}
+
+.movies-card-foot {
+  grid-column: 2;
+  min-width: 0;
 }
 
 .movies-card-pick {
@@ -763,15 +830,19 @@ body {
   color: var(--bg);
 }
 
-.movies-card-body .movies-links {
+.movies-card-foot .movies-links {
   margin-top: 8px;
 }
 
 .movies-card-body .movies-overview {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
-.movies-card-body .movies-actions {
+.movies-card-foot .movies-overview {
+  margin: 6px 0 0;
+}
+
+.movies-card-foot .movies-actions {
   margin-top: 12px;
 }
 
@@ -1119,6 +1190,20 @@ body {
 
   .movies-card {
     grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  /* Phones: the foot spans the card under the poster, so links and buttons
+     each fit on one line. */
+  .movies-card > :first-child {
+    grid-row: 1;
+  }
+
+  .movies-card-foot {
+    grid-column: 1 / -1;
+  }
+
+  .movies-card-foot .movies-links {
+    margin-top: 12px;
   }
 
   .movies-card-pick {
