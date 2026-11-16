@@ -21,15 +21,35 @@
     return Array.isArray(movie.not_wanted_by) ? movie.not_wanted_by : [];
   }
 
-  // Whoever is home: something at least one of them wants to see, that none
-  // of them said "yo no" to, and that not all of them have seen already.
-  function suitsPeople(movie, people) {
+  // How a movie fits whoever is ticked as home. The same rules drive the list
+  // and the random pick. Wanting to see it is what counts; "ya la he visto"
+  // is only shown, never filtered on. Always out: anything someone at home
+  // said "yo no" to, and anything someone away wants. Then, by mode:
+  //   lax    ("alguno") — at least one of you at home wants it;
+  //   strict ("todos")  — all of you at home want it;
+  //   ideal             — all of you at home want it and everyone away said
+  //                       "yo no".
+  const MATCH_MODES = ["lax", "strict", "ideal"];
+
+  function suitsPeople(movie, people, match = "lax") {
+    const wanted = wantedBy(movie);
     if (!people.length) return true;
-    return (
-      wantedBy(movie).some((person) => people.includes(person)) &&
-      !notWantedBy(movie).some((person) => people.includes(person)) &&
-      !people.every((person) => seenBy(movie).includes(person))
-    );
+    if (notWantedBy(movie).some((person) => people.includes(person))) return false;
+    if (someoneAwayWants(movie, people)) return false;
+    if (match === "lax") return wanted.some((person) => people.includes(person));
+    if (!people.every((person) => wanted.includes(person))) return false;
+    if (match !== "ideal") return true;
+    const away = NAMES.filter((name) => !people.includes(name));
+    return away.every((person) => notWantedBy(movie).includes(person));
+  }
+
+  function isIdeal(movie, people) {
+    return people.length > 0 && suitsPeople(movie, people, "ideal");
+  }
+
+  // Nobody wants it: hidden unless asked for, when nobody is ticked as home.
+  function unwanted(movie) {
+    return wantedBy(movie).length === 0;
   }
 
   // The duration slider runs from one hour to three in quarter hours; its
@@ -47,10 +67,11 @@
 
   function filterMovies(
     movies,
-    { people = [], maxRuntime = null, genres = [] } = {},
+    { people = [], match = "lax", maxRuntime = null, genres = [], includeUnwanted = false } = {},
   ) {
     return movies.filter((movie) => {
-      if (!suitsPeople(movie, people)) return false;
+      if (!people.length && !includeUnwanted && unwanted(movie)) return false;
+      if (!suitsPeople(movie, people, match)) return false;
       // Without a known runtime we can't promise it fits.
       if (maxRuntime && !(movie.runtime && movie.runtime <= maxRuntime)) return false;
       if (genres.length && !(movie.genres || []).some((genre) => genres.includes(genre))) {
@@ -61,9 +82,11 @@
   }
 
   // A one-line description of the active filters, for when the panel is shut.
-  function filterSummary({ people = [], maxRuntime = null, genres = [] } = {}) {
+  function filterSummary({ people = [], match = "lax", maxRuntime = null, genres = [] } = {}) {
     const parts = [];
     if (people.length) parts.push(`en casa: ${people.join(", ")}`);
+    if (people.length && match === "strict") parts.push("todos");
+    if (people.length && match === "ideal") parts.push("ideal");
     if (maxRuntime) parts.push(runtimeLimitLabel(maxRuntime));
     if (genres.length) parts.push(genres.join(", "));
     return parts.join(" · ");
@@ -156,20 +179,14 @@
     return `★ ${rating.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
   }
 
-  // Someone who wants to see it, hasn't yet, and isn't home tonight: picking
-  // it at random would leave them out.
-  function leavesSomeoneOut(movie, people) {
-    return wantedBy(movie).some(
-      (person) => !people.includes(person) && !seenBy(movie).includes(person),
-    );
+  // Someone away tonight wants to see it: picking it would leave them out.
+  function someoneAwayWants(movie, people) {
+    return wantedBy(movie).some((person) => !people.includes(person));
   }
 
   function pickRandom(movies, { exclude = null, random = Math.random, ...filters } = {}) {
+    // Exactly what the list shows: same filters, nothing extra.
     let pool = filterMovies(movies, filters);
-    // With people ticked as home, the random pick only offers movies that
-    // nobody absent is still waiting to see. The list itself shows them all.
-    const people = filters.people || [];
-    if (people.length) pool = pool.filter((movie) => !leavesSomeoneOut(movie, people));
     if (pool.length > 1 && exclude != null) {
       pool = pool.filter((movie) => movie.tmdb_id !== exclude);
     }
@@ -320,10 +337,14 @@
     formatRating,
     sortMovies,
     pickRandom,
+    isIdeal,
+    suitsPeople,
+    MATCH_MODES,
     scrambledOrder,
     settleTiles,
     reelItems,
-    leavesSomeoneOut,
+    someoneAwayWants,
+    unwanted,
     formatRuntime,
     movieMeta,
     humanList,
@@ -356,6 +377,7 @@
   const searchStatus = $("#movies-search-status");
   const results = $("#movies-results");
   const byOptions = $("#movies-by");
+  const matchSwitch = $("#movies-match");
   const sortBox = $("#movies-sort");
   const sortToggle = $("#movies-sort-toggle");
   const sortLabel = $("#movies-sort-label");
@@ -369,6 +391,7 @@
   const durationValue = $("#movies-duration-value");
   const genreOptions = $("#movies-genres");
   const listCount = $("#movies-count");
+  const unwantedToggle = $("#movies-unwanted");
   const randomButton = $("#movies-random");
   const pickSection = $("#movies-pick");
   const pickCard = $("#movies-pick-card");
@@ -386,6 +409,8 @@
     people: [],
     maxRuntime: null,
     genres: [],
+    match: "lax",
+    showUnwanted: false,
     sort: { key: "added", dir: -1 },
     filtersOpen: false,
     picked: null,
@@ -536,6 +561,11 @@
       state.people = toggled(state.people, name);
       filtersChanged();
     });
+    // lax / strict / ideal only mean something once someone is ticked.
+    for (const button of matchSwitch.querySelectorAll("button")) {
+      button.disabled = !state.people.length;
+      button.setAttribute("aria-checked", String(button.dataset.match === state.match));
+    }
 
     // Genres come from the movies on the list, so there is never an empty one.
     const genres = genresOf(state.movies);
@@ -548,7 +578,12 @@
     durationSlider.value = String(state.maxRuntime || RUNTIME_SLIDER.max);
     durationValue.textContent = runtimeLimitLabel(state.maxRuntime);
 
-    const active = [state.people.length, state.maxRuntime, state.genres.length].filter(Boolean).length;
+    const active = [
+      state.people.length,
+      state.match !== "lax" && state.people.length,
+      state.maxRuntime,
+      state.genres.length,
+    ].filter(Boolean).length;
     filtersCount.textContent = active ? String(active) : "";
     filtersToggle.setAttribute("aria-expanded", String(state.filtersOpen));
     filtersPanel.hidden = !state.filtersOpen;
@@ -563,7 +598,13 @@
   }
 
   function activeFilters() {
-    return { people: state.people, maxRuntime: state.maxRuntime, genres: state.genres };
+    return {
+      people: state.people,
+      maxRuntime: state.maxRuntime,
+      genres: state.genres,
+      match: state.match,
+      includeUnwanted: state.showUnwanted,
+    };
   }
 
   function filtering() {
@@ -571,6 +612,8 @@
   }
 
   function clearFilters() {
+    state.match = "lax";
+    state.showUnwanted = false;
     state.people = [];
     state.maxRuntime = null;
     state.genres = [];
@@ -632,7 +675,7 @@
 
   // Comments: one per person, newest last. Yours carries "borrar"; until you
   // have one, a one-line field (Enter or "enviar") lets you write it.
-  function commentsPanel(movie) {
+  function commentsPanel(movie, scope) {
     const mine = (movie.comments || []).find((comment) => comment.name === state.name);
     const items = (movie.comments || []).map((comment) =>
       el("li", { className: "movies-comment" }, [
@@ -673,7 +716,7 @@
         enterKeyHint: "send",
         ariaLabel: `Comentario sobre ${movie.title}`,
       });
-      input.dataset.draftFor = String(movie.tmdb_id);
+      input.dataset.draftFor = scope;
       input.addEventListener("input", () => {
         state.commentDrafts.set(movie.tmdb_id, input.value);
         counter.textContent = `${input.value.length}/${COMMENT_MAX_LENGTH}`;
@@ -721,12 +764,13 @@
 
   // "sinopsis" and "comentarios" open under the links, one at a time. What is
   // open stays open when the list is drawn again (after any button, or a live
-  // update), so the page doesn't jump under your finger.
-  function lookUpRow(movie, panels) {
+  // update), so the page doesn't jump under your finger. `scope` keeps the
+  // pick card's panels apart from the same movie's card in the list.
+  function lookUpRow(scope, panels) {
     const items = [];
     const toggles = [];
     const sync = () => {
-      const open = state.openPanels.get(movie.tmdb_id);
+      const open = state.openPanels.get(scope);
       for (const { key, button, panel } of toggles) {
         button.ariaExpanded = String(open === key);
         panel.hidden = open !== key;
@@ -743,11 +787,11 @@
         className: "movies-link movies-panel-toggle",
         textContent: label,
         onclick: () => {
-          const open = state.openPanels.get(movie.tmdb_id);
-          if (open === key) state.openPanels.delete(movie.tmdb_id);
-          else state.openPanels.set(movie.tmdb_id, key);
+          const open = state.openPanels.get(scope);
+          if (open === key) state.openPanels.delete(scope);
+          else state.openPanels.set(scope, key);
           sync();
-          if (state.openPanels.get(movie.tmdb_id) === "comments") {
+          if (state.openPanels.get(scope) === "comments") {
             const input = panel.querySelector("input");
             if (input) input.focus({ preventScroll: true });
           }
@@ -771,14 +815,21 @@
     const genres = movie.genres && movie.genres.length
       ? el("p", { className: "movies-genres", textContent: movie.genres.join(" · ") })
       : null;
-    const comments = pick ? null : commentsPanel(movie);
-    const where = pick ? null : wherePanel(movie);
+    const scope = pick ? `pick:${movie.tmdb_id}` : String(movie.tmdb_id);
+    const comments = commentsPanel(movie, scope);
+    const where = wherePanel(movie);
     const commentCount = (movie.comments || []).length;
     const commentsLabel = commentCount ? `comentarios (${commentCount})` : "comentarios";
 
     const body = el("div", { className: "movies-card-body" }, [
       el("div", { className: "movies-card-head" }, [
-        el("h3", { textContent: movie.title }),
+        el("h3", {}, [
+          movie.title,
+          // Shown whenever it fits whoever is ticked as home, filter or not.
+          state.people.length && isIdeal(movie, state.people)
+            ? el("span", { className: "movies-ideal", textContent: "IDEAL", title: "La queréis ver todos los que estáis y los que no están dijeron «yo no»" })
+            : null,
+        ]),
         // The rating opens the movie on Letterboxd (where the reviews are);
         // without a rating yet, the link still sits in the same place.
         el("a", {
@@ -804,20 +855,18 @@
           ]),
         ),
       ),
-      pick ? overview : null,
     ]);
 
     // The foot (links, what they open, your buttons) sits under the text on
     // wide screens and spans the whole card, under the poster, on phones.
-    const foot = pick
-      ? null
-      : el("div", { className: "movies-card-foot" }, [
-          lookUpRow(movie, { synopsis: overview, comments, commentsLabel, where }),
-          overview,
-          comments,
-          where,
-          myButtons(movie),
-        ]);
+    // The pick card has the same links, without your buttons.
+    const foot = el("div", { className: "movies-card-foot" }, [
+      lookUpRow(scope, { synopsis: overview, comments, commentsLabel, where }),
+      overview,
+      comments,
+      where,
+      pick ? null : myButtons(movie),
+    ]);
 
     return el("article", { className: pick ? "movies-card movies-card-pick" : "movies-card" }, [
       pick ? poster(movie, "movies-poster") : posterWithRemove(movie),
@@ -839,13 +888,17 @@
       : undefined;
     const caret = typing ? document.activeElement.selectionStart : null;
     list.replaceChildren(...visible.map((movie) => el("li", {}, [movieCard(movie)])));
-    if (typing) {
-      const input = list.querySelector(`input[data-draft-for="${typing}"]`);
-      if (input) {
-        input.focus({ preventScroll: true });
-        input.setSelectionRange(caret, caret);
-      }
-    }
+    // With nobody ticked, movies nobody wants wait behind a link.
+    const hiddenCount = state.people.length
+      ? 0
+      : filterMovies(state.movies, { ...activeFilters(), includeUnwanted: true }).length -
+        filterMovies(state.movies, { ...activeFilters(), includeUnwanted: false }).length;
+    unwantedToggle.hidden = !hiddenCount;
+    unwantedToggle.textContent = state.showUnwanted
+      ? "ocultar las que no quiere nadie"
+      : hiddenCount === 1
+        ? "ver la que no quiere nadie"
+        : `ver las ${hiddenCount} que no quiere nadie`;
     let empty = "";
     if (!visible.length) {
       empty = filtering()
@@ -854,6 +907,13 @@
     }
     setMessage(listStatus, empty);
     renderPick();
+    if (typing) {
+      const input = document.querySelector(`input[data-draft-for="${typing}"]`);
+      if (input) {
+        input.focus({ preventScroll: true });
+        input.setSelectionRange(caret, caret);
+      }
+    }
     if (state.lastSearch) renderResults(state.lastSearch);
   }
 
@@ -1204,7 +1264,8 @@
   }
 
   // The poster carries a small × in its top left corner (on hover with a
-  // mouse, always on touch screens). It asks again over the poster itself
+  // mouse; on touch screens after tapping the poster, and a tap anywhere else
+  // hides it again). It asks again over the poster itself
   // ("¿quitarla? sí / no") rather than with a browser dialog.
   function posterWithRemove(movie) {
     const ask = el("button", {
@@ -1242,11 +1303,10 @@
       confirmBox.hidden = false;
       confirmBox.querySelector("button").focus();
     });
-    return el("div", { className: "movies-poster-wrap" }, [
-      poster(movie, "movies-poster"),
-      ask,
-      confirmBox,
-    ]);
+    const image = poster(movie, "movies-poster");
+    const wrap = el("div", { className: "movies-poster-wrap" }, [image, ask, confirmBox]);
+    image.addEventListener("click", () => wrap.classList.toggle("movies-remove-armed"));
+    return wrap;
   }
 
   async function removeMovie(movie) {
@@ -1404,6 +1464,18 @@
     filtersChanged();
   });
 
+  unwantedToggle.addEventListener("click", () => {
+    state.showUnwanted = !state.showUnwanted;
+    renderList();
+  });
+
+  for (const button of matchSwitch.querySelectorAll("button")) {
+    button.addEventListener("click", () => {
+      state.match = button.dataset.match;
+      filtersChanged();
+    });
+  }
+
   for (const button of document.querySelectorAll(".movies-clear-filters")) {
     button.addEventListener("click", clearFilters);
   }
@@ -1513,6 +1585,9 @@
   sortToggle.addEventListener("click", () => setSortMenu(sortMenu.hidden));
   document.addEventListener("click", (event) => {
     if (!sortMenu.hidden && !sortBox.contains(event.target)) setSortMenu(false);
+    for (const wrap of document.querySelectorAll(".movies-remove-armed")) {
+      if (!wrap.contains(event.target)) wrap.classList.remove("movies-remove-armed");
+    }
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !sortMenu.hidden) {

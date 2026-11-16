@@ -1345,14 +1345,14 @@ async function testMoviesFilterAndSort() {
   const { filterMovies, sortMovies, NAMES } = moviesModule();
   const ids = (movies) => movies.map((movie) => movie.tmdb_id);
 
-  // Nobody ticked: every movie, seen or not.
+  // Nobody ticked: every movie someone wants, seen or not.
   assert.deepEqual(ids(filterMovies(MOVIES, {})), [1, 2, 3, 4, 5]);
-  // Once everyone at home has seen it, it drops out.
-  assert.deepEqual(ids(filterMovies(MOVIES, { people: ["Marta"] })), [1]);
-  assert.deepEqual(ids(filterMovies(MOVIES, { people: ["Antonio", "Miguel"] })), [2, 5]);
-  // If only some of them have seen it, it still shows.
-  assert.deepEqual(ids(filterMovies(MOVIES, { people: ["Antonio"] })), [2]);
-  assert.deepEqual(ids(filterMovies(MOVIES, { people: ["Antonio", "Marta"] })), [1, 2, 3, 4]);
+  // Seen is only shown, never filtered on: Marta still wants 3.
+  assert.deepEqual(ids(filterMovies(MOVIES, { people: ["Marta"] })), [1, 3]);
+  // Antonio wants 2 and 4; Miguel wants 5.
+  assert.deepEqual(ids(filterMovies(MOVIES, { people: ["Antonio", "Miguel"] })), [2, 4, 5]);
+  // Miguel away wants 5, so it waits.
+  assert.deepEqual(ids(filterMovies(MOVIES, { people: ["Antonio"] })), [2, 4]);
   // By default, the latest added first.
   assert.deepEqual(ids(sortMovies(filterMovies(MOVIES, {}))), [5, 4, 3, 1, 2]);
   assert.deepEqual([...NAMES], ["Antonio", "Javi", "Jorge", "Miguel"]);
@@ -1362,7 +1362,7 @@ async function testMoviesFilterByWhoWantsItDurationAndGenre() {
   const { filterMovies, wantedBy, genresOf, pickRandom } = moviesModule();
   const ids = (movies) => movies.map((movie) => movie.tmdb_id);
   const movies = [
-    { tmdb_id: 1, added_by: "Antonio", wanted_by: ["Antonio", "Jorge"], runtime: 85, genres: ["Terror"] },
+    { tmdb_id: 1, added_by: "Antonio", wanted_by: ["Jorge"], runtime: 85, genres: ["Terror"] },
     { tmdb_id: 2, added_by: "Javi", wanted_by: [], runtime: 110, genres: ["Drama", "Comedia"] },
     { tmdb_id: 3, added_by: "Miguel", runtime: 150, genres: ["Drama"] },
     { tmdb_id: 4, added_by: "Javi", wanted_by: ["Javi"], runtime: null, genres: [] },
@@ -1375,29 +1375,24 @@ async function testMoviesFilterByWhoWantsItDurationAndGenre() {
   // Javi added the second one but dropped out of it.
   assert.deepEqual(ids(filterMovies(movies, { people: ["Javi"] })), [4]);
 
-  // "Yo no" keeps a movie off while that person is home, even if others want it.
-  const vetoed = [
-    { tmdb_id: 7, wanted_by: ["Antonio"], not_wanted_by: ["Miguel"] },
-    { tmdb_id: 8, wanted_by: ["Antonio", "Miguel"], not_wanted_by: [] },
-  ];
-  assert.deepEqual(ids(filterMovies(vetoed, { people: ["Antonio"] })), [7, 8]);
-  assert.deepEqual(ids(filterMovies(vetoed, { people: ["Antonio", "Miguel"] })), [8]);
-  // Nobody ticked: everything shows.
-  assert.deepEqual(ids(filterMovies(vetoed, { people: [] })), [7, 8]);
+  // Nobody wants 2: hidden with nobody ticked, unless asked for.
+  assert.deepEqual(ids(filterMovies(movies, {})), [1, 3, 4]);
+  assert.deepEqual(ids(filterMovies(movies, { includeUnwanted: true })), [1, 2, 3, 4]);
 
-  assert.deepEqual(ids(filterMovies(movies, { maxRuntime: 90 })), [1]);
-  assert.deepEqual(ids(filterMovies(movies, { maxRuntime: 120 })), [1, 2]);
+  const all = { includeUnwanted: true };
+  assert.deepEqual(ids(filterMovies(movies, { ...all, maxRuntime: 90 })), [1]);
+  assert.deepEqual(ids(filterMovies(movies, { ...all, maxRuntime: 120 })), [1, 2]);
   // Unknown runtime only shows when there is no limit.
-  assert.deepEqual(ids(filterMovies(movies, { maxRuntime: null })), [1, 2, 3, 4]);
+  assert.deepEqual(ids(filterMovies(movies, { ...all, maxRuntime: null })), [1, 2, 3, 4]);
 
   // Several genres: anything in any of them.
-  assert.deepEqual(ids(filterMovies(movies, { genres: ["Drama"] })), [2, 3]);
-  assert.deepEqual(ids(filterMovies(movies, { genres: ["Terror", "Comedia"] })), [1, 2]);
-  assert.deepEqual(ids(filterMovies(movies, { genres: ["Drama"], maxRuntime: 120 })), [2]);
+  assert.deepEqual(ids(filterMovies(movies, { ...all, genres: ["Drama"] })), [2, 3]);
+  assert.deepEqual(ids(filterMovies(movies, { ...all, genres: ["Terror", "Comedia"] })), [1, 2]);
+  assert.deepEqual(ids(filterMovies(movies, { ...all, genres: ["Drama"], maxRuntime: 120 })), [2]);
   assert.deepEqual([...genresOf(movies)], ["Comedia", "Drama", "Terror"]);
 
   // The random pick honours every filter.
-  assert.equal(pickRandom(movies, { genres: ["Drama"], maxRuntime: 120 }).tmdb_id, 2);
+  assert.equal(pickRandom(movies, { ...all, genres: ["Drama"], maxRuntime: 120 }).tmdb_id, 2);
   assert.equal(pickRandom(movies, { genres: ["Terror"], people: ["Miguel"] }), null);
 }
 
@@ -1527,27 +1522,70 @@ async function testMoviesRevealSettlesEveryTile() {
   assert.equal(settleTiles(order, 5, random), 0);
 }
 
-async function testMoviesRandomPickWaitsForAbsentFlatmates() {
-  const { pickRandom, leavesSomeoneOut } = moviesModule();
+async function testMoviesMatchModesForWhoIsHome() {
+  const { isIdeal, filterMovies, filterSummary, pickRandom } = moviesModule();
+  const ids = (movies) => movies.map((movie) => movie.tmdb_id);
+  const home = ["Jorge", "Miguel", "Javi"];
+  const movies = [
+    // All three at home want it and Antonio (away) said "yo no": ideal.
+    { tmdb_id: 1, wanted_by: ["Jorge", "Miguel", "Javi"], not_wanted_by: ["Antonio"], seen_by: ["Jorge", "Miguel", "Javi"] },
+    // All three want it, Antonio has no say: "todos", not ideal.
+    { tmdb_id: 2, wanted_by: ["Jorge", "Miguel", "Javi"], seen_by: [] },
+    // Only two of the three: "alguno" only.
+    { tmdb_id: 3, wanted_by: ["Jorge", "Miguel"], seen_by: [] },
+    // Antonio (away) wants it, even having seen it: out in every mode.
+    { tmdb_id: 4, wanted_by: ["Jorge", "Miguel", "Javi", "Antonio"], seen_by: ["Antonio"] },
+    // Someone at home said "yo no": out in every mode.
+    { tmdb_id: 5, wanted_by: ["Jorge", "Miguel"], not_wanted_by: ["Javi"], seen_by: [] },
+  ];
+
+  assert.deepEqual(ids(filterMovies(movies, { people: home })), [1, 2, 3]);
+  assert.deepEqual(ids(filterMovies(movies, { people: home, match: "strict" })), [1, 2]);
+  assert.deepEqual(ids(filterMovies(movies, { people: home, match: "ideal" })), [1]);
+  // Modes mean nothing without people.
+  assert.deepEqual(ids(filterMovies(movies, { match: "ideal" })), [1, 2, 3, 4, 5]);
+
+  assert.deepEqual(movies.map((movie) => isIdeal(movie, home)), [true, false, false, false, false]);
+  assert.equal(isIdeal(movies[0], []), false);
+
+  // The random pick draws from exactly the list, in every mode.
+  for (const match of ["lax", "strict", "ideal"]) {
+    const listed = ids(filterMovies(movies, { people: home, match }));
+    const drawn = new Set(
+      [0, 0.2, 0.4, 0.6, 0.8, 0.99].map(
+        (r) => pickRandom(movies, { people: home, match, random: () => r }).tmdb_id,
+      ),
+    );
+    assert.deepEqual([...drawn].sort(), [...listed].sort());
+  }
+
+  assert.equal(filterSummary({ people: home }), "en casa: Jorge, Miguel, Javi");
+  assert.equal(filterSummary({ people: home, match: "strict" }), "en casa: Jorge, Miguel, Javi · todos");
+  assert.equal(filterSummary({ people: home, match: "ideal" }), "en casa: Jorge, Miguel, Javi · ideal");
+  assert.equal(filterSummary({ match: "ideal" }), "");
+}
+
+async function testMoviesAbsentWantersKeepAMovieOut() {
+  const { filterMovies, pickRandom, someoneAwayWants } = moviesModule();
+  const ids = (movies) => movies.map((movie) => movie.tmdb_id);
   const movies = [
     // Antonio and Javi want it; Javi is out tonight.
     { tmdb_id: 1, wanted_by: ["Antonio", "Javi"], seen_by: [] },
-    // Same, but Javi has already seen it.
+    // Same, and Javi has seen it, but still wants it: still waits for him.
     { tmdb_id: 2, wanted_by: ["Antonio", "Javi"], seen_by: ["Javi"] },
     // Only Miguel wants it.
     { tmdb_id: 3, wanted_by: ["Miguel"], seen_by: [] },
   ];
   const home = ["Antonio", "Miguel"];
 
-  assert.equal(leavesSomeoneOut(movies[0], home), true);
-  assert.equal(leavesSomeoneOut(movies[1], home), false);
-  assert.equal(leavesSomeoneOut(movies[2], home), false);
-  // Only 2 and 3 can come up.
-  assert.equal(pickRandom(movies, { people: home, random: () => 0 }).tmdb_id, 2);
-  assert.equal(pickRandom(movies, { people: home, random: () => 0.99 }).tmdb_id, 3);
-  // Nothing fair left: no pick.
+  assert.equal(someoneAwayWants(movies[0], home), true);
+  assert.equal(someoneAwayWants(movies[1], home), true);
+  assert.equal(someoneAwayWants(movies[2], home), false);
+  // Out of the list and out of the pick alike.
+  assert.deepEqual(ids(filterMovies(movies, { people: home })), [3]);
+  assert.equal(pickRandom(movies, { people: home, random: () => 0.5 }).tmdb_id, 3);
   assert.equal(pickRandom([movies[0]], { people: home }), null);
-  // Nobody ticked: anything goes.
+  // Nobody ticked: anything someone wants.
   assert.equal(pickRandom(movies, { random: () => 0 }).tmdb_id, 1);
 }
 
@@ -1556,16 +1594,17 @@ async function testMoviesRandomPickHonoursWhoIsHome() {
 
   assert.equal(pickRandom(MOVIES, { random: () => 0 }).tmdb_id, 1);
   assert.equal(pickRandom(MOVIES, { random: () => 0.99 }).tmdb_id, 5);
-  assert.equal(pickRandom(MOVIES, { people: ["Marta"], random: () => 0.99 }).tmdb_id, 1);
+  // Marta at home: 1 and 3.
+  assert.equal(pickRandom(MOVIES, { people: ["Marta"], random: () => 0.99 }).tmdb_id, 3);
   assert.equal(
     pickRandom(MOVIES, { people: ["Antonio", "Miguel"], random: () => 0 }).tmdb_id,
     2,
   );
   // "Otra" never repeats the current pick while there is something else.
   assert.equal(pickRandom(MOVIES, { exclude: 1, random: () => 0 }).tmdb_id, 2);
-  assert.equal(pickRandom(MOVIES, { people: ["Marta"], exclude: 1 }).tmdb_id, 1);
-  // Nothing left that the people at home haven't all seen.
-  assert.equal(pickRandom(MOVIES.slice(2, 4), { people: ["Marta"] }), null);
+  assert.equal(pickRandom(MOVIES, { people: ["Marta"], exclude: 1 }).tmdb_id, 3);
+  // Nothing fits.
+  assert.equal(pickRandom(MOVIES, { people: ["Javi"] }), null);
   assert.equal(pickRandom([]), null);
 }
 
@@ -1616,7 +1655,8 @@ async function run() {
     ["says who a movie is for, one line per kind", testMoviesPeopleLine],
     ["filters and sorts the movie list", testMoviesFilterAndSort],
     ["picks a random movie for whoever is home", testMoviesRandomPickHonoursWhoIsHome],
-    ["leaves out movies someone absent still wants", testMoviesRandomPickWaitsForAbsentFlatmates],
+    ["keeps out movies someone absent still wants", testMoviesAbsentWantersKeepAMovieOut],
+    ["matches lax, strict or ideal for whoever is home", testMoviesMatchModesForWhoIsHome],
     ["settles every tile of the reveal", testMoviesRevealSettlesEveryTile],
     ["stops every slot reel on the winner", testMoviesReelsEndOnTheWinner],
     ["formats movie details and links", testMoviesMetaAndLinks],

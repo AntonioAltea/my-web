@@ -518,6 +518,48 @@ body {
   color: var(--bg);
 }
 
+/* lax / strict / ideal: a small three-way switch under the names. */
+.movies-match {
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 2px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+}
+
+.movies-page .movies-match button {
+  min-height: 28px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.movies-page .movies-match button[aria-checked="true"] {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.movies-page .movies-match button:disabled {
+  opacity: 0.45;
+}
+
+/* The IDEAL tag by a movie's title. */
+.movies-ideal {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  vertical-align: 0.2em;
+}
+
 .movies-tags:empty::before {
   color: var(--muted);
   content: "aún no hay géneros";
@@ -594,19 +636,22 @@ body {
   background: var(--paper-strong);
 }
 
-.movies-card-pick .movies-card-body {
+.movies-card-pick .movies-card-body,
+.movies-card-pick .movies-card-foot {
   transition: opacity 0.35s ease, transform 0.35s ease;
 }
 
 /* Hidden at once when the reveal starts; only the way back fades. */
-.movies-revealing .movies-card-body {
+.movies-revealing .movies-card-body,
+.movies-revealing .movies-card-foot {
   opacity: 0;
   transform: translateY(6px);
   transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .movies-card-pick .movies-card-body {
+  .movies-card-pick .movies-card-body,
+  .movies-card-pick .movies-card-foot {
     transition: none;
   }
 }
@@ -1043,7 +1088,8 @@ body {
 }
 
 /* Removing: a small × in the poster's corner (shown on hover with a mouse,
-   always on touch screens) that asks again over the poster. */
+   after a tap on the poster on touch screens) that asks again over the
+   poster. */
 .movies-poster-wrap {
   position: relative;
 }
@@ -1075,14 +1121,25 @@ body {
   stroke-width: 2.6;
 }
 
-.movies-poster-wrap:hover .movies-remove-x,
 .movies-page .movies-remove-x:focus-visible {
   opacity: 1;
 }
 
+@media (hover: hover) {
+  .movies-poster-wrap:hover .movies-remove-x {
+    opacity: 1;
+  }
+}
+
+/* Touch: hidden and untappable until the poster is tapped. */
 @media (hover: none) {
   .movies-page .movies-remove-x {
+    pointer-events: none;
+  }
+
+  .movies-page .movies-remove-armed .movies-remove-x {
     opacity: 0.85;
+    pointer-events: auto;
   }
 }
 
@@ -1119,6 +1176,12 @@ body {
 .movies-page .movies-remove-yes {
   border-color: #e5484d;
   background: #e5484d;
+}
+
+.movies-page .movies-unwanted {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .movies-footer {

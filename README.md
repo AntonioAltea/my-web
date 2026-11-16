@@ -176,8 +176,13 @@ and carries `noindex`.
 - The page reads in Literata (self-hosted in `src/static/fonts/`, OFL licence in `licenses/`); its title keeps IM Fell.
 - "dónde verla" opens, next to the synopsis and comments, two link bubbles with each site's icon (favicons self-hosted in
   `src/static/icons/`): JustWatch (its Spanish search by title) and the Stremio app (`stremio:///detail/movie/<imdb id>/<imdb id>`, only when TMDB knows the IMDb id).
-- With people ticked as home, the random pick also skips movies that someone not at home wants and hasn't seen,
-  so nobody misses one they were waiting for. The list still shows them.
+- The list and the random pick follow exactly the same rules: the pick draws from what the list shows. Wanting a
+  movie is what counts; "ya la he visto" is shown but never filtered on. With nobody ticked as home, the list shows
+  what someone wants, and the movies nobody wants wait behind a "ver las N que no quiere nadie" link. With people
+  ticked, a movie is out if someone at home said "yo no" or someone away wants it, and a three-way switch asks for
+  more: "alguno" (one of you at home wants it), "todos" (all of you at home want it) or "ideal" (all of you at home
+  want it and everyone away said "yo no"). Movies that are ideal for whoever is ticked carry an IDEAL tag by the
+  title in any mode.
 - The random pick is unveiled with one of two quiet animations, chosen at random each time: the poster as a
   scrambled, coarse grid of tiles on a canvas that swap into place while the pixels sharpen (about 1.4 s), or three
   reels of posters from the list, drawn inside the card, that stop one after another on the winner (about 1.6 s). The

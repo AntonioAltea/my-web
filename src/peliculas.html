@@ -103,6 +103,11 @@
         <div class="movies-filter">
           <p class="movies-filter-label" id="movies-by-label">en casa</p>
           <div id="movies-by" class="movies-tags" role="group" aria-labelledby="movies-by-label"></div>
+          <div id="movies-match" class="movies-match" role="radiogroup" aria-label="Cuánto tiene que encajar">
+            <button type="button" role="radio" data-match="lax" aria-checked="true" disabled title="La quiere ver alguno de los que estáis">alguno</button>
+            <button type="button" role="radio" data-match="strict" aria-checked="false" disabled title="La queréis ver todos los que estáis">todos</button>
+            <button type="button" role="radio" data-match="ideal" aria-checked="false" disabled title="La queréis ver todos los que estáis y los que no están dijeron «yo no»">ideal</button>
+          </div>
         </div>
         <div class="movies-filter">
           <p class="movies-filter-label">
@@ -132,6 +137,7 @@
 
       <p id="movies-list-status" class="movies-empty" aria-live="polite" hidden></p>
       <ul id="movies-list" class="movies-list"></ul>
+      <button id="movies-unwanted" class="movies-link movies-unwanted" type="button" hidden></button>
 
       <p class="movies-footer">
         Datos e imágenes de <a href="https://www.themoviedb.org/" rel="noopener">TMDB</a>.
