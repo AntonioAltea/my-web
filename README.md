@@ -139,7 +139,8 @@ The event collector endpoint is `/api/analytics/event`.
 ## Flat Movie Watchlist
 
 `/peliculas` is a private shared watchlist for the flat: anyone with the password can add movies, mark them as watched,
-remove them and pick a random pending one (optionally among the ones a given person added). It is not linked from the site
+remove them and pick a random pending one. The list and the random pick can be narrowed to what any of the ticked flatmates added
+(whoever is home that night); nobody ticked means everyone. It is not linked from the site
 and carries `noindex`.
 
 - Access is one shared password, `MOVIES_PASSWORD`. Logging in sets an HttpOnly cookie derived from it, so changing the

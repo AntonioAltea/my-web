@@ -1338,16 +1338,23 @@ const MOVIES = [
   { tmdb_id: 2, title: "Dos", added_by: "Antonio", added_at: "2026-01-01", watched_at: null },
   { tmdb_id: 3, title: "Tres", added_by: "Marta", added_at: "2026-01-03", watched_at: "2026-02-01" },
   { tmdb_id: 4, title: "Cuatro", added_by: "Antonio", added_at: "2026-01-04", watched_at: "2026-03-01" },
+  { tmdb_id: 5, title: "Cinco", added_by: "Miguel", added_at: "2026-01-05", watched_at: null },
 ];
 
 async function testMoviesFilterAndSort() {
   const { filterMovies, sortMovies, NAMES } = moviesModule();
   const ids = (movies) => movies.map((movie) => movie.tmdb_id);
 
-  assert.deepEqual(ids(filterMovies(MOVIES, { status: "pending" })), [1, 2]);
-  assert.deepEqual(ids(filterMovies(MOVIES, { status: "watched", by: "Marta" })), [3]);
+  assert.deepEqual(ids(filterMovies(MOVIES, { status: "pending" })), [1, 2, 5]);
+  assert.deepEqual(ids(filterMovies(MOVIES, { status: "watched", people: ["Marta"] })), [3]);
+  // Ticking several people shows what any of them added; nobody ticked is everyone.
+  assert.deepEqual(
+    ids(filterMovies(MOVIES, { status: "pending", people: ["Antonio", "Miguel"] })),
+    [2, 5],
+  );
+  assert.deepEqual(ids(filterMovies(MOVIES, { status: "pending", people: [] })), [1, 2, 5]);
   // Pending oldest first, so nothing sinks forever; watched latest first.
-  assert.deepEqual(ids(sortMovies(filterMovies(MOVIES, { status: "pending" }), "pending")), [2, 1]);
+  assert.deepEqual(ids(sortMovies(filterMovies(MOVIES, { status: "pending" }), "pending")), [2, 1, 5]);
   assert.deepEqual(ids(sortMovies(filterMovies(MOVIES, { status: "watched" }), "watched")), [4, 3]);
   assert.deepEqual([...NAMES], ["Antonio", "Javi", "Jorge", "Miguel"]);
 }
@@ -1356,12 +1363,16 @@ async function testMoviesRandomPickOnlyOffersPendingOnes() {
   const { pickRandom } = moviesModule();
 
   assert.equal(pickRandom(MOVIES, { random: () => 0 }).tmdb_id, 1);
-  assert.equal(pickRandom(MOVIES, { random: () => 0.99 }).tmdb_id, 2);
-  assert.equal(pickRandom(MOVIES, { by: "Marta", random: () => 0.99 }).tmdb_id, 1);
+  assert.equal(pickRandom(MOVIES, { random: () => 0.99 }).tmdb_id, 5);
+  assert.equal(pickRandom(MOVIES, { people: ["Marta"], random: () => 0.99 }).tmdb_id, 1);
+  assert.equal(
+    pickRandom(MOVIES, { people: ["Antonio", "Miguel"], random: () => 0 }).tmdb_id,
+    2,
+  );
   // "Otra" never repeats the current pick while there is something else.
   assert.equal(pickRandom(MOVIES, { exclude: 1, random: () => 0 }).tmdb_id, 2);
-  assert.equal(pickRandom(MOVIES, { by: "Marta", exclude: 1 }).tmdb_id, 1);
-  assert.equal(pickRandom(MOVIES.slice(2)), null);
+  assert.equal(pickRandom(MOVIES, { people: ["Marta"], exclude: 1 }).tmdb_id, 1);
+  assert.equal(pickRandom(MOVIES.slice(2, 4)), null);
 }
 
 async function testMoviesMetaAndLinks() {

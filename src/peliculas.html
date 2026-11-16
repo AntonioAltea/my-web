@@ -60,10 +60,10 @@
           <button type="button" data-status="pending" aria-pressed="true">pendientes <span id="movies-count-pending" class="movies-count"></span></button>
           <button type="button" data-status="watched" aria-pressed="false">vistas <span id="movies-count-watched" class="movies-count"></span></button>
         </div>
-        <label class="movies-by">
-          de
-          <select id="movies-by"></select>
-        </label>
+        <div class="movies-by">
+          <span id="movies-by-label">de</span>
+          <div id="movies-by" class="movies-by-options" role="group" aria-labelledby="movies-by-label"></div>
+        </div>
         <button id="movies-random" class="movies-random" type="button">elegir una al azar</button>
       </section>
 

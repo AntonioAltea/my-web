@@ -9,11 +9,11 @@
     return Boolean(movie.watched_at);
   }
 
-  function filterMovies(movies, { status = "pending", by = "" } = {}) {
+  function filterMovies(movies, { status = "pending", people = [] } = {}) {
     return movies.filter((movie) => {
       if (status === "pending" && isWatched(movie)) return false;
       if (status === "watched" && !isWatched(movie)) return false;
-      if (by && movie.added_by !== by) return false;
+      if (people.length && !people.includes(movie.added_by)) return false;
       return true;
     });
   }
@@ -27,8 +27,8 @@
     );
   }
 
-  function pickRandom(movies, { by = "", exclude = null, random = Math.random } = {}) {
-    let pool = filterMovies(movies, { status: "pending", by });
+  function pickRandom(movies, { people = [], exclude = null, random = Math.random } = {}) {
+    let pool = filterMovies(movies, { status: "pending", people });
     if (pool.length > 1 && exclude != null) {
       pool = pool.filter((movie) => movie.tmdb_id !== exclude);
     }
@@ -102,7 +102,7 @@
   const queryInput = $("#movies-query");
   const searchStatus = $("#movies-search-status");
   const results = $("#movies-results");
-  const bySelect = $("#movies-by");
+  const byOptions = $("#movies-by");
   const statusButtons = [...document.querySelectorAll(".movies-tabs button")];
   const randomButton = $("#movies-random");
   const pickSection = $("#movies-pick");
@@ -114,7 +114,7 @@
     name: "",
     movies: [],
     status: "pending",
-    by: "",
+    people: [],
     picked: null,
     searchTimer: null,
     searchSeq: 0,
@@ -221,20 +221,41 @@
   }
 
   function renderToolbar() {
-    if (!bySelect.options.length) {
-      bySelect.append(
-        el("option", { value: "", textContent: "todos" }),
-        ...NAMES.map((name) => el("option", { value: name, textContent: name })),
-      );
-    }
-    bySelect.value = state.by;
+    // Tick whoever is home tonight; nobody ticked means everyone.
+    const toggle = (name) => {
+      state.people = state.people.includes(name)
+        ? state.people.filter((person) => person !== name)
+        : [...state.people, name];
+      state.picked = null;
+      renderList();
+    };
+    byOptions.replaceChildren(
+      el("button", {
+        type: "button",
+        textContent: "todos",
+        ariaPressed: String(!state.people.length),
+        onclick: () => {
+          state.people = [];
+          state.picked = null;
+          renderList();
+        },
+      }),
+      ...NAMES.map((name) =>
+        el("button", {
+          type: "button",
+          textContent: name,
+          ariaPressed: String(state.people.includes(name)),
+          onclick: () => toggle(name),
+        }),
+      ),
+    );
     for (const button of statusButtons) {
       button.setAttribute("aria-pressed", String(button.dataset.status === state.status));
     }
-    const mine = filterMovies(state.movies, { status: "all", by: state.by });
-    $("#movies-count-pending").textContent = filterMovies(mine, { status: "pending" }).length;
-    $("#movies-count-watched").textContent = filterMovies(mine, { status: "watched" }).length;
-    randomButton.disabled = !pickRandom(state.movies, { by: state.by });
+    const theirs = filterMovies(state.movies, { status: "all", people: state.people });
+    $("#movies-count-pending").textContent = filterMovies(theirs, { status: "pending" }).length;
+    $("#movies-count-watched").textContent = filterMovies(theirs, { status: "watched" }).length;
+    randomButton.disabled = !pickRandom(state.movies, { people: state.people });
   }
 
   function linkList(movie) {
@@ -312,7 +333,7 @@
   function renderList() {
     renderToolbar();
     const visible = sortMovies(
-      filterMovies(state.movies, { status: state.status, by: state.by }),
+      filterMovies(state.movies, { status: state.status, people: state.people }),
       state.status,
     );
     list.replaceChildren(...visible.map((movie) => el("li", {}, [movieCard(movie)])));
@@ -339,7 +360,7 @@
   }
 
   function choose() {
-    const movie = pickRandom(state.movies, { by: state.by, exclude: state.picked });
+    const movie = pickRandom(state.movies, { people: state.people, exclude: state.picked });
     state.picked = movie ? movie.tmdb_id : null;
     renderPick();
     if (movie) pickSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -509,11 +530,6 @@
       renderList();
     });
   }
-
-  bySelect.addEventListener("change", () => {
-    state.by = bySelect.value;
-    renderList();
-  });
 
   randomButton.addEventListener("click", choose);
   $("#movies-pick-again").addEventListener("click", choose);
