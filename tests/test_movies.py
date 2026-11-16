@@ -212,6 +212,53 @@ class ListTests(MovieApiTestCase):
         status, _, _ = self.call("POST", "/api/movies/1/watched", {"watched": True})
         self.assertEqual(status, 404)
 
+    def test_whoever_adds_a_movie_wants_to_see_it(self) -> None:
+        _, payload = self.add(added_by="Antonio")
+        self.assertEqual(payload["movie"]["wanted_by"], ["Antonio"])
+
+    def test_others_can_join_and_leave(self) -> None:
+        self.add(added_by="Antonio")
+
+        status, payload, _ = self.call(
+            "POST", "/api/movies/603/wanted", {"name": "Miguel", "want": True}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["movie"]["wanted_by"], ["Antonio", "Miguel"])
+
+        # Saying yes twice doesn't list anyone twice.
+        _, payload, _ = self.call(
+            "POST", "/api/movies/603/wanted", {"name": "Miguel", "want": True}
+        )
+        self.assertEqual(payload["movie"]["wanted_by"], ["Antonio", "Miguel"])
+
+        _, payload, _ = self.call(
+            "POST", "/api/movies/603/wanted", {"name": "Antonio", "want": False}
+        )
+        self.assertEqual(payload["movie"]["wanted_by"], ["Miguel"])
+        stored = self.call("GET", "/api/movies")[1]["movies"][0]
+        self.assertEqual(stored["wanted_by"], ["Miguel"])
+        self.assertEqual(stored["added_by"], "Antonio")
+
+    def test_wanting_validates_input(self) -> None:
+        self.add()
+        for body in ({"want": True}, {"name": "Miguel"}, {"name": "Miguel", "want": 1}):
+            status, _, _ = self.call("POST", "/api/movies/603/wanted", body)
+            self.assertEqual(status, 400, body)
+        status, _, _ = self.call(
+            "POST", "/api/movies/1/wanted", {"name": "Miguel", "want": True}
+        )
+        self.assertEqual(status, 404)
+
+    def test_older_movies_are_wanted_by_whoever_added_them(self) -> None:
+        self.path.write_text(
+            json.dumps(
+                {"movies": [{"tmdb_id": 1, "added_by": "Javi"}, {"tmdb_id": 2}]}
+            ),
+            encoding="utf-8",
+        )
+        stored = self.call("GET", "/api/movies")[1]["movies"]
+        self.assertEqual([movie["wanted_by"] for movie in stored], [["Javi"], []])
+
     def test_removing(self) -> None:
         self.add()
         self.add(tmdb_id=11)

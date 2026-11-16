@@ -35,8 +35,20 @@ body {
 
 /* Header */
 
+.movies-session {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.movies-session strong {
+  color: var(--ink);
+  font-weight: 400;
+}
+
 .movies-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 16px;
@@ -274,6 +286,52 @@ body {
   color: var(--muted);
 }
 
+/* Desktop: tabs and the random button on top, then who is home, then the
+   duration and genre menus. */
+.movies-tabs {
+  order: 1;
+}
+
+.movies-page .movies-random {
+  order: 2;
+}
+
+.movies-by {
+  flex-basis: 100%;
+  order: 3;
+}
+
+.movies-selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  order: 4;
+}
+
+.movies-selects select {
+  min-height: 36px;
+  font-size: 0.95rem;
+}
+
+.movies-card-body .movies-added {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+}
+
+.movies-page .movies-want {
+  min-height: 28px;
+  padding: 0 8px;
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+.movies-page .movies-wanted {
+  border-color: var(--accent);
+  background: var(--mark);
+}
+
 .movies-by-options {
   display: flex;
   flex-wrap: wrap;
@@ -486,8 +544,19 @@ body {
     content: none;
   }
 
+  .movies-selects {
+    display: grid;
+    flex: 1 1 100%;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .movies-selects select {
+    min-width: 0;
+  }
+
   .movies-page .movies-random {
     flex: 1 1 100%;
+    order: 5;
     margin-left: 0;
   }
 

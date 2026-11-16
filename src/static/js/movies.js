@@ -9,13 +9,47 @@
     return Boolean(movie.watched_at);
   }
 
-  function filterMovies(movies, { status = "pending", people = [] } = {}) {
+  // Older movies only know who added them.
+  function wantedBy(movie) {
+    if (Array.isArray(movie.wanted_by)) return movie.wanted_by;
+    return movie.added_by ? [movie.added_by] : [];
+  }
+
+  // Duration filter: each option is an upper (or lower) bound in minutes.
+  const DURATIONS = [
+    { value: "", label: "cualquier duración" },
+    { value: "90", label: "hasta 1 h 30", test: (minutes) => minutes <= 90 },
+    { value: "120", label: "hasta 2 h", test: (minutes) => minutes <= 120 },
+    { value: "120+", label: "más de 2 h", test: (minutes) => minutes > 120 },
+  ];
+
+  function matchesDuration(movie, duration) {
+    const option = DURATIONS.find((item) => item.value === duration);
+    if (!option || !option.test) return true;
+    // Without a known runtime we can't promise it fits.
+    return Boolean(movie.runtime) && option.test(movie.runtime);
+  }
+
+  function filterMovies(
+    movies,
+    { status = "pending", people = [], duration = "", genre = "" } = {},
+  ) {
     return movies.filter((movie) => {
       if (status === "pending" && isWatched(movie)) return false;
       if (status === "watched" && !isWatched(movie)) return false;
-      if (people.length && !people.includes(movie.added_by)) return false;
+      // Whoever is home: show what any of them wants to see.
+      if (people.length && !wantedBy(movie).some((person) => people.includes(person))) {
+        return false;
+      }
+      if (!matchesDuration(movie, duration)) return false;
+      if (genre && !(movie.genres || []).includes(genre)) return false;
       return true;
     });
+  }
+
+  function genresOf(movies) {
+    const genres = new Set(movies.flatMap((movie) => movie.genres || []));
+    return [...genres].sort((a, b) => a.localeCompare(b, "es"));
   }
 
   function sortMovies(movies, status) {
@@ -27,8 +61,8 @@
     );
   }
 
-  function pickRandom(movies, { people = [], exclude = null, random = Math.random } = {}) {
-    let pool = filterMovies(movies, { status: "pending", people });
+  function pickRandom(movies, { exclude = null, random = Math.random, ...filters } = {}) {
+    let pool = filterMovies(movies, { ...filters, status: "pending" });
     if (pool.length > 1 && exclude != null) {
       pool = pool.filter((movie) => movie.tmdb_id !== exclude);
     }
@@ -74,7 +108,10 @@
 
   global.ManturonMovies = {
     NAMES,
+    DURATIONS,
+    wantedBy,
     filterMovies,
+    genresOf,
     sortMovies,
     pickRandom,
     formatRuntime,
@@ -96,6 +133,9 @@
   const loginForm = $("#movies-login");
   const loginError = $("#movies-login-error");
   const logoutButton = $("#movies-logout");
+  const session = $("#movies-session");
+  const sessionName = $("#movies-session-name");
+  const whoSection = $("#movies-who");
   const app = $("#movies-app");
   const whoOptions = $("#movies-who-options");
   const nameHint = $("#movies-name-hint");
@@ -103,6 +143,8 @@
   const searchStatus = $("#movies-search-status");
   const results = $("#movies-results");
   const byOptions = $("#movies-by");
+  const durationSelect = $("#movies-duration");
+  const genreSelect = $("#movies-genre");
   const statusButtons = [...document.querySelectorAll(".movies-tabs button")];
   const randomButton = $("#movies-random");
   const pickSection = $("#movies-pick");
@@ -111,10 +153,14 @@
   const list = $("#movies-list");
 
   const state = {
+    loggedIn: false,
+    changingName: false,
     name: "",
     movies: [],
     status: "pending",
     people: [],
+    duration: "",
+    genre: "",
     picked: null,
     searchTimer: null,
     searchSeq: 0,
@@ -189,18 +235,28 @@
     return el("img", { className, src: movie.poster, alt: "", loading: "lazy", decoding: "async" });
   }
 
+  // Who you are is asked at the door, with the password. Someone already
+  // logged in without a name gets just that question before the list.
+  function renderScreen() {
+    const ready = state.loggedIn && Boolean(state.name);
+    whoSection.hidden = ready && !state.changingName;
+    loginForm.hidden = state.loggedIn;
+    app.hidden = !ready;
+    session.hidden = !ready;
+    sessionName.textContent = state.name;
+    renderWho();
+  }
+
   function showLogin() {
-    app.hidden = true;
-    logoutButton.hidden = true;
-    loginForm.hidden = false;
+    state.loggedIn = false;
+    renderScreen();
     $("#movies-password").focus();
   }
 
   function showApp() {
     setMessage(pageStatus, "");
-    loginForm.hidden = true;
-    logoutButton.hidden = false;
-    app.hidden = false;
+    state.loggedIn = true;
+    renderScreen();
   }
 
   function renderWho() {
@@ -212,8 +268,11 @@
           ariaPressed: String(state.name === name),
           onclick: () => {
             storeName(name);
+            state.changingName = false;
             setMessage(nameHint, "");
-            renderWho();
+            renderScreen();
+            // The "yo también" buttons depend on who you are.
+            if (state.loggedIn) renderList();
           },
         }),
       ),
@@ -252,10 +311,35 @@
     for (const button of statusButtons) {
       button.setAttribute("aria-pressed", String(button.dataset.status === state.status));
     }
-    const theirs = filterMovies(state.movies, { status: "all", people: state.people });
-    $("#movies-count-pending").textContent = filterMovies(theirs, { status: "pending" }).length;
-    $("#movies-count-watched").textContent = filterMovies(theirs, { status: "watched" }).length;
-    randomButton.disabled = !pickRandom(state.movies, { people: state.people });
+
+    if (!durationSelect.options.length) {
+      durationSelect.append(
+        ...DURATIONS.map((item) => el("option", { value: item.value, textContent: item.label })),
+      );
+    }
+    durationSelect.value = state.duration;
+
+    // Genres come from the movies on the list, so the menu never offers an empty one.
+    const genres = genresOf(state.movies);
+    if (state.genre && !genres.includes(state.genre)) state.genre = "";
+    genreSelect.replaceChildren(
+      el("option", { value: "", textContent: "cualquier género" }),
+      ...genres.map((genre) => el("option", { value: genre, textContent: genre })),
+    );
+    genreSelect.value = state.genre;
+
+    const matching = filterMovies(state.movies, { ...activeFilters(), status: "all" });
+    $("#movies-count-pending").textContent = filterMovies(matching, { status: "pending" }).length;
+    $("#movies-count-watched").textContent = filterMovies(matching, { status: "watched" }).length;
+    randomButton.disabled = !pickRandom(state.movies, activeFilters());
+  }
+
+  function activeFilters() {
+    return { people: state.people, duration: state.duration, genre: state.genre };
+  }
+
+  function filtering() {
+    return Boolean(state.people.length || state.duration || state.genre);
   }
 
   function linkList(movie) {
@@ -267,14 +351,27 @@
     ]);
   }
 
-  function addedLine(movie) {
-    if (!movie.watched_at) return `la añadió ${movie.added_by}`;
+  function wantedLine(movie) {
+    const people = wantedBy(movie);
+    const who = people.length ? `quieren verla: ${people.join(", ")}` : "ya no la quiere ver nadie";
+    if (!movie.watched_at) return who;
     const date = new Date(movie.watched_at).toLocaleDateString("es-ES", {
       day: "numeric",
       month: "short",
       year: "numeric",
     });
-    return `la añadió ${movie.added_by} · vista el ${date}`;
+    return `vista el ${date} · ${who}`;
+  }
+
+  function wantButton(movie) {
+    const wanted = Boolean(state.name) && wantedBy(movie).includes(state.name);
+    return el("button", {
+      type: "button",
+      className: wanted ? "movies-want movies-wanted" : "movies-want",
+      textContent: wanted ? "✓ yo también" : "+ yo también",
+      title: wanted ? "Quitarte de quienes quieren verla" : "Apuntarte para verla",
+      onclick: () => toggleWanted(movie, !wanted),
+    });
   }
 
   function movieCard(movie, { pick = false } = {}) {
@@ -302,7 +399,10 @@
         ? el("p", { className: "movies-genres", textContent: movie.genres.join(", ") })
         : null,
       overview,
-      el("p", { className: "movies-added", textContent: addedLine(movie) }),
+      el("p", { className: "movies-added" }, [
+        wantedLine(movie),
+        pick || watched ? null : wantButton(movie),
+      ]),
       linkList(movie),
     ]);
 
@@ -333,15 +433,19 @@
   function renderList() {
     renderToolbar();
     const visible = sortMovies(
-      filterMovies(state.movies, { status: state.status, people: state.people }),
+      filterMovies(state.movies, { ...activeFilters(), status: state.status }),
       state.status,
     );
     list.replaceChildren(...visible.map((movie) => el("li", {}, [movieCard(movie)])));
     let empty = "";
     if (!visible.length) {
-      empty = state.status === "pending"
-        ? "No hay nada pendiente. Busca una película arriba y añádela."
-        : "Todavía no habéis marcado ninguna como vista.";
+      if (filtering()) {
+        empty = "Nada encaja con estos filtros.";
+      } else {
+        empty = state.status === "pending"
+          ? "No hay nada pendiente. Busca una película arriba y añádela."
+          : "Todavía no habéis marcado ninguna como vista.";
+      }
     }
     setMessage(listStatus, empty);
     renderPick();
@@ -360,7 +464,7 @@
   }
 
   function choose() {
-    const movie = pickRandom(state.movies, { people: state.people, exclude: state.picked });
+    const movie = pickRandom(state.movies, { ...activeFilters(), exclude: state.picked });
     state.picked = movie ? movie.tmdb_id : null;
     renderPick();
     if (movie) pickSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -371,13 +475,14 @@
       const data = await api("GET", "/api/movies");
       state.movies = data.movies || [];
       showApp();
-      renderWho();
       renderList();
     } catch (error) {
       if (error.status === 401) return;
       // Server not configured or down: nothing else on the page can work.
       app.hidden = true;
       loginForm.hidden = true;
+      whoSection.hidden = true;
+      session.hidden = true;
       setMessage(pageStatus, error.message);
     }
   }
@@ -398,6 +503,30 @@
     }
   }
 
+  function askForName(text) {
+    state.changingName = true;
+    renderScreen();
+    setMessage(nameHint, text);
+    whoOptions.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function toggleWanted(movie, want) {
+    if (!state.name) {
+      askForName("Elige quién eres para apuntarte.");
+      return;
+    }
+    try {
+      const data = await api("POST", `/api/movies/${movie.tmdb_id}/wanted`, {
+        name: state.name,
+        want,
+      });
+      replaceMovie(data.movie);
+      renderList();
+    } catch (error) {
+      setMessage(listStatus, error.message);
+    }
+  }
+
   async function removeMovie(movie) {
     if (!global.confirm(`¿Quitar «${movie.title}» de la lista?`)) return;
     try {
@@ -411,8 +540,7 @@
 
   async function addMovie(result, button) {
     if (!state.name) {
-      setMessage(nameHint, "Elige quién eres para poder añadir.");
-      whoOptions.scrollIntoView({ behavior: "smooth", block: "center" });
+      askForName("Elige quién eres para poder añadir.");
       return;
     }
     button.disabled = true;
@@ -495,6 +623,10 @@
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     loginError.textContent = "";
+    if (!state.name) {
+      setMessage(nameHint, "Elige quién eres.");
+      return;
+    }
     const password = $("#movies-password").value;
     try {
       await api("POST", "/api/movies/login", { password });
@@ -531,11 +663,28 @@
     });
   }
 
+  durationSelect.addEventListener("change", () => {
+    state.duration = durationSelect.value;
+    state.picked = null;
+    renderList();
+  });
+
+  genreSelect.addEventListener("change", () => {
+    state.genre = genreSelect.value;
+    state.picked = null;
+    renderList();
+  });
+
   randomButton.addEventListener("click", choose);
   $("#movies-pick-again").addEventListener("click", choose);
   $("#movies-pick-close").addEventListener("click", () => {
     state.picked = null;
     renderPick();
+  });
+
+  $("#movies-change-name").addEventListener("click", () => {
+    state.changingName = !state.changingName;
+    renderScreen();
   });
 
   logoutButton.addEventListener("click", async () => {
@@ -548,5 +697,6 @@
   });
 
   state.name = storedName();
+  renderWho();
   loadMovies();
 })(globalThis);

@@ -1359,6 +1359,38 @@ async function testMoviesFilterAndSort() {
   assert.deepEqual([...NAMES], ["Antonio", "Javi", "Jorge", "Miguel"]);
 }
 
+async function testMoviesFilterByWhoWantsItDurationAndGenre() {
+  const { filterMovies, wantedBy, genresOf, pickRandom } = moviesModule();
+  const ids = (movies) => movies.map((movie) => movie.tmdb_id);
+  const movies = [
+    { tmdb_id: 1, added_by: "Antonio", wanted_by: ["Antonio", "Jorge"], runtime: 85, genres: ["Terror"] },
+    { tmdb_id: 2, added_by: "Javi", wanted_by: [], runtime: 110, genres: ["Drama", "Comedia"] },
+    { tmdb_id: 3, added_by: "Miguel", runtime: 150, genres: ["Drama"] },
+    { tmdb_id: 4, added_by: "Javi", wanted_by: ["Javi"], runtime: null, genres: [] },
+  ];
+
+  // Older movies without the list count as wanted by whoever added them.
+  assert.deepEqual([...wantedBy(movies[2])], ["Miguel"]);
+  // "Yo también" counts: Jorge never added anything but wants the first one.
+  assert.deepEqual(ids(filterMovies(movies, { people: ["Jorge"] })), [1]);
+  // Javi added the second one but dropped out of it.
+  assert.deepEqual(ids(filterMovies(movies, { people: ["Javi"] })), [4]);
+
+  assert.deepEqual(ids(filterMovies(movies, { duration: "90" })), [1]);
+  assert.deepEqual(ids(filterMovies(movies, { duration: "120" })), [1, 2]);
+  assert.deepEqual(ids(filterMovies(movies, { duration: "120+" })), [3]);
+  // Unknown runtime only shows when duration doesn't matter.
+  assert.deepEqual(ids(filterMovies(movies, { duration: "" })), [1, 2, 3, 4]);
+
+  assert.deepEqual(ids(filterMovies(movies, { genre: "Drama" })), [2, 3]);
+  assert.deepEqual(ids(filterMovies(movies, { genre: "Drama", duration: "120" })), [2]);
+  assert.deepEqual([...genresOf(movies)], ["Comedia", "Drama", "Terror"]);
+
+  // The random pick honours every filter.
+  assert.equal(pickRandom(movies, { genre: "Drama", duration: "120+" }).tmdb_id, 3);
+  assert.equal(pickRandom(movies, { genre: "Terror", people: ["Miguel"] }), null);
+}
+
 async function testMoviesRandomPickOnlyOffersPendingOnes() {
   const { pickRandom } = moviesModule();
 
@@ -1411,6 +1443,7 @@ async function testMoviesSearchPutsPeopleFirst() {
 async function run() {
   const tests = [
     ["puts people first in movie search", testMoviesSearchPutsPeopleFirst],
+    ["filters movies by who wants them, duration and genre", testMoviesFilterByWhoWantsItDurationAndGenre],
     ["filters and sorts the movie list", testMoviesFilterAndSort],
     ["picks a random pending movie", testMoviesRandomPickOnlyOffersPendingOnes],
     ["formats movie details and links", testMoviesMetaAndLinks],

@@ -35,7 +35,7 @@ PERSON_MOVIE_LIMIT = 24
 NAME_MAX_LENGTH = 40
 FAILED_LOGIN_DELAY_SECONDS = 1.0
 MOVIES_LOCK = threading.Lock()
-MOVIE_ITEM_PATH = re.compile(r"^/api/movies/(?P<id>\d+)(?P<action>/watched)?$")
+MOVIE_ITEM_PATH = re.compile(r"^/api/movies/(?P<id>\d+)(?P<action>/watched|/wanted)?$")
 
 
 class MovieError(Exception):
@@ -109,7 +109,18 @@ def load_movies(path: Path) -> list[dict[str, object]]:
     movies = data.get("movies") if isinstance(data, dict) else None
     if not isinstance(movies, list):
         return []
-    return [movie for movie in movies if isinstance(movie, dict)]
+    return [with_wanted_by(movie) for movie in movies if isinstance(movie, dict)]
+
+
+def with_wanted_by(movie: dict[str, object]) -> dict[str, object]:
+    # Movies saved before "yo también" existed only knew who added them.
+    wanted_by = movie.get("wanted_by")
+    if not isinstance(wanted_by, list):
+        added_by = movie.get("added_by")
+        movie["wanted_by"] = (
+            [added_by] if isinstance(added_by, str) and added_by else []
+        )
+    return movie
 
 
 def save_movies(path: Path, movies: list[dict[str, object]]) -> None:
@@ -318,6 +329,7 @@ def add_movie(path: Path, payload: dict[str, object]) -> dict[str, object]:
         movie = {
             **details,
             "added_by": added_by,
+            "wanted_by": [added_by],
             "added_at": utc_now_iso(),
             "watched_at": None,
         }
@@ -337,6 +349,27 @@ def set_watched(
         for movie in movies:
             if movie.get("tmdb_id") == tmdb_id:
                 movie["watched_at"] = utc_now_iso() if watched else None
+                save_movies(path, movies)
+                return movie
+    raise MovieError(404, "Esa película no está en la lista.")
+
+
+def set_wanted(
+    path: Path, tmdb_id: int, payload: dict[str, object]
+) -> dict[str, object]:
+    """Add or drop one person from the people who want to see a movie."""
+    name = clean_name(payload.get("name"))
+    want = payload.get("want")
+    if not name:
+        raise MovieError(400, "Dinos quién eres.")
+    if not isinstance(want, bool):
+        raise MovieError(400, "Falta indicar si quieres verla.")
+    with MOVIES_LOCK:
+        movies = load_movies(path)
+        for movie in movies:
+            if movie.get("tmdb_id") == tmdb_id:
+                others = [person for person in movie["wanted_by"] if person != name]
+                movie["wanted_by"] = [*others, name] if want else others
                 save_movies(path, movies)
                 return movie
     raise MovieError(404, "Esa película no está en la lista.")
@@ -406,10 +439,12 @@ def handle_request(
         match = MOVIE_ITEM_PATH.match(route)
         if match:
             tmdb_id = int(match.group("id"))
-            if match.group("action") and method == "POST":
-                movie = set_watched(path, tmdb_id, parse_json_body(body))
+            action = match.group("action")
+            if action and method == "POST":
+                update = set_watched if action == "/watched" else set_wanted
+                movie = update(path, tmdb_id, parse_json_body(body))
                 return 200, {"movie": movie}, []
-            if not match.group("action") and method == "DELETE":
+            if not action and method == "DELETE":
                 remove_movie(path, tmdb_id)
                 return 200, {"ok": True}, []
 

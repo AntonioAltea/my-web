@@ -21,10 +21,20 @@
   <main class="movies-page">
     <header class="movies-header">
       <h1>películas</h1>
-      <button id="movies-logout" class="movies-link" type="button" hidden>salir</button>
+      <p id="movies-session" class="movies-session" hidden>
+        eres <strong id="movies-session-name"></strong>
+        · <button id="movies-change-name" class="movies-link" type="button">cambiar</button>
+        · <button id="movies-logout" class="movies-link" type="button">salir</button>
+      </p>
     </header>
 
     <p id="movies-page-status" class="movies-error" role="alert" hidden></p>
+
+    <section id="movies-who" class="movies-who" aria-labelledby="movies-who-label" hidden>
+      <span id="movies-who-label">¿quién eres?</span>
+      <div id="movies-who-options" class="movies-chips" role="group" aria-labelledby="movies-who-label"></div>
+      <p id="movies-name-hint" class="movies-error" role="alert" hidden></p>
+    </section>
 
     <form id="movies-login" class="movies-login" hidden>
       <label for="movies-password">contraseña</label>
@@ -36,11 +46,6 @@
     </form>
 
     <div id="movies-app" hidden>
-      <section class="movies-who" aria-labelledby="movies-who-label">
-        <span id="movies-who-label">¿quién eres?</span>
-        <div id="movies-who-options" class="movies-chips" role="group" aria-labelledby="movies-who-label"></div>
-        <p id="movies-name-hint" class="movies-error" role="alert" hidden></p>
-      </section>
 
       <section class="movies-search" aria-label="Añadir película">
         <input
@@ -61,8 +66,12 @@
           <button type="button" data-status="watched" aria-pressed="false">vistas <span id="movies-count-watched" class="movies-count"></span></button>
         </div>
         <div class="movies-by">
-          <span id="movies-by-label">de</span>
+          <span id="movies-by-label">en casa</span>
           <div id="movies-by" class="movies-by-options" role="group" aria-labelledby="movies-by-label"></div>
+        </div>
+        <div class="movies-selects">
+          <select id="movies-duration" aria-label="Duración"></select>
+          <select id="movies-genre" aria-label="Género"></select>
         </div>
         <button id="movies-random" class="movies-random" type="button">elegir una al azar</button>
       </section>
