@@ -35,7 +35,10 @@ PERSON_MOVIE_LIMIT = 24
 NAME_MAX_LENGTH = 40
 FAILED_LOGIN_DELAY_SECONDS = 1.0
 MOVIES_LOCK = threading.Lock()
-MOVIE_ITEM_PATH = re.compile(r"^/api/movies/(?P<id>\d+)(?P<action>/seen|/wanted)?$")
+MOVIE_ITEM_PATH = re.compile(
+    r"^/api/movies/(?P<id>\d+)(?P<action>/seen|/wanted|/comment)?$"
+)
+COMMENT_MAX_LENGTH = 100
 
 
 class MovieError(Exception):
@@ -127,6 +130,8 @@ def with_wanted_by(movie: dict[str, object]) -> dict[str, object]:
         # particular; the closest guess is that whoever wanted it saw it.
         movie["seen_by"] = list(movie["wanted_by"]) if movie.get("watched_at") else []
     movie.pop("watched_at", None)
+    if not isinstance(movie.get("comments"), list):
+        movie["comments"] = []
     return movie
 
 
@@ -416,6 +421,7 @@ def add_movie(path: Path, payload: dict[str, object]) -> dict[str, object]:
             "wanted_by": [added_by],
             "not_wanted_by": [],
             "seen_by": [],
+            "comments": [],
             "added_at": utc_now_iso(),
         }
         movies.append(movie)
@@ -466,6 +472,56 @@ def set_wanted(
                 save_movies(path, movies)
                 return movie
     raise MovieError(404, "Esa película no está en la lista.")
+
+
+def update_movie(path: Path, tmdb_id: int, change) -> dict[str, object]:
+    """Apply `change` to one movie under the lock and save the list."""
+    with MOVIES_LOCK:
+        movies = load_movies(path)
+        for movie in movies:
+            if movie.get("tmdb_id") == tmdb_id:
+                change(movie)
+                save_movies(path, movies)
+                return movie
+    raise MovieError(404, "Esa película no está en la lista.")
+
+
+def add_comment(
+    path: Path, tmdb_id: int, payload: dict[str, object]
+) -> dict[str, object]:
+    """One comment per person; to write another, delete yours first."""
+    name = clean_name(payload.get("name"))
+    text = payload.get("text")
+    if not name:
+        raise MovieError(400, "Dinos quién eres.")
+    if not isinstance(text, str) or not " ".join(text.split()):
+        raise MovieError(400, "El comentario está vacío.")
+    text = " ".join(text.split())
+    if len(text) > COMMENT_MAX_LENGTH:
+        raise MovieError(400, f"Máximo {COMMENT_MAX_LENGTH} caracteres.")
+
+    def change(movie: dict[str, object]) -> None:
+        if any(comment.get("name") == name for comment in movie["comments"]):
+            raise MovieError(
+                409, "Ya tienes un comentario; bórralo para escribir otro."
+            )
+        movie["comments"].append({"name": name, "text": text, "at": utc_now_iso()})
+
+    return update_movie(path, tmdb_id, change)
+
+
+def delete_comment(path: Path, tmdb_id: int, name: str) -> dict[str, object]:
+    name = clean_name(name)
+    if not name:
+        raise MovieError(400, "Dinos quién eres.")
+
+    def change(movie: dict[str, object]) -> None:
+        kept = [comment for comment in movie["comments"] if comment.get("name") != name]
+        if len(kept) == len(movie["comments"]):
+            raise MovieError(404, "No tienes comentario en esta película.")
+        movie["comments"] = kept
+
+    return update_movie(path, tmdb_id, change)
 
 
 def remove_movie(path: Path, tmdb_id: int) -> None:
@@ -536,6 +592,12 @@ def handle_request(
         if match:
             tmdb_id = int(match.group("id"))
             action = match.group("action")
+            if action == "/comment" and method == "POST":
+                movie = add_comment(path, tmdb_id, parse_json_body(body))
+                return 201, {"movie": movie}, []
+            if action == "/comment" and method == "DELETE":
+                name = parse_qs(parsed.query).get("name", [""])[0]
+                return 200, {"movie": delete_comment(path, tmdb_id, name)}, []
             if action and method == "POST":
                 update = set_seen if action == "/seen" else set_wanted
                 movie = update(path, tmdb_id, parse_json_body(body))

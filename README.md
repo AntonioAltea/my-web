@@ -149,14 +149,14 @@ the ticked flatmates wants to see, none of them said "yo no" to and not all of t
 night; nobody ticked means everyone), to a maximum runtime
 picked on a slider (its last stop is no limit; a movie without a known runtime only shows then) and to any of the
 ticked genres (the tags come from the movies on the list). The page uses no native menus or browser dialogs:
-removing a movie asks again inside its card. It is not linked from the site
+removing a movie is a × on its poster (on hover with a mouse, always on touch screens) that asks again over the poster. It is not linked from the site
 and carries `noindex`.
 
 - Access is one shared password, `MOVIES_PASSWORD`. Logging in sets an HttpOnly cookie derived from it, so changing the
   password logs everyone out. Without it set, the whole API answers 503.
 - Movie data comes from TMDB (search and details in Spanish, posters hotlinked from `image.tmdb.org`). `TMDB_API_KEY` takes
-  either the v3 API key or the v4 read access token from <https://www.themoviedb.org/settings/api>. Each movie links to
-  Letterboxd through `letterboxd.com/tmdb/<id>/` and to IMDb when TMDB knows the IMDb id.
+  either the v3 API key or the v4 read access token from <https://www.themoviedb.org/settings/api>. Each movie's rating links to
+  Letterboxd through `letterboxd.com/tmdb/<id>/`.
 - Search uses TMDB's `/search/multi`: matching titles, plus the films of up to two people whose name contains every
   word typed (accents ignored), fetched with `/person/<id>/movie_credits` — as director for people known for directing,
   as cast otherwise.
@@ -168,9 +168,14 @@ and carries `noindex`.
 - The list can be sorted by date added, title, year, runtime or TMDB rating (`vote_average`, stored as `rating`
   when a movie is added). Movies saved before ratings existed get theirs in a background lookup the first time the
   list is read. The chosen order is remembered per browser.
+- Each movie has `comments`: one per flatmate (`{name, text, at}`, up to 100 characters). Writing another means
+  deleting yours first. On the page, "comentarios" opens under the links in place of the synopsis (one or the other).
+- The page reads in Literata (self-hosted in `src/static/fonts/`, OFL licence in `licenses/`); its title keeps IM Fell.
+- "dónde verla" opens, next to the synopsis and comments, two link bubbles with each site's icon (favicons self-hosted in
+  `src/static/icons/`): JustWatch (its Spanish search by title) and the Stremio app (`stremio:///detail/movie/<imdb id>/<imdb id>`, only when TMDB knows the IMDb id).
 - The list lives in `movies.json` under the media root (`assets/movies.json` locally, `/data/movies.json` on Fly).
 - API: `POST /api/movies/login` and `/logout`, `GET /api/movies`, `GET /api/movies/events` (SSE), `GET /api/movies/search?q=`, `POST /api/movies`
-  (`{tmdbId, addedBy}`), `POST /api/movies/<id>/seen` (`{name, seen}`), `POST /api/movies/<id>/wanted` (`{name, want}`: `true` "yo también", `false` "yo no", `null` neither), `DELETE /api/movies/<id>`.
+  (`{tmdbId, addedBy}`), `POST /api/movies/<id>/seen` (`{name, seen}`), `POST /api/movies/<id>/comment` (`{name, text}`), `DELETE /api/movies/<id>/comment?name=`, `POST /api/movies/<id>/wanted` (`{name, want}`: `true` "yo también", `false` "yo no", `null` neither), `DELETE /api/movies/<id>`.
 
 Locally:
 

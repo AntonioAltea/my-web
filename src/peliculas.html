@@ -21,11 +21,22 @@
   <main class="movies-page">
     <header class="movies-header">
       <h1>películas</h1>
-      <p id="movies-session" class="movies-session" hidden>
-        eres <strong id="movies-session-name"></strong>
-        · <button id="movies-change-name" class="movies-link" type="button">cambiar</button>
-        · <button id="movies-logout" class="movies-link" type="button">salir</button>
-      </p>
+      <div class="movies-header-side">
+        <p id="movies-session" class="movies-session" hidden>
+          eres <strong id="movies-session-name"></strong>
+          · <button id="movies-change-name" class="movies-link" type="button">cambiar</button>
+          · <button id="movies-logout" class="movies-link" type="button">salir</button>
+        </p>
+        <!-- The same theme control as the rest of the site (static/js/theme.js),
+             so the choice is shared with the home page. -->
+        <button
+          id="theme-toggle"
+          class="movies-link movies-theme-toggle"
+          type="button"
+          aria-label="Tema automatico. Cambiar a modo oscuro"
+          aria-pressed="false"
+        >tema: <span id="theme-toggle-label">auto</span></button>
+      </div>
     </header>
 
     <p id="movies-page-status" class="movies-error" role="alert" hidden></p>
@@ -51,7 +62,7 @@
         <input
           id="movies-query"
           type="search"
-          placeholder="busca una película, un director o un actor"
+          placeholder="busca película, director o actor"
           aria-label="Buscar película, director o actor"
           autocomplete="off"
           enterkeyhint="search"
@@ -129,6 +140,7 @@
     </div>
   </main>
 
+  <script src="/static/js/theme.js"></script>
   <script src="/static/js/movies.js"></script>
 </body>
 </html>

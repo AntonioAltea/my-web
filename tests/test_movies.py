@@ -747,3 +747,81 @@ class MovieEventStreamTests(unittest.TestCase):
             writes,
             [b"retry: 3000\n\n", b"event: changed\ndata: 7\n\n", b": ping\n\n"],
         )
+
+
+class CommentTests(MovieApiTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        with mock.patch.object(
+            movies, "tmdb_get", return_value=tmdb_detail_payload(603)
+        ):
+            self.call("POST", "/api/movies", {"tmdbId": 603, "addedBy": "Antonio"})
+
+    def comment(self, name: str, text: object) -> tuple[int, dict]:
+        status, payload, _ = self.call(
+            "POST", "/api/movies/603/comment", {"name": name, "text": text}
+        )
+        return status, payload
+
+    def test_new_movies_start_without_comments(self) -> None:
+        stored = self.call("GET", "/api/movies")[1]["movies"][0]
+        self.assertEqual(stored["comments"], [])
+
+    def test_one_comment_per_person(self) -> None:
+        status, payload = self.comment("Antonio", "  muy   buena\n")
+        self.assertEqual(status, 201)
+        [comment] = payload["movie"]["comments"]
+        self.assertEqual((comment["name"], comment["text"]), ("Antonio", "muy buena"))
+        self.assertTrue(comment["at"])
+
+        status, payload = self.comment("Antonio", "otra")
+        self.assertEqual(status, 409)
+        self.assertIn("bórralo", payload["error"])
+
+        status, payload = self.comment("Miguel", "flojita")
+        self.assertEqual(
+            [c["name"] for c in payload["movie"]["comments"]], ["Antonio", "Miguel"]
+        )
+
+    def test_deleting_lets_you_write_again(self) -> None:
+        self.comment("Antonio", "primera")
+        self.comment("Miguel", "la de Miguel")
+
+        status, payload, _ = self.call("DELETE", "/api/movies/603/comment?name=Antonio")
+        self.assertEqual(status, 200)
+        self.assertEqual([c["name"] for c in payload["movie"]["comments"]], ["Miguel"])
+
+        status, payload = self.comment("Antonio", "segunda")
+        self.assertEqual(status, 201)
+        self.assertEqual(payload["movie"]["comments"][-1]["text"], "segunda")
+
+    def test_comment_validation(self) -> None:
+        for name, text in (
+            ("", "hola"),
+            ("Antonio", ""),
+            ("Antonio", "   "),
+            ("Antonio", 5),
+            ("Antonio", "x" * (movies.COMMENT_MAX_LENGTH + 1)),
+        ):
+            status, _ = self.comment(name, text)
+            self.assertEqual(status, 400, (name, text))
+        status, _ = self.comment("Antonio", "x" * movies.COMMENT_MAX_LENGTH)
+        self.assertEqual(status, 201)
+
+        status, _, _ = self.call(
+            "POST", "/api/movies/1/comment", {"name": "Antonio", "text": "hola"}
+        )
+        self.assertEqual(status, 404)
+
+    def test_delete_validation(self) -> None:
+        status, _, _ = self.call("DELETE", "/api/movies/603/comment")
+        self.assertEqual(status, 400)
+        status, _, _ = self.call("DELETE", "/api/movies/603/comment?name=Javi")
+        self.assertEqual(status, 404)
+        status, _, _ = self.call("DELETE", "/api/movies/1/comment?name=Javi")
+        self.assertEqual(status, 404)
+
+    def test_older_movies_get_an_empty_list(self) -> None:
+        self.path.write_text(json.dumps({"movies": [{"tmdb_id": 9}]}), encoding="utf-8")
+        stored = self.call("GET", "/api/movies")[1]["movies"][0]
+        self.assertEqual(stored["comments"], [])

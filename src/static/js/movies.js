@@ -2,6 +2,7 @@
   const NAMES = ["Antonio", "Javi", "Jorge", "Miguel"];
   const NAME_STORAGE_KEY = "manturon-peliculas-name";
   const SORT_STORAGE_KEY = "manturon-peliculas-sort";
+  const COMMENT_MAX_LENGTH = 100;
   const SEARCH_DELAY_MS = 350;
 
   // Pure helpers, exposed for the tests.
@@ -222,8 +223,14 @@
     return `https://letterboxd.com/tmdb/${movie.tmdb_id}/`;
   }
 
-  function imdbUrl(movie) {
-    return movie.imdb_id ? `https://www.imdb.com/title/${movie.imdb_id}/` : "";
+  // JustWatch has no address by TMDB id, so this opens its Spanish search.
+  function justWatchUrl(movie) {
+    return `https://www.justwatch.com/es/buscar?q=${encodeURIComponent(movie.title || "")}`;
+  }
+
+  // Opens the movie straight in the Stremio app (by IMDb id).
+  function stremioUrl(movie) {
+    return movie.imdb_id ? `stremio:///detail/movie/${movie.imdb_id}/${movie.imdb_id}` : "";
   }
 
   // People first: when you type a name you want their films, and titles that
@@ -265,7 +272,8 @@
     humanList,
     peopleLines,
     letterboxdUrl,
-    imdbUrl,
+    justWatchUrl,
+    stremioUrl,
     searchGroups,
   };
 
@@ -315,7 +323,9 @@
     changingName: false,
     name: "",
     movies: [],
-    openSynopses: new Set(),
+    openPanels: new Map(),
+    commentDrafts: new Map(),
+    commentErrors: new Map(),
     people: [],
     maxRuntime: null,
     genres: [],
@@ -509,6 +519,32 @@
     filtersChanged();
   }
 
+  // Who wants it (tick), who doesn't (cross), who has seen it (eye): a
+  // symbol before the names, coloured by kind in the CSS.
+  const PEOPLE_ICONS = {
+    wanted: ["M5 12.5l4.5 4.5L19 7.5"],
+    none: ["M5 12.5l4.5 4.5L19 7.5"],
+    against: ["M7 7l10 10", "M17 7L7 17"],
+    seen: [
+      "M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z",
+      "M12 9.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6z",
+    ],
+  };
+
+  function peopleIcon(kind) {
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("class", "movies-people-icon");
+    for (const d of PEOPLE_ICONS[kind] || PEOPLE_ICONS.wanted) {
+      const path = document.createElementNS(ns, "path");
+      path.setAttribute("d", d);
+      svg.append(path);
+    }
+    return svg;
+  }
+
   // A card reads top to bottom: what the movie is, who it is for, where to
   // look it up, and what you can do with it.
 
@@ -536,34 +572,133 @@
     ]);
   }
 
-  // "sinopsis" toggles the text under the links; open ones stay open when the
-  // list is drawn again (after any button, or a live update), so the page
-  // doesn't jump under your finger.
-  function lookUpRow(movie, overview, { removable = false } = {}) {
+  // Comments: one per person, newest last. Yours carries "borrar"; until you
+  // have one, a one-line field (Enter or "enviar") lets you write it.
+  function commentsPanel(movie) {
+    const mine = (movie.comments || []).find((comment) => comment.name === state.name);
+    const items = (movie.comments || []).map((comment) =>
+      el("li", { className: "movies-comment" }, [
+        el("div", { className: "movies-comment-head" }, [
+          el("span", { className: "movies-comment-name", textContent: comment.name }),
+          comment === mine
+            ? el("button", {
+                type: "button",
+                className: "movies-link movies-comment-delete",
+                textContent: "borrar",
+                onclick: () => deleteComment(movie),
+              })
+            : null,
+        ]),
+        el("span", { className: "movies-comment-text", textContent: comment.text }),
+      ]),
+    );
+    const children = [
+      items.length
+        ? el("ul", { className: "movies-comment-list" }, items)
+        : el("p", { className: "movies-comment-empty", textContent: "Aún no hay comentarios." }),
+    ];
+
+    if (!mine) {
+      const draft = state.commentDrafts.get(movie.tmdb_id) || "";
+      // The count only shows once you start typing, to keep the field wide.
+      const counter = el("span", {
+        className: "movies-comment-count",
+        textContent: `${draft.length}/${COMMENT_MAX_LENGTH}`,
+        hidden: !draft.length,
+      });
+      const input = el("input", {
+        type: "text",
+        className: "movies-comment-input",
+        maxLength: COMMENT_MAX_LENGTH,
+        placeholder: "escribe un comentario…",
+        value: draft,
+        enterKeyHint: "send",
+        ariaLabel: `Comentario sobre ${movie.title}`,
+      });
+      input.dataset.draftFor = String(movie.tmdb_id);
+      input.addEventListener("input", () => {
+        state.commentDrafts.set(movie.tmdb_id, input.value);
+        counter.textContent = `${input.value.length}/${COMMENT_MAX_LENGTH}`;
+        counter.hidden = !input.value.length;
+      });
+      const form = el("form", { className: "movies-comment-form" }, [
+        input,
+        counter,
+        el("button", { type: "submit", className: "movies-comment-send", textContent: "enviar" }),
+      ]);
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        sendComment(movie, input.value);
+      });
+      children.push(form);
+    }
+
+    const error = state.commentErrors.get(movie.tmdb_id);
+    if (error) children.push(el("p", { className: "movies-error", textContent: error }));
+    return el("div", { className: "movies-comments" }, children);
+  }
+
+  // "dónde verla": two bubbles, JustWatch (search by title) and the Stremio
+  // app, each a link.
+  function wherePanel(movie) {
+    const places = [
+      { name: "JustWatch", logo: "/static/icons/justwatch.png", href: justWatchUrl(movie), external: true },
+      { name: "Stremio", logo: "/static/icons/stremio.png", href: stremioUrl(movie), external: false },
+    ].filter((place) => place.href);
+    return el("div", { className: "movies-where" }, [
+      el("ul", { className: "movies-providers" }, places.map((place) =>
+        el("li", {}, [
+          el("a", {
+            className: "movies-provider",
+            href: place.href,
+            ...(place.external ? { rel: "noopener", target: "_blank" } : {}),
+          }, [
+            el("img", { className: "movies-provider-logo", src: place.logo, alt: "", width: 22, height: 22 }),
+            el("span", { textContent: place.name }),
+          ]),
+        ]),
+      )),
+    ]);
+  }
+
+  // "sinopsis" and "comentarios" open under the links, one at a time. What is
+  // open stays open when the list is drawn again (after any button, or a live
+  // update), so the page doesn't jump under your finger.
+  function lookUpRow(movie, panels) {
     const items = [];
-    if (overview) {
-      const open = () => state.openSynopses.has(movie.tmdb_id);
+    const toggles = [];
+    const sync = () => {
+      const open = state.openPanels.get(movie.tmdb_id);
+      for (const { key, button, panel } of toggles) {
+        button.ariaExpanded = String(open === key);
+        panel.hidden = open !== key;
+      }
+    };
+    for (const [key, label, panel] of [
+      ["synopsis", "sinopsis", panels.synopsis],
+      ["comments", panels.commentsLabel, panels.comments],
+      ["where", "dónde verla", panels.where],
+    ]) {
+      if (!panel) continue;
       const button = el("button", {
         type: "button",
-        className: "movies-link movies-synopsis-toggle",
-        textContent: "sinopsis",
-        ariaExpanded: String(open()),
+        className: "movies-link movies-panel-toggle",
+        textContent: label,
         onclick: () => {
-          if (open()) state.openSynopses.delete(movie.tmdb_id);
-          else state.openSynopses.add(movie.tmdb_id);
-          button.ariaExpanded = String(open());
-          overview.hidden = !open();
+          const open = state.openPanels.get(movie.tmdb_id);
+          if (open === key) state.openPanels.delete(movie.tmdb_id);
+          else state.openPanels.set(movie.tmdb_id, key);
+          sync();
+          if (state.openPanels.get(movie.tmdb_id) === "comments") {
+            const input = panel.querySelector("input");
+            if (input) input.focus({ preventScroll: true });
+          }
         },
       });
-      overview.hidden = !open();
+      toggles.push({ key, button, panel });
       items.push(button);
     }
-    items.push(el("a", { href: letterboxdUrl(movie), textContent: "Letterboxd", rel: "noopener", target: "_blank" }));
-    if (imdbUrl(movie)) {
-      items.push(el("a", { href: imdbUrl(movie), textContent: "IMDb", rel: "noopener", target: "_blank" }));
-    }
-    // "quitar" closes the row, out of the way of the buttons you use often.
-    if (removable) items.push(removeControl(movie));
+    sync();
     return el("p", { className: "movies-links" }, items);
   }
 
@@ -578,11 +713,24 @@
     const genres = movie.genres && movie.genres.length
       ? el("p", { className: "movies-genres", textContent: movie.genres.join(" · ") })
       : null;
+    const comments = pick ? null : commentsPanel(movie);
+    const where = pick ? null : wherePanel(movie);
+    const commentCount = (movie.comments || []).length;
+    const commentsLabel = commentCount ? `comentarios (${commentCount})` : "comentarios";
 
     const body = el("div", { className: "movies-card-body" }, [
       el("div", { className: "movies-card-head" }, [
         el("h3", { textContent: movie.title }),
-        rating ? el("span", { className: "movies-rating", textContent: rating }) : null,
+        // The rating opens the movie on Letterboxd (where the reviews are);
+        // without a rating yet, the link still sits in the same place.
+        el("a", {
+          className: "movies-rating",
+          href: letterboxdUrl(movie),
+          rel: "noopener",
+          target: "_blank",
+          title: "Ver en Letterboxd",
+          textContent: `${rating || "Letterboxd"} ↗`,
+        }),
       ]),
       original,
       el("p", { className: "movies-meta", textContent: movieMeta(movie) }),
@@ -591,20 +739,23 @@
         "div",
         { className: "movies-people" },
         peopleLines(movie).map((line) =>
-          el("p", { className: `movies-people-${line.kind}` }, [
-            el("span", { className: "movies-people-label", textContent: line.label }),
-            line.names ? ` ${line.names}` : null,
+          el("p", { className: `movies-people-${line.kind}`, title: line.label }, [
+            peopleIcon(line.kind),
+            el("span", { className: "movies-visually-hidden", textContent: `${line.label} ` }),
+            el("span", { textContent: line.names || "nadie" }),
           ]),
         ),
       ),
       pick ? overview : null,
-      lookUpRow(movie, pick ? null : overview, { removable: !pick }),
+      lookUpRow(movie, pick ? {} : { synopsis: overview, comments, commentsLabel, where }),
       pick ? null : overview,
+      pick ? null : comments,
+      pick ? null : where,
       pick ? null : myButtons(movie),
     ]);
 
     return el("article", { className: pick ? "movies-card movies-card-pick" : "movies-card" }, [
-      poster(movie, "movies-poster"),
+      pick ? poster(movie, "movies-poster") : posterWithRemove(movie),
       body,
     ]);
   }
@@ -615,7 +766,20 @@
       filterMovies(state.movies, activeFilters()),
       state.sort,
     );
+    // If you are typing a comment when the list is redrawn (someone else's
+    // change arriving live), put the cursor back where it was.
+    const typing = document.activeElement && document.activeElement.dataset
+      ? document.activeElement.dataset.draftFor
+      : undefined;
+    const caret = typing ? document.activeElement.selectionStart : null;
     list.replaceChildren(...visible.map((movie) => el("li", {}, [movieCard(movie)])));
+    if (typing) {
+      const input = list.querySelector(`input[data-draft-for="${typing}"]`);
+      if (input) {
+        input.focus({ preventScroll: true });
+        input.setSelectionRange(caret, caret);
+      }
+    }
     let empty = "";
     if (!visible.length) {
       empty = filtering()
@@ -712,6 +876,40 @@
     );
   }
 
+  async function sendComment(movie, text) {
+    if (!state.name) {
+      askForName("Elige quién eres para comentar.");
+      return;
+    }
+    if (!text.trim()) return;
+    try {
+      const data = await api("POST", `/api/movies/${movie.tmdb_id}/comment`, {
+        name: state.name,
+        text,
+      });
+      state.commentDrafts.delete(movie.tmdb_id);
+      state.commentErrors.delete(movie.tmdb_id);
+      replaceMovie(data.movie);
+    } catch (error) {
+      state.commentErrors.set(movie.tmdb_id, error.message);
+    }
+    renderList();
+  }
+
+  async function deleteComment(movie) {
+    try {
+      const data = await api(
+        "DELETE",
+        `/api/movies/${movie.tmdb_id}/comment?name=${encodeURIComponent(state.name)}`,
+      );
+      state.commentErrors.delete(movie.tmdb_id);
+      replaceMovie(data.movie);
+    } catch (error) {
+      state.commentErrors.set(movie.tmdb_id, error.message);
+    }
+    renderList();
+  }
+
   async function toggleSeen(movie, seen) {
     if (!state.name) {
       askForName("Elige quién eres.");
@@ -753,41 +951,48 @@
     }
   }
 
-  // "quitar" asks again in place ("¿seguro? sí · no") rather than with a
-  // browser dialog.
-  function removeControl(movie) {
-    const wrapper = el("span", { className: "movies-remove-wrap" });
+  // The poster carries a small × in its top left corner (on hover with a
+  // mouse, always on touch screens). It asks again over the poster itself
+  // ("¿quitarla? sí / no") rather than with a browser dialog.
+  function posterWithRemove(movie) {
     const ask = el("button", {
       type: "button",
-      className: "movies-link movies-remove",
-      textContent: "quitar",
+      className: "movies-remove-x",
+      textContent: "×",
+      ariaLabel: `Quitar «${movie.title}» de la lista`,
+      title: "Quitar de la lista",
     });
-    const confirmBox = el("span", { className: "movies-confirm", hidden: true }, [
-      el("span", { textContent: "¿quitarla?" }),
-      el("button", {
-        type: "button",
-        className: "movies-link movies-confirm-yes",
-        textContent: "sí",
-        onclick: () => removeMovie(movie),
-      }),
-      el("button", {
-        type: "button",
-        className: "movies-link",
-        textContent: "no",
-        onclick: () => {
-          confirmBox.hidden = true;
-          ask.hidden = false;
-          ask.focus();
-        },
-      }),
+    const confirmBox = el("div", { className: "movies-remove-confirm", hidden: true }, [
+      el("p", { textContent: "¿quitarla de la lista?" }),
+      el("div", { className: "movies-remove-choices" }, [
+        el("button", {
+          type: "button",
+          className: "movies-remove-yes",
+          textContent: "sí",
+          onclick: () => removeMovie(movie),
+        }),
+        el("button", {
+          type: "button",
+          className: "movies-remove-no",
+          textContent: "no",
+          onclick: () => {
+            confirmBox.hidden = true;
+            ask.hidden = false;
+            ask.focus();
+          },
+        }),
+      ]),
     ]);
     ask.addEventListener("click", () => {
       ask.hidden = true;
       confirmBox.hidden = false;
       confirmBox.querySelector("button").focus();
     });
-    wrapper.append(ask, confirmBox);
-    return wrapper;
+    return el("div", { className: "movies-poster-wrap" }, [
+      poster(movie, "movies-poster"),
+      ask,
+      confirmBox,
+    ]);
   }
 
   async function removeMovie(movie) {
@@ -1058,6 +1263,14 @@
       sortToggle.focus();
     }
   });
+
+  // Light / dark / auto, shared with the rest of the site.
+  if (global.ManturonTheme) {
+    global.ManturonTheme.createThemeController({
+      button: $("#theme-toggle"),
+      label: $("#theme-toggle-label"),
+    }).init();
+  }
 
   state.sort = storedSort();
   renderSort();

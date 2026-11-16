@@ -1503,7 +1503,7 @@ async function testMoviesRandomPickHonoursWhoIsHome() {
 }
 
 async function testMoviesMetaAndLinks() {
-  const { movieMeta, formatRuntime, letterboxdUrl, imdbUrl } = moviesModule();
+  const { movieMeta, formatRuntime, letterboxdUrl, justWatchUrl, stremioUrl } = moviesModule();
 
   // Non-breaking spaces keep the runtime on one line.
   assert.equal(formatRuntime(136), "2 h 16 min");
@@ -1513,8 +1513,12 @@ async function testMoviesMetaAndLinks() {
   assert.equal(movieMeta({ year: "1999", runtime: 136 }), "1999 · 2 h 16 min");
   assert.equal(movieMeta({ year: "" }), "");
   assert.equal(letterboxdUrl({ tmdb_id: 603 }), "https://letterboxd.com/tmdb/603/");
-  assert.equal(imdbUrl({ imdb_id: "tt0133093" }), "https://www.imdb.com/title/tt0133093/");
-  assert.equal(imdbUrl({ imdb_id: "" }), "");
+  assert.equal(
+    justWatchUrl({ title: "El club de la lucha" }),
+    "https://www.justwatch.com/es/buscar?q=El%20club%20de%20la%20lucha",
+  );
+  assert.equal(stremioUrl({ imdb_id: "tt0133093" }), "stremio:///detail/movie/tt0133093/tt0133093");
+  assert.equal(stremioUrl({ imdb_id: "" }), "");
 }
 
 async function testMoviesSearchOrdersTitlesDirectorsActors() {

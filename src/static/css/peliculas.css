@@ -7,8 +7,32 @@ body {
   overflow: auto;
 }
 
+/* Literata for reading (self-hosted, Latin subset, variable weight and
+   optical size; licence in licenses/Literata-OFL.txt). The page title keeps
+   IM Fell so it still looks like the rest of the site. */
+@font-face {
+  font-family: "Literata";
+  src: url("../fonts/literata-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Literata";
+  src: url("../fonts/literata-latin-italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 400 600;
+  font-display: swap;
+}
+
 body {
-  font-size: 17px;
+  font-family: "Literata", Georgia, serif;
+  font-size: 16px;
+}
+
+.movies-header h1 {
+  font-family: "IM FELL DW Pica", serif;
 }
 
 .movies-page {
@@ -34,6 +58,22 @@ body {
 }
 
 /* Header */
+
+.movies-header-side {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  justify-content: flex-end;
+  align-items: baseline;
+}
+
+.movies-page .movies-theme-toggle,
+.movies-page .movies-theme-toggle[aria-pressed="true"] {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
 
 .movies-session {
   margin: 0;
@@ -175,8 +215,10 @@ body {
   border-left: 0;
 }
 
-.movies-chips button[aria-pressed="true"] + button {
-  border-left: 1px solid var(--accent);
+/* The chosen name only changes its fill: keeping the same borders as the
+   others leaves every divider in place. */
+.movies-page .movies-chips button[aria-pressed="true"] {
+  border-color: var(--control-line);
 }
 
 /* Search */
@@ -308,9 +350,13 @@ body {
 
 /* A floating card: two short groups ("ordenar por", "sentido"), the chosen
    item marked with a tick rather than a block of colour. */
-.movies-sort-menu {
+.movies-sort-menu,
+.movies-filters {
   --menu-bg: var(--bg);
   --menu-shadow: 0 14px 34px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.movies-sort-menu {
   position: absolute;
   z-index: 10;
   top: calc(100% + 6px);
@@ -325,13 +371,15 @@ body {
   animation: movies-reveal 0.15s ease-out;
 }
 
-:root[data-theme="dark"] .movies-sort-menu {
+:root[data-theme="dark"] .movies-sort-menu,
+:root[data-theme="dark"] .movies-filters {
   --menu-bg: var(--paper-strong);
   --menu-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .movies-sort-menu {
+  :root:not([data-theme="light"]) .movies-sort-menu,
+  :root:not([data-theme="light"]) .movies-filters {
     --menu-bg: var(--paper-strong);
     --menu-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
   }
@@ -406,11 +454,13 @@ body {
 
 .movies-filters {
   display: grid;
-  gap: 20px;
-  margin-top: 12px;
-  padding: 18px 18px 14px;
+  gap: 16px;
+  margin-top: 10px;
+  padding: 12px 16px 12px;
   border: 1px solid var(--line-strong);
-  background: var(--surface-soft);
+  border-radius: 10px;
+  background: var(--menu-bg);
+  box-shadow: var(--menu-shadow);
   animation: movies-reveal 0.18s ease-out;
 }
 
@@ -431,23 +481,22 @@ body {
   }
 }
 
+/* Group titles read like the sort menu's: small, grey, italic. */
 .movies-filter-label {
   display: flex;
   gap: 8px;
   align-items: baseline;
-  margin: 0 0 8px;
-  font-size: 0.95rem;
-}
-
-.movies-filter-label span,
-.movies-filter-label output {
+  margin: 0 0 6px;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.8rem;
+  font-style: italic;
 }
 
 .movies-filter-label output {
   margin-left: auto;
   color: var(--ink);
+  font-size: 0.9rem;
+  font-style: normal;
 }
 
 .movies-tags {
@@ -559,7 +608,7 @@ body {
 .movies-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 40px;
+  gap: 0 32px;
   margin: 20px 0 0;
   padding: 0;
   list-style: none;
@@ -572,8 +621,8 @@ body {
 
 .movies-card {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 16px;
   align-items: start;
 }
 
@@ -582,6 +631,7 @@ body {
 }
 
 .movies-poster {
+  display: block;
   width: 100%;
   aspect-ratio: 2 / 3;
   object-fit: cover;
@@ -614,11 +664,18 @@ body {
   font-size: 1.6rem;
 }
 
-.movies-rating {
+.movies-page .movies-rating {
   flex: none;
   color: var(--muted);
   font-size: 0.9rem;
+  text-decoration: none;
   white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .movies-page .movies-rating:hover {
+    color: var(--accent);
+  }
 }
 
 .movies-card-body p {
@@ -641,31 +698,62 @@ body {
   margin-top: 2px;
 }
 
-/* Who it is for: one line each, the label coloured by kind (green wants it,
-   red does not, grey has seen it) and the names in the text colour. */
+/* Who it is for: one line each, a symbol then the names: a green tick wants
+   it, a red cross doesn't, a grey eye has seen it. The words stay for
+   screen readers. */
 .movies-card-body .movies-people {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   margin-top: 10px;
   font-size: 0.9rem;
   line-height: 1.35;
 }
 
-.movies-people-label {
-  font-style: italic;
+.movies-card-body .movies-people p {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
-.movies-people-wanted .movies-people-label {
-  color: var(--accent);
+.movies-people-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
 }
 
-.movies-people-against .movies-people-label {
-  color: var(--danger);
+.movies-people-wanted .movies-people-icon {
+  stroke: var(--accent);
 }
 
-.movies-people-seen .movies-people-label,
-.movies-people-none .movies-people-label {
+.movies-people-against .movies-people-icon {
+  stroke: var(--danger);
+}
+
+.movies-people-seen .movies-people-icon {
+  stroke-width: 2.2;
+}
+
+/* The eye's pupil is filled. */
+.movies-people-seen .movies-people-icon path:last-child {
+  fill: var(--muted);
+}
+
+.movies-people-none {
   color: var(--muted);
+}
+
+.movies-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 /* "✓ vista" shares the grey of "vista por": seen is done, not a wish. */
@@ -676,7 +764,7 @@ body {
 }
 
 .movies-card-body .movies-links {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .movies-card-body .movies-overview {
@@ -712,16 +800,17 @@ body {
 .movies-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 14px;
+  gap: 4px 11px;
   align-items: baseline;
-  font-size: 0.88rem;
+  font-size: 0.84rem;
 }
 
-.movies-page .movies-synopsis-toggle {
+.movies-page .movies-panel-toggle {
   color: var(--accent);
+  font-size: inherit;
 }
 
-.movies-synopsis-toggle::after {
+.movies-panel-toggle::after {
   display: inline-block;
   margin-left: 3px;
   content: "▾";
@@ -729,8 +818,150 @@ body {
   text-decoration: none;
 }
 
-.movies-synopsis-toggle[aria-expanded="true"]::after {
+.movies-panel-toggle[aria-expanded="true"]::after {
   content: "▴";
+}
+
+/* "dónde verla": link bubbles with each site's own icon (self-hosted in
+   static/icons). */
+.movies-where {
+  margin-top: 10px;
+}
+
+.movies-providers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.movies-page .movies-provider {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  padding: 3px 12px 3px 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .movies-page .movies-provider:hover {
+    border-color: var(--accent);
+    color: var(--ink);
+  }
+}
+
+.movies-provider-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+/* Comments: no box, just a short thread under the links (name above, text
+   below) and one rounded field with the send button inside it. */
+.movies-comments {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 0.92rem;
+}
+
+.movies-comment-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.movies-comment {
+  display: grid;
+  gap: 1px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-strong);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.movies-comment-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.movies-comment-name {
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.movies-page .movies-comment-delete {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.movies-comment-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-style: italic;
+}
+
+.movies-comment-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 3px 3px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--bg);
+  transition: border-color 0.15s ease;
+}
+
+.movies-comment-form:focus-within {
+  border-color: var(--accent);
+}
+
+.movies-page .movies-comment-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 0.92rem;
+}
+
+.movies-page .movies-comment-input:focus-visible {
+  outline: none;
+}
+
+.movies-comment-count {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.movies-page .movies-comment-send {
+  min-height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 0.85rem;
+}
+
+.movies-comments .movies-error {
+  margin: 0;
+  font-size: 0.85rem;
 }
 
 .movies-actions {
@@ -740,31 +971,76 @@ body {
   align-items: center;
 }
 
-/* "quitar" sits apart at the end of the links row. */
-.movies-links .movies-remove-wrap {
-  margin-left: auto;
-  padding-left: 8px;
+/* Removing: a small × in the poster's corner (shown on hover with a mouse,
+   always on touch screens) that asks again over the poster. */
+.movies-poster-wrap {
+  position: relative;
 }
 
-.movies-confirm {
-  display: inline-flex;
-  gap: 10px;
-  align-items: baseline;
-  color: var(--muted);
-  font-size: 0.92rem;
+.movies-page .movies-remove-x {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
-.movies-confirm[hidden] {
-  display: none;
+.movies-poster-wrap:hover .movies-remove-x,
+.movies-page .movies-remove-x:focus-visible {
+  opacity: 1;
 }
 
-.movies-page .movies-confirm-yes {
-  color: var(--danger);
+@media (hover: none) {
+  .movies-page .movies-remove-x {
+    opacity: 0.85;
+  }
 }
 
-.movies-page .movies-remove {
-  color: var(--muted);
-  font-size: 0.92rem;
+.movies-remove-confirm {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: 8px;
+  place-content: center;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.movies-remove-choices {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.movies-page .movies-remove-yes,
+.movies-page .movies-remove-no {
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid #fff;
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.movies-page .movies-remove-yes {
+  border-color: #e5484d;
+  background: #e5484d;
 }
 
 .movies-footer {
