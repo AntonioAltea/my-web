@@ -28,7 +28,7 @@
   //   lax    ("alguno") — at least one of you at home wants it;
   //   strict ("todos")  — all of you at home want it;
   //   ideal             — all of you at home want it and everyone away said
-  //                       "yo no".
+  //                       "yo no". Not a switch position: only the IDEAL tag.
   const MATCH_MODES = ["lax", "strict", "ideal"];
 
   function suitsPeople(movie, people, match = "lax") {

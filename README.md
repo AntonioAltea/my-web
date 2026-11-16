@@ -179,10 +179,9 @@ and carries `noindex`.
 - The list and the random pick follow exactly the same rules: the pick draws from what the list shows. Wanting a
   movie is what counts; "ya la he visto" is shown but never filtered on. With nobody ticked as home, the list shows
   what someone wants, and the movies nobody wants wait behind a "ver las N que no quiere nadie" link. With people
-  ticked, a movie is out if someone at home said "yo no" or someone away wants it, and a three-way switch asks for
-  more: "alguno" (one of you at home wants it), "todos" (all of you at home want it) or "ideal" (all of you at home
-  want it and everyone away said "yo no"). Movies that are ideal for whoever is ticked carry an IDEAL tag by the
-  title in any mode.
+  ticked, a movie is out if someone at home said "yo no" or someone away wants it, and a switch asks for more:
+  "alguno" (one of you at home wants it) or "todos" (all of you at home want it). Movies that all of you at home
+  want and everyone away said "yo no" to carry an IDEAL tag by the title.
 - The random pick is unveiled with one of two quiet animations, chosen at random each time: the poster as a
   scrambled, coarse grid of tiles on a canvas that swap into place while the pixels sharpen (about 1.4 s), or three
   reels of posters from the list, drawn inside the card, that stop one after another on the winner (about 1.6 s). The
