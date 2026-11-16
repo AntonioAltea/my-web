@@ -951,6 +951,17 @@
     }
   }
 
+  function crossIcon() {
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", "M6 6l12 12M18 6L6 18");
+    svg.append(path);
+    return svg;
+  }
+
   // The poster carries a small × in its top left corner (on hover with a
   // mouse, always on touch screens). It asks again over the poster itself
   // ("¿quitarla? sí / no") rather than with a browser dialog.
@@ -958,10 +969,12 @@
     const ask = el("button", {
       type: "button",
       className: "movies-remove-x",
-      textContent: "×",
       ariaLabel: `Quitar «${movie.title}» de la lista`,
       title: "Quitar de la lista",
     });
+    // Drawn rather than typed: a "×" glyph sits wherever the font puts it,
+    // never quite in the middle of the circle.
+    ask.append(crossIcon());
     const confirmBox = el("div", { className: "movies-remove-confirm", hidden: true }, [
       el("p", { textContent: "¿quitarla de la lista?" }),
       el("div", { className: "movies-remove-choices" }, [
