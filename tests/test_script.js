@@ -1334,28 +1334,27 @@ function moviesModule() {
 }
 
 const MOVIES = [
-  { tmdb_id: 1, title: "Uno", added_by: "Marta", added_at: "2026-01-02", watched_at: null },
-  { tmdb_id: 2, title: "Dos", added_by: "Antonio", added_at: "2026-01-01", watched_at: null },
-  { tmdb_id: 3, title: "Tres", added_by: "Marta", added_at: "2026-01-03", watched_at: "2026-02-01" },
-  { tmdb_id: 4, title: "Cuatro", added_by: "Antonio", added_at: "2026-01-04", watched_at: "2026-03-01" },
-  { tmdb_id: 5, title: "Cinco", added_by: "Miguel", added_at: "2026-01-05", watched_at: null },
+  { tmdb_id: 1, title: "Uno", added_by: "Marta", added_at: "2026-01-02", seen_by: [] },
+  { tmdb_id: 2, title: "Dos", added_by: "Antonio", added_at: "2026-01-01", seen_by: [] },
+  { tmdb_id: 3, title: "Tres", added_by: "Marta", added_at: "2026-01-03", seen_by: ["Marta"] },
+  { tmdb_id: 4, title: "Cuatro", added_by: "Antonio", added_at: "2026-01-04", seen_by: ["Antonio", "Miguel"] },
+  { tmdb_id: 5, title: "Cinco", added_by: "Miguel", added_at: "2026-01-05", seen_by: [] },
 ];
 
 async function testMoviesFilterAndSort() {
   const { filterMovies, sortMovies, NAMES } = moviesModule();
   const ids = (movies) => movies.map((movie) => movie.tmdb_id);
 
-  assert.deepEqual(ids(filterMovies(MOVIES, { status: "pending" })), [1, 2, 5]);
-  assert.deepEqual(ids(filterMovies(MOVIES, { status: "watched", people: ["Marta"] })), [3]);
-  // Ticking several people shows what any of them added; nobody ticked is everyone.
-  assert.deepEqual(
-    ids(filterMovies(MOVIES, { status: "pending", people: ["Antonio", "Miguel"] })),
-    [2, 5],
-  );
-  assert.deepEqual(ids(filterMovies(MOVIES, { status: "pending", people: [] })), [1, 2, 5]);
-  // Pending oldest first, so nothing sinks forever; watched latest first.
-  assert.deepEqual(ids(sortMovies(filterMovies(MOVIES, { status: "pending" }), "pending")), [2, 1, 5]);
-  assert.deepEqual(ids(sortMovies(filterMovies(MOVIES, { status: "watched" }), "watched")), [4, 3]);
+  // Nobody ticked: every movie, seen or not.
+  assert.deepEqual(ids(filterMovies(MOVIES, {})), [1, 2, 3, 4, 5]);
+  // Once everyone at home has seen it, it drops out.
+  assert.deepEqual(ids(filterMovies(MOVIES, { people: ["Marta"] })), [1]);
+  assert.deepEqual(ids(filterMovies(MOVIES, { people: ["Antonio", "Miguel"] })), [2, 5]);
+  // If only some of them have seen it, it still shows.
+  assert.deepEqual(ids(filterMovies(MOVIES, { people: ["Antonio"] })), [2]);
+  assert.deepEqual(ids(filterMovies(MOVIES, { people: ["Antonio", "Marta"] })), [1, 2, 3, 4]);
+  // By default, the latest added first.
+  assert.deepEqual(ids(sortMovies(filterMovies(MOVIES, {}))), [5, 4, 3, 1, 2]);
   assert.deepEqual([...NAMES], ["Antonio", "Javi", "Jorge", "Miguel"]);
 }
 
@@ -1402,6 +1401,40 @@ async function testMoviesFilterByWhoWantsItDurationAndGenre() {
   assert.equal(pickRandom(movies, { genres: ["Terror"], people: ["Miguel"] }), null);
 }
 
+async function testMoviesSortOrders() {
+  const { sortMovies, nextSort, sortWay, formatRating, movieMeta } = moviesModule();
+  const ids = (movies) => movies.map((movie) => movie.tmdb_id);
+  const movies = [
+    { tmdb_id: 1, title: "Ágora", year: "2009", runtime: 127, rating: 6.8, added_at: "2026-01-02" },
+    { tmdb_id: 2, title: "alien", year: "1979", runtime: 117, rating: 8.1, added_at: "2026-01-03" },
+    { tmdb_id: 3, title: "Zelig", year: "", runtime: null, added_at: "2026-01-01" },
+    { tmdb_id: 4, title: "Brazil", year: "1985", runtime: 142, rating: null, added_at: "2026-01-04" },
+  ];
+
+  assert.deepEqual(ids(sortMovies(movies, { key: "added", dir: -1 })), [4, 2, 1, 3]);
+  assert.deepEqual(ids(sortMovies(movies, { key: "added", dir: 1 })), [3, 1, 2, 4]);
+  // Alphabetical ignores accents and case.
+  assert.deepEqual(ids(sortMovies(movies, { key: "title", dir: 1 })), [1, 2, 4, 3]);
+  assert.deepEqual(ids(sortMovies(movies, { key: "title", dir: -1 })), [3, 4, 2, 1]);
+  // Missing values go last whichever way the list runs.
+  assert.deepEqual(ids(sortMovies(movies, { key: "year", dir: -1 })), [1, 4, 2, 3]);
+  assert.deepEqual(ids(sortMovies(movies, { key: "year", dir: 1 })), [2, 4, 1, 3]);
+  assert.deepEqual(ids(sortMovies(movies, { key: "runtime", dir: 1 })), [2, 1, 4, 3]);
+  assert.deepEqual(ids(sortMovies(movies, { key: "rating", dir: -1 })), [2, 1, 4, 3]);
+  assert.deepEqual(ids(sortMovies(movies, { key: "rating", dir: 1 })), [1, 2, 4, 3]);
+
+  // Picking the active order flips it; a new one starts its own way.
+  assert.deepEqual({ ...nextSort({ key: "rating", dir: -1 }, "rating") }, { key: "rating", dir: 1 });
+  assert.deepEqual({ ...nextSort({ key: "rating", dir: 1 }, "runtime") }, { key: "runtime", dir: 1 });
+  assert.equal(sortWay({ key: "rating", dir: -1 }), "mejor nota primero");
+  assert.equal(sortWay({ key: "title", dir: 1 }), "de la A a la Z");
+
+  assert.equal(formatRating(7.8), "★ 7,8");
+  assert.equal(formatRating(8), "★ 8,0");
+  assert.equal(formatRating(null), "");
+  assert.equal(movieMeta({ year: "1979", runtime: 117, rating: 8.1 }), "1979 · 1 h 57 min · ★ 8,1");
+}
+
 async function testMoviesRuntimeSliderAndSummary() {
   const { runtimeLimit, runtimeLimitLabel, filterSummary, RUNTIME_SLIDER } = moviesModule();
 
@@ -1418,7 +1451,7 @@ async function testMoviesRuntimeSliderAndSummary() {
   );
 }
 
-async function testMoviesRandomPickOnlyOffersPendingOnes() {
+async function testMoviesRandomPickHonoursWhoIsHome() {
   const { pickRandom } = moviesModule();
 
   assert.equal(pickRandom(MOVIES, { random: () => 0 }).tmdb_id, 1);
@@ -1431,7 +1464,9 @@ async function testMoviesRandomPickOnlyOffersPendingOnes() {
   // "Otra" never repeats the current pick while there is something else.
   assert.equal(pickRandom(MOVIES, { exclude: 1, random: () => 0 }).tmdb_id, 2);
   assert.equal(pickRandom(MOVIES, { people: ["Marta"], exclude: 1 }).tmdb_id, 1);
-  assert.equal(pickRandom(MOVIES.slice(2, 4)), null);
+  // Nothing left that the people at home haven't all seen.
+  assert.equal(pickRandom(MOVIES.slice(2, 4), { people: ["Marta"] }), null);
+  assert.equal(pickRandom([]), null);
 }
 
 async function testMoviesMetaAndLinks() {
@@ -1449,31 +1484,33 @@ async function testMoviesMetaAndLinks() {
   assert.equal(imdbUrl({ imdb_id: "" }), "");
 }
 
-async function testMoviesSearchPutsPeopleFirst() {
+async function testMoviesSearchOrdersTitlesDirectorsActors() {
   const { searchGroups } = moviesModule();
   const groups = searchGroups({
     movies: [{ tmdb_id: 9 }],
+    // The server may list the actor before the director.
     people: [
-      { name: "Pedro Almodóvar", role: "director", movies: [{ tmdb_id: 1 }] },
       { name: "Penélope Cruz", role: "actor", movies: [{ tmdb_id: 2 }] },
+      { name: "Pedro Almodóvar", role: "director", movies: [{ tmdb_id: 1 }] },
       { name: "Nadie", role: "actor", movies: [] },
     ],
   });
 
   assert.deepEqual(
     groups.map((group) => group.title),
-    ["dirigidas por Pedro Almodóvar", "con Penélope Cruz", "películas"],
+    ["películas", "dirigidas por Pedro Almodóvar", "con Penélope Cruz"],
   );
   assert.equal(searchGroups({ movies: [], people: [] }).length, 0);
 }
 
 async function run() {
   const tests = [
-    ["puts people first in movie search", testMoviesSearchPutsPeopleFirst],
+    ["orders search results: titles, directors, actors", testMoviesSearchOrdersTitlesDirectorsActors],
     ["filters movies by who wants them, duration and genre", testMoviesFilterByWhoWantsItDurationAndGenre],
     ["reads the runtime slider and sums up the filters", testMoviesRuntimeSliderAndSummary],
+    ["sorts movies every way", testMoviesSortOrders],
     ["filters and sorts the movie list", testMoviesFilterAndSort],
-    ["picks a random pending movie", testMoviesRandomPickOnlyOffersPendingOnes],
+    ["picks a random movie for whoever is home", testMoviesRandomPickHonoursWhoIsHome],
     ["formats movie details and links", testMoviesMetaAndLinks],
     ["locks photo controls while loading", testPhotoControlsLockWhileLoading],
     ["unlocks photo controls after a stalled image times out", testPhotoLoadTimeoutUnlocksControls],

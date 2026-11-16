@@ -138,13 +138,15 @@ The event collector endpoint is `/api/analytics/event`.
 
 ## Flat Movie Watchlist
 
-`/peliculas` is a private shared watchlist for the flat: anyone with the password can add movies, mark them as watched,
-remove them and pick a random pending one. Each movie keeps `wanted_by`, the flatmates who want to see it: whoever added it, plus
-anyone who pressed "yo también" (older entries without the field count as wanted by whoever added them), and
-`not_wanted_by`, those who pressed "yo no". The two exclude each other. A "filtros"
+`/peliculas` is a private shared watchlist for the flat: anyone with the password can add movies, say who
+wants to see them, mark them as seen, remove them and pick a random one. There is one list; nothing moves to a
+"watched" section. Each movie keeps `wanted_by`, the flatmates who want to see it: whoever added it, plus anyone who
+pressed "yo también" (older entries without the field count as wanted by whoever added them); `not_wanted_by`, those
+who pressed "yo no" (the two exclude each other); and `seen_by`, those who pressed "ya la he visto" (movies marked
+watched under the old single `watched_at` count as seen by whoever wanted them). A "filtros"
 panel (shut by default; shut, one line sums up what is active) narrows the list and the random pick to what any of
-the ticked flatmates wants to see and none of them said "yo no" to (whoever is home that night; nobody ticked means
-everyone), to a maximum runtime
+the ticked flatmates wants to see, none of them said "yo no" to and not all of them have seen (whoever is home that
+night; nobody ticked means everyone), to a maximum runtime
 picked on a slider (its last stop is no limit; a movie without a known runtime only shows then) and to any of the
 ticked genres (the tags come from the movies on the list). The page uses no native menus or browser dialogs:
 removing a movie asks again inside its card. It is not linked from the site
@@ -159,9 +161,16 @@ and carries `noindex`.
   word typed (accents ignored), fetched with `/person/<id>/movie_credits` — as director for people known for directing,
   as cast otherwise.
 - Who added a movie is picked from a fixed list of flatmates, `NAMES` in `src/static/js/movies.js`.
+- Live updates use Server-Sent Events: `GET /api/movies/events` keeps a stream open and sends `changed` whenever
+  the list is saved (with a heartbeat comment every 25 s so Fly's proxy keeps it), and the page fetches the list
+  again. It also refetches when a phone brings the tab back. The change signal lives in memory, which is fine with
+  one machine; with several, each would only hear its own saves.
+- The list can be sorted by date added, title, year, runtime or TMDB rating (`vote_average`, stored as `rating`
+  when a movie is added). Movies saved before ratings existed get theirs in a background lookup the first time the
+  list is read. The chosen order is remembered per browser.
 - The list lives in `movies.json` under the media root (`assets/movies.json` locally, `/data/movies.json` on Fly).
-- API: `POST /api/movies/login` and `/logout`, `GET /api/movies`, `GET /api/movies/search?q=`, `POST /api/movies`
-  (`{tmdbId, addedBy}`), `POST /api/movies/<id>/watched` (`{watched}`), `POST /api/movies/<id>/wanted` (`{name, want}`: `true` "yo también", `false` "yo no", `null` neither), `DELETE /api/movies/<id>`.
+- API: `POST /api/movies/login` and `/logout`, `GET /api/movies`, `GET /api/movies/events` (SSE), `GET /api/movies/search?q=`, `POST /api/movies`
+  (`{tmdbId, addedBy}`), `POST /api/movies/<id>/seen` (`{name, seen}`), `POST /api/movies/<id>/wanted` (`{name, want}`: `true` "yo también", `false` "yo no", `null` neither), `DELETE /api/movies/<id>`.
 
 Locally:
 

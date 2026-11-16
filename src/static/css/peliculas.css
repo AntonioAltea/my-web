@@ -262,21 +262,21 @@ body {
   border-top: 1px solid var(--line-strong);
 }
 
-.movies-tabs {
-  display: flex;
-}
-
-.movies-tabs button + button {
-  border-left: 0;
-}
-
-.movies-tabs button[aria-pressed="true"] + button {
-  border-left: 1px solid var(--accent);
-}
-
 .movies-count {
+  margin: 0 8px 0 0;
   color: var(--muted);
-  font-size: 0.9em;
+  font-size: 0.95rem;
+}
+
+.movies-page .movies-seen[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.movies-seen-by {
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
 /* Filters: a toggle in the toolbar opens a panel; shut, a line says what is
@@ -295,6 +295,65 @@ body {
 
 .movies-filters-toggle[aria-expanded="true"]::after {
   transform: rotate(180deg);
+}
+
+/* Sort: a button with our own small menu under it. */
+
+.movies-sort {
+  position: relative;
+}
+
+.movies-sort-icon {
+  color: var(--muted);
+}
+
+.movies-page .movies-sort-toggle[aria-expanded="true"] {
+  background: var(--mark-soft);
+}
+
+.movies-sort-menu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  min-width: 260px;
+  padding: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  animation: movies-reveal 0.15s ease-out;
+}
+
+.movies-page .movies-sort-option {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: baseline;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 0;
+  text-align: left;
+}
+
+.movies-page .movies-sort-option:hover,
+.movies-page .movies-sort-option:focus-visible {
+  background: var(--mark-soft);
+}
+
+.movies-page .movies-sort-option[aria-checked="true"] {
+  background: var(--mark);
+}
+
+.movies-sort-way {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .movies-sort-menu {
+    animation: none;
+  }
 }
 
 .movies-badge:not(:empty) {
@@ -635,17 +694,25 @@ body {
     gap: 8px;
   }
 
-  .movies-tabs {
-    flex: 1;
+  .movies-count {
+    flex: 1 1 100%;
   }
 
-  .movies-tabs button {
-    flex: 1;
-    padding: 0 8px;
+  .movies-page .movies-filters-toggle,
+  .movies-sort {
+    flex: 1 1 0;
   }
 
-  .movies-page .movies-filters-toggle {
-    padding: 0 12px;
+  .movies-page .movies-filters-toggle,
+  .movies-page .movies-sort-toggle {
+    width: 100%;
+    padding: 0 10px;
+  }
+
+  .movies-sort-menu {
+    right: 0;
+    left: auto;
+    min-width: min(280px, calc(100vw - 32px));
   }
 
   .movies-page .movies-random {

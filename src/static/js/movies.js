@@ -1,12 +1,13 @@
 (function (global) {
   const NAMES = ["Antonio", "Javi", "Jorge", "Miguel"];
   const NAME_STORAGE_KEY = "manturon-peliculas-name";
+  const SORT_STORAGE_KEY = "manturon-peliculas-sort";
   const SEARCH_DELAY_MS = 350;
 
   // Pure helpers, exposed for the tests.
 
-  function isWatched(movie) {
-    return Boolean(movie.watched_at);
+  function seenBy(movie) {
+    return Array.isArray(movie.seen_by) ? movie.seen_by : [];
   }
 
   // Older movies only know who added them.
@@ -19,13 +20,14 @@
     return Array.isArray(movie.not_wanted_by) ? movie.not_wanted_by : [];
   }
 
-  // Whoever is home: something at least one of them wants to see, and that
-  // none of them said "yo no" to.
+  // Whoever is home: something at least one of them wants to see, that none
+  // of them said "yo no" to, and that not all of them have seen already.
   function suitsPeople(movie, people) {
     if (!people.length) return true;
     return (
       wantedBy(movie).some((person) => people.includes(person)) &&
-      !notWantedBy(movie).some((person) => people.includes(person))
+      !notWantedBy(movie).some((person) => people.includes(person)) &&
+      !people.every((person) => seenBy(movie).includes(person))
     );
   }
 
@@ -44,11 +46,9 @@
 
   function filterMovies(
     movies,
-    { status = "pending", people = [], maxRuntime = null, genres = [] } = {},
+    { people = [], maxRuntime = null, genres = [] } = {},
   ) {
     return movies.filter((movie) => {
-      if (status === "pending" && isWatched(movie)) return false;
-      if (status === "watched" && !isWatched(movie)) return false;
       if (!suitsPeople(movie, people)) return false;
       // Without a known runtime we can't promise it fits.
       if (maxRuntime && !(movie.runtime && movie.runtime <= maxRuntime)) return false;
@@ -73,17 +73,90 @@
     return [...genres].sort((a, b) => a.localeCompare(b, "es"));
   }
 
-  function sortMovies(movies, status) {
-    const key = status === "watched" ? "watched_at" : "added_at";
-    // Pending: oldest first, so nothing sinks forever. Watched: latest first.
-    const direction = status === "watched" ? -1 : 1;
-    return [...movies].sort(
-      (a, b) => direction * String(a[key] || "").localeCompare(String(b[key] || "")),
-    );
+  // Sort orders. `dir` is the default direction (1 ascending, -1 descending);
+  // `ways` names each direction for people: [ascending, descending].
+  const SORTS = [
+    {
+      key: "added",
+      label: "fecha de añadido",
+      dir: -1,
+      ways: ["antiguas primero", "recientes primero"],
+      value: (movie) => movie.added_at || null,
+    },
+    {
+      key: "title",
+      label: "alfabético",
+      dir: 1,
+      ways: ["de la A a la Z", "de la Z a la A"],
+      value: (movie) => movie.title || null,
+    },
+    {
+      key: "year",
+      label: "año",
+      dir: -1,
+      ways: ["antiguas primero", "recientes primero"],
+      value: (movie) => Number(movie.year) || null,
+    },
+    {
+      key: "runtime",
+      label: "duración",
+      dir: 1,
+      ways: ["cortas primero", "largas primero"],
+      value: (movie) => movie.runtime || null,
+    },
+    {
+      key: "rating",
+      label: "nota",
+      dir: -1,
+      ways: ["peor nota primero", "mejor nota primero"],
+      value: (movie) => (typeof movie.rating === "number" ? movie.rating : null),
+    },
+  ];
+  const DEFAULT_SORT = { key: "added", dir: -1 };
+
+  function sortOption(key) {
+    return SORTS.find((option) => option.key === key) || SORTS[0];
+  }
+
+  function sortWay(sort) {
+    return sortOption(sort.key).ways[sort.dir === 1 ? 0 : 1];
+  }
+
+  // Picking the active order again flips it; a new one starts its default way.
+  function nextSort(current, key) {
+    if (current.key === key) return { key, dir: -current.dir };
+    return { key, dir: sortOption(key).dir };
+  }
+
+  function compareValues(a, b) {
+    if (typeof a === "string" && typeof b === "string") {
+      return a.localeCompare(b, "es", { sensitivity: "base", numeric: true });
+    }
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+
+  function sortMovies(movies, sort = DEFAULT_SORT) {
+    const option = sortOption(sort.key);
+    const dir = sort.dir === 1 ? 1 : -1;
+    return [...movies].sort((a, b) => {
+      const left = option.value(a);
+      const right = option.value(b);
+      // Movies missing the value (no rating yet, unknown runtime) go last
+      // whichever way the list runs.
+      if (left === null && right !== null) return 1;
+      if (right === null && left !== null) return -1;
+      const order = left === null ? 0 : dir * compareValues(left, right);
+      return order || compareValues(a.title || "", b.title || "");
+    });
+  }
+
+  function formatRating(rating) {
+    if (typeof rating !== "number") return "";
+    return `★ ${rating.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
   }
 
   function pickRandom(movies, { exclude = null, random = Math.random, ...filters } = {}) {
-    let pool = filterMovies(movies, { ...filters, status: "pending" });
+    let pool = filterMovies(movies, filters);
     if (pool.length > 1 && exclude != null) {
       pool = pool.filter((movie) => movie.tmdb_id !== exclude);
     }
@@ -105,6 +178,8 @@
     if (movie.year) parts.push(movie.year);
     const runtime = formatRuntime(movie.runtime);
     if (runtime) parts.push(runtime);
+    const rating = formatRating(movie.rating);
+    if (rating) parts.push(rating);
     return parts.join(" · ");
   }
 
@@ -118,13 +193,18 @@
 
   // People first: when you type a name you want their films, and titles that
   // merely contain the name are usually noise.
+  // Titles first, then directors' films, then actors'.
   function searchGroups(data) {
-    const groups = (data.people || []).map((person) => ({
+    const people = data.people || [];
+    const groupFor = (person) => ({
       title: person.role === "director" ? `dirigidas por ${person.name}` : `con ${person.name}`,
       movies: person.movies || [],
-    }));
-    groups.push({ title: "películas", movies: data.movies || [] });
-    return groups.filter((group) => group.movies.length);
+    });
+    return [
+      { title: "películas", movies: data.movies || [] },
+      ...people.filter((person) => person.role === "director").map(groupFor),
+      ...people.filter((person) => person.role !== "director").map(groupFor),
+    ].filter((group) => group.movies.length);
   }
 
   global.ManturonMovies = {
@@ -135,8 +215,14 @@
     filterSummary,
     wantedBy,
     notWantedBy,
+    seenBy,
     filterMovies,
     genresOf,
+    SORTS,
+    DEFAULT_SORT,
+    sortWay,
+    nextSort,
+    formatRating,
     sortMovies,
     pickRandom,
     formatRuntime,
@@ -168,6 +254,10 @@
   const searchStatus = $("#movies-search-status");
   const results = $("#movies-results");
   const byOptions = $("#movies-by");
+  const sortBox = $("#movies-sort");
+  const sortToggle = $("#movies-sort-toggle");
+  const sortLabel = $("#movies-sort-label");
+  const sortMenu = $("#movies-sort-menu");
   const filtersToggle = $("#movies-filters-toggle");
   const filtersCount = $("#movies-filters-count");
   const filtersPanel = $("#movies-filters");
@@ -176,7 +266,7 @@
   const durationSlider = $("#movies-duration");
   const durationValue = $("#movies-duration-value");
   const genreOptions = $("#movies-genres");
-  const statusButtons = [...document.querySelectorAll(".movies-tabs button")];
+  const listCount = $("#movies-count");
   const randomButton = $("#movies-random");
   const pickSection = $("#movies-pick");
   const pickCard = $("#movies-pick-card");
@@ -188,10 +278,11 @@
     changingName: false,
     name: "",
     movies: [],
-    status: "pending",
+    openSynopses: new Set(),
     people: [],
     maxRuntime: null,
     genres: [],
+    sort: { key: "added", dir: -1 },
     filtersOpen: false,
     picked: null,
     searchTimer: null,
@@ -335,10 +426,6 @@
   }
 
   function renderToolbar() {
-    for (const button of statusButtons) {
-      button.setAttribute("aria-pressed", String(button.dataset.status === state.status));
-    }
-
     // Tick whoever is home tonight; nobody ticked means everyone.
     tags(byOptions, NAMES, state.people, (name) => {
       state.people = toggled(state.people, name);
@@ -365,9 +452,8 @@
     filtersSummaryText.textContent = summary;
     filtersSummary.hidden = !summary || state.filtersOpen;
 
-    const matching = filterMovies(state.movies, { ...activeFilters(), status: "all" });
-    $("#movies-count-pending").textContent = filterMovies(matching, { status: "pending" }).length;
-    $("#movies-count-watched").textContent = filterMovies(matching, { status: "watched" }).length;
+    const shown = filterMovies(state.movies, activeFilters()).length;
+    listCount.textContent = shown === 1 ? "1 película" : `${shown} películas`;
     randomButton.disabled = !pickRandom(state.movies, activeFilters());
   }
 
@@ -400,13 +486,18 @@
     const against = notWantedBy(movie);
     let who = people.length ? `quieren verla: ${people.join(", ")}` : "no la quiere ver nadie";
     if (against.length) who += ` · ${against.length > 1 ? "no quieren" : "no quiere"}: ${against.join(", ")}`;
-    if (!movie.watched_at) return who;
-    const date = new Date(movie.watched_at).toLocaleDateString("es-ES", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
+    return who;
+  }
+
+  function seenButton(movie) {
+    const seen = Boolean(state.name) && seenBy(movie).includes(state.name);
+    return el("button", {
+      type: "button",
+      className: "movies-seen",
+      textContent: seen ? "✓ ya la he visto" : "ya la he visto",
+      ariaPressed: String(seen),
+      onclick: () => toggleSeen(movie, !seen),
     });
-    return `vista el ${date} · ${who}`;
   }
 
   // "yo también" and "yo no" exclude each other; pressing the one already on
@@ -436,18 +527,29 @@
     ]);
   }
 
+  // Open synopses stay open when the list is drawn again (after any button,
+  // or a live update), so the page doesn't jump under your finger.
+  function synopsis(movie) {
+    const details = el("details", { className: "movies-details", open: state.openSynopses.has(movie.tmdb_id) }, [
+      el("summary", { textContent: "sinopsis" }),
+      el("p", { className: "movies-overview", textContent: movie.overview }),
+    ]);
+    details.addEventListener("toggle", () => {
+      if (details.open) state.openSynopses.add(movie.tmdb_id);
+      else state.openSynopses.delete(movie.tmdb_id);
+    });
+    return details;
+  }
+
   function movieCard(movie, { pick = false } = {}) {
-    const watched = isWatched(movie);
+    const seen = seenBy(movie);
     const original = movie.original_title && movie.original_title !== movie.title
       ? el("p", { className: "movies-original", textContent: movie.original_title })
       : null;
     const overview = movie.overview
       ? pick
         ? el("p", { className: "movies-overview", textContent: movie.overview })
-        : el("details", { className: "movies-details" }, [
-            el("summary", { textContent: "sinopsis" }),
-            el("p", { className: "movies-overview", textContent: movie.overview }),
-          ])
+        : synopsis(movie)
       : null;
 
     const body = el("div", { className: "movies-card-body" }, [
@@ -463,21 +565,15 @@
       overview,
       el("p", { className: "movies-added" }, [
         wantedLine(movie),
-        pick || watched ? null : wantButtons(movie),
+        pick ? null : wantButtons(movie),
       ]),
+      seen.length ? el("p", { className: "movies-seen-by", textContent: `vista por: ${seen.join(", ")}` }) : null,
       linkList(movie),
     ]);
 
     if (!pick) {
       body.append(
-        el("div", { className: "movies-actions" }, [
-          el("button", {
-            type: "button",
-            textContent: watched ? "desmarcar vista" : "ya la vimos",
-            onclick: () => toggleWatched(movie, !watched),
-          }),
-          removeControl(movie),
-        ]),
+        el("div", { className: "movies-actions" }, [seenButton(movie), removeControl(movie)]),
       );
     }
 
@@ -490,19 +586,15 @@
   function renderList() {
     renderToolbar();
     const visible = sortMovies(
-      filterMovies(state.movies, { ...activeFilters(), status: state.status }),
-      state.status,
+      filterMovies(state.movies, activeFilters()),
+      state.sort,
     );
     list.replaceChildren(...visible.map((movie) => el("li", {}, [movieCard(movie)])));
     let empty = "";
     if (!visible.length) {
-      if (filtering()) {
-        empty = "Nada encaja con estos filtros.";
-      } else {
-        empty = state.status === "pending"
-          ? "No hay nada pendiente. Busca una película arriba y añádela."
-          : "Todavía no habéis marcado ninguna como vista.";
-      }
+      empty = filtering()
+        ? "Nada encaja con estos filtros."
+        : "La lista está vacía. Busca una película arriba y añádela.";
     }
     setMessage(listStatus, empty);
     renderPick();
@@ -511,7 +603,7 @@
 
   function renderPick() {
     const current = state.picked && state.movies.find((movie) => movie.tmdb_id === state.picked);
-    if (!current || isWatched(current)) {
+    if (!current) {
       state.picked = null;
       pickSection.hidden = true;
       return;
@@ -533,6 +625,7 @@
       state.movies = data.movies || [];
       showApp();
       renderList();
+      startLiveUpdates();
     } catch (error) {
       if (error.status === 401) return;
       // Server not configured or down: nothing else on the page can work.
@@ -544,15 +637,65 @@
     }
   }
 
+  // Live updates. The server pushes "changed" over Server-Sent Events when
+  // anyone saves the list; we fetch it again and redraw only if it differs,
+  // so our own changes (already drawn) don't cause a second render.
+  let liveEvents = null;
+  let refreshing = false;
+  let refreshAgain = false;
+
+  function startLiveUpdates() {
+    if (liveEvents || !global.EventSource) return;
+    liveEvents = new global.EventSource("/api/movies/events");
+    liveEvents.addEventListener("changed", refresh);
+  }
+
+  function stopLiveUpdates() {
+    if (liveEvents) liveEvents.close();
+    liveEvents = null;
+  }
+
+  async function refresh() {
+    if (!state.loggedIn) return;
+    if (refreshing) {
+      refreshAgain = true;
+      return;
+    }
+    refreshing = true;
+    try {
+      const data = await api("GET", "/api/movies");
+      const fresh = data.movies || [];
+      if (JSON.stringify(fresh) !== JSON.stringify(state.movies)) {
+        state.movies = fresh;
+        renderList();
+      }
+    } catch {
+      // A missed refresh is fine; the next change or visit brings it.
+    } finally {
+      refreshing = false;
+      if (refreshAgain) {
+        refreshAgain = false;
+        refresh();
+      }
+    }
+  }
+
   function replaceMovie(updated) {
     state.movies = state.movies.map((movie) =>
       movie.tmdb_id === updated.tmdb_id ? updated : movie,
     );
   }
 
-  async function toggleWatched(movie, watched) {
+  async function toggleSeen(movie, seen) {
+    if (!state.name) {
+      askForName("Elige quién eres.");
+      return;
+    }
     try {
-      const data = await api("POST", `/api/movies/${movie.tmdb_id}/watched`, { watched });
+      const data = await api("POST", `/api/movies/${movie.tmdb_id}/seen`, {
+        name: state.name,
+        seen,
+      });
       replaceMovie(data.movie);
       renderList();
     } catch (error) {
@@ -641,7 +784,6 @@
     try {
       const data = await api("POST", "/api/movies", { tmdbId: result.tmdb_id, addedBy: state.name });
       state.movies = [...state.movies, data.movie];
-      state.status = "pending";
       renderList();
     } catch (error) {
       button.disabled = false;
@@ -651,14 +793,24 @@
     }
   }
 
-  function resultRow(result, inList) {
-    const already = inList.has(result.tmdb_id);
-    const button = el("button", {
-      type: "button",
-      textContent: already ? "en la lista" : "añadir",
-      disabled: already,
-    });
-    button.addEventListener("click", () => addMovie(result, button));
+  function resultRow(result) {
+    // Already on the list: the button signs you up for it instead.
+    const listed = state.movies.find((movie) => movie.tmdb_id === result.tmdb_id);
+    let button;
+    if (listed) {
+      const yes = Boolean(state.name) && wantedBy(listed).includes(state.name);
+      button = el("button", {
+        type: "button",
+        className: "movies-want",
+        textContent: "yo también",
+        ariaPressed: String(yes),
+        title: yes ? "Ya está en la lista y la quieres ver" : "Ya está en la lista: apúntate",
+        onclick: () => toggleWanted(listed, yes ? null : true),
+      });
+    } else {
+      button = el("button", { type: "button", textContent: "añadir" });
+      button.addEventListener("click", () => addMovie(result, button));
+    }
     const original = result.original_title && result.original_title !== result.title
       ? result.original_title
       : "";
@@ -676,12 +828,11 @@
   }
 
   function renderResults(data) {
-    const inList = new Set(state.movies.map((movie) => movie.tmdb_id));
     results.replaceChildren(
       ...searchGroups(data).map((group) =>
         el("section", { className: "movies-result-group" }, [
           el("h2", { textContent: group.title }),
-          el("ul", {}, group.movies.map((result) => resultRow(result, inList))),
+          el("ul", {}, group.movies.map(resultRow)),
         ]),
       ),
     );
@@ -749,12 +900,6 @@
     }
   });
 
-  for (const button of statusButtons) {
-    button.addEventListener("click", () => {
-      state.status = button.dataset.status;
-      renderList();
-    });
-  }
 
   filtersToggle.addEventListener("click", () => {
     state.filtersOpen = !state.filtersOpen;
@@ -790,11 +935,83 @@
     try {
       await api("POST", "/api/movies/logout");
     } finally {
+      stopLiveUpdates();
       state.movies = [];
       showLogin();
     }
   });
 
+  // Phones drop background connections; catch up when the page comes back.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refresh();
+  });
+
+  // Sort menu: our own small menu, not a native select.
+  function storedSort() {
+    try {
+      const saved = JSON.parse(global.localStorage.getItem(SORT_STORAGE_KEY) || "null");
+      if (saved && SORTS.some((option) => option.key === saved.key) && [1, -1].includes(saved.dir)) {
+        return saved;
+      }
+    } catch {
+      // Unreadable or blocked storage: use the default.
+    }
+    return { ...DEFAULT_SORT };
+  }
+
+  function renderSort() {
+    const current = SORTS.find((option) => option.key === state.sort.key);
+    sortLabel.textContent = current.label;
+    sortToggle.title = `Ordenar: ${current.label}, ${sortWay(state.sort)}`;
+    sortToggle.setAttribute("aria-expanded", String(!sortMenu.hidden));
+    sortMenu.replaceChildren(
+      ...SORTS.map((option) => {
+        const active = option.key === state.sort.key;
+        return el("button", {
+          type: "button",
+          role: "menuitemradio",
+          className: "movies-sort-option",
+          ariaChecked: String(active),
+          onclick: () => {
+            state.sort = nextSort(state.sort, option.key);
+            try {
+              global.localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(state.sort));
+            } catch {
+              // The order just lasts this visit.
+            }
+            renderSort();
+            renderList();
+          },
+        }, [
+          el("span", { textContent: option.label }),
+          el("span", {
+            className: "movies-sort-way",
+            textContent: active ? `${sortWay(state.sort)} ⇅` : "",
+          }),
+        ]);
+      }),
+    );
+  }
+
+  function setSortMenu(open) {
+    sortMenu.hidden = !open;
+    renderSort();
+    if (open) sortMenu.querySelector("[aria-checked='true']").focus();
+  }
+
+  sortToggle.addEventListener("click", () => setSortMenu(sortMenu.hidden));
+  document.addEventListener("click", (event) => {
+    if (!sortMenu.hidden && !sortBox.contains(event.target)) setSortMenu(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !sortMenu.hidden) {
+      setSortMenu(false);
+      sortToggle.focus();
+    }
+  });
+
+  state.sort = storedSort();
+  renderSort();
   state.name = storedName();
   renderWho();
   loadMovies();

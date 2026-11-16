@@ -160,7 +160,7 @@ class ListTests(MovieApiTestCase):
         self.assertEqual(movie["runtime"], 136)
         self.assertEqual(movie["imdb_id"], "tt0133093")
         self.assertEqual(movie["added_by"], "Marta G.")
-        self.assertIsNone(movie["watched_at"])
+        self.assertEqual(movie["seen_by"], [])
 
         stored = self.call("GET", "/api/movies")[1]["movies"]
         self.assertEqual([item["tmdb_id"] for item in stored], [603])
@@ -191,26 +191,50 @@ class ListTests(MovieApiTestCase):
         )
         self.assertEqual(status, 400)
 
-    def test_marking_watched_and_back(self) -> None:
+    def test_each_person_marks_it_seen_and_back(self) -> None:
         self.add()
 
-        status, payload, _ = self.call(
-            "POST", "/api/movies/603/watched", {"watched": True}
-        )
+        for name in ("Antonio", "Miguel", "Antonio"):
+            status, payload, _ = self.call(
+                "POST", "/api/movies/603/seen", {"name": name, "seen": True}
+            )
         self.assertEqual(status, 200)
-        self.assertTrue(payload["movie"]["watched_at"])
+        self.assertEqual(payload["movie"]["seen_by"], ["Miguel", "Antonio"])
 
-        status, payload, _ = self.call(
-            "POST", "/api/movies/603/watched", {"watched": False}
+        _, payload, _ = self.call(
+            "POST", "/api/movies/603/seen", {"name": "Miguel", "seen": False}
         )
-        self.assertIsNone(payload["movie"]["watched_at"])
+        self.assertEqual(payload["movie"]["seen_by"], ["Antonio"])
 
-    def test_marking_watched_validates_input(self) -> None:
+    def test_marking_seen_validates_input(self) -> None:
         self.add()
-        status, _, _ = self.call("POST", "/api/movies/603/watched", {"watched": "yes"})
-        self.assertEqual(status, 400)
-        status, _, _ = self.call("POST", "/api/movies/1/watched", {"watched": True})
+        for body in ({"name": "Antonio", "seen": "yes"}, {"seen": True}):
+            status, _, _ = self.call("POST", "/api/movies/603/seen", body)
+            self.assertEqual(status, 400, body)
+        status, _, _ = self.call(
+            "POST", "/api/movies/1/seen", {"name": "Antonio", "seen": True}
+        )
         self.assertEqual(status, 404)
+
+    def test_movies_watched_before_count_as_seen_by_who_wanted_them(self) -> None:
+        self.path.write_text(
+            json.dumps(
+                {
+                    "movies": [
+                        {
+                            "tmdb_id": 1,
+                            "wanted_by": ["Javi", "Jorge"],
+                            "watched_at": "x",
+                        },
+                        {"tmdb_id": 2, "wanted_by": ["Javi"], "watched_at": None},
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        stored = self.call("GET", "/api/movies")[1]["movies"]
+        self.assertEqual([m["seen_by"] for m in stored], [["Javi", "Jorge"], []])
+        self.assertTrue(all("watched_at" not in m for m in stored))
 
     def test_whoever_adds_a_movie_wants_to_see_it(self) -> None:
         _, payload = self.add(added_by="Antonio")
@@ -298,7 +322,7 @@ class ListTests(MovieApiTestCase):
     def test_unknown_routes_and_methods_are_not_found(self) -> None:
         for method, path in (
             ("GET", "/api/movies/nope"),
-            ("DELETE", "/api/movies/603/watched"),
+            ("DELETE", "/api/movies/603/seen"),
             ("GET", "/api/movies/603"),
         ):
             status, _, _ = self.call(method, path)
@@ -582,10 +606,144 @@ class ServerRoutingTests(unittest.TestCase):
 
     def test_is_movies_request_matches_only_the_api(self) -> None:
         self.assertTrue(movies.is_movies_request("/api/movies?x=1"))
-        self.assertTrue(movies.is_movies_request("/api/movies/603/watched"))
+        self.assertTrue(movies.is_movies_request("/api/movies/603/seen"))
         self.assertFalse(movies.is_movies_request("/api/moviesx"))
         self.assertFalse(movies.is_movies_request("/peliculas"))
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RatingTests(MovieApiTestCase):
+    def test_details_keep_tmdbs_rating(self) -> None:
+        payload = {**tmdb_detail_payload(), "vote_average": 8.234, "vote_count": 25000}
+        with mock.patch.object(movies, "tmdb_get", return_value=payload):
+            self.assertEqual(movies.movie_details(603)["rating"], 8.2)
+
+    def test_no_votes_means_no_rating(self) -> None:
+        self.assertIsNone(movies.tmdb_rating({"vote_average": 0, "vote_count": 0}))
+        self.assertIsNone(movies.tmdb_rating({"vote_average": "7", "vote_count": 3}))
+        self.assertIsNone(movies.tmdb_rating({}))
+
+    def write(self, items: list[dict]) -> None:
+        self.path.write_text(json.dumps({"movies": items}), encoding="utf-8")
+
+    def test_reading_the_list_backfills_missing_ratings(self) -> None:
+        self.write([{"tmdb_id": 1, "rating": 7.0}, {"tmdb_id": 2}])
+        with mock.patch.object(movies, "start_backfill") as start:
+            status, _, _ = self.call("GET", "/api/movies")
+        self.assertEqual(status, 200)
+        start.assert_called_once_with(self.path)
+
+        self.write([{"tmdb_id": 1, "rating": None}])
+        with mock.patch.object(movies, "start_backfill") as start:
+            self.call("GET", "/api/movies")
+        start.assert_not_called()
+
+    def test_backfill_stores_ratings_and_retries_failures_later(self) -> None:
+        self.write([{"tmdb_id": 1, "rating": 7.0}, {"tmdb_id": 2}, {"tmdb_id": 3}])
+
+        def details(tmdb_id: int) -> dict:
+            if tmdb_id == 3:
+                raise movies.MovieError(502, "down")
+            return {"rating": 6.5}
+
+        with mock.patch.object(movies, "movie_details", side_effect=details) as lookup:
+            movies.backfill_ratings(self.path)
+        self.assertEqual([call.args[0] for call in lookup.call_args_list], [2, 3])
+        stored = {m["tmdb_id"]: m for m in movies.load_movies(self.path)}
+        self.assertEqual(stored[1]["rating"], 7.0)
+        self.assertEqual(stored[2]["rating"], 6.5)
+        self.assertNotIn("rating", stored[3])
+
+    def test_backfill_does_nothing_when_everything_fails_or_one_is_running(
+        self,
+    ) -> None:
+        self.write([{"tmdb_id": 3}])
+        before = self.path.read_text(encoding="utf-8")
+        with mock.patch.object(
+            movies, "movie_details", side_effect=movies.MovieError(502, "down")
+        ):
+            movies.backfill_ratings(self.path)
+        self.assertEqual(self.path.read_text(encoding="utf-8"), before)
+
+        with movies.BACKFILL_LOCK:
+            with mock.patch.object(movies, "movie_details") as lookup:
+                movies.backfill_ratings(self.path)
+        lookup.assert_not_called()
+
+    def test_start_backfill_runs_in_a_thread(self) -> None:
+        with mock.patch.object(movies.threading, "Thread") as thread:
+            movies.start_backfill(self.path)
+        thread.assert_called_once_with(
+            target=movies.backfill_ratings, args=(self.path,), daemon=True
+        )
+        thread.return_value.start.assert_called_once_with()
+
+
+class ChangeNotificationTests(MovieApiTestCase):
+    def test_saving_bumps_the_version(self) -> None:
+        before = movies.change_version()
+        movies.save_movies(self.path, [])
+        self.assertEqual(movies.change_version(), before + 1)
+
+    def test_waiting_returns_on_change_or_timeout(self) -> None:
+        version = movies.change_version()
+        self.assertEqual(movies.wait_for_change(version, 0.01), version)
+        movies.notify_change()
+        self.assertEqual(movies.wait_for_change(version, 5), version + 1)
+
+
+class MovieEventStreamTests(unittest.TestCase):
+    def make_handler(self, cookie: str | None) -> server.MediaHandler:
+        handler = server.MediaHandler.__new__(server.MediaHandler)
+        handler.path = "/api/movies/events"
+        handler.headers = {"Cookie": cookie} if cookie else {}
+        handler.wfile = io.BytesIO()
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+        return handler
+
+    def setUp(self) -> None:
+        env = mock.patch.dict("os.environ", {"MOVIES_PASSWORD": PASSWORD})
+        env.start()
+        self.addCleanup(env.stop)
+        self.cookie = f"{movies.COOKIE_NAME}={movies.auth_token(PASSWORD)}"
+
+    def test_refuses_without_the_password(self) -> None:
+        handler = self.make_handler(None)
+        with mock.patch.object(server, "redirect_target", return_value=None):
+            server.MediaHandler.do_GET(handler)
+        handler.send_response.assert_called_once_with(401)
+
+    def test_sends_changes_and_heartbeats_until_the_page_leaves(self) -> None:
+        handler = self.make_handler(self.cookie)
+        # A change, then a quiet heartbeat period, then the browser is gone.
+        waits = iter([7, 7])
+        writes = []
+
+        def write(data: bytes) -> None:
+            writes.append(data)
+            if len(writes) == 3:
+                raise BrokenPipeError
+
+        handler.wfile = mock.Mock(write=write)
+        with (
+            mock.patch.object(server.movies, "change_version", return_value=6),
+            mock.patch.object(
+                server.movies, "wait_for_change", side_effect=lambda v, t: next(waits)
+            ),
+            mock.patch.object(server, "redirect_target", return_value=None),
+        ):
+            server.MediaHandler.do_GET(handler)
+
+        handler.send_response.assert_called_once_with(200)
+        handler.send_header.assert_any_call(
+            "Content-Type", "text/event-stream; charset=utf-8"
+        )
+        self.assertEqual(
+            writes,
+            [b"retry: 3000\n\n", b"event: changed\ndata: 7\n\n", b": ping\n\n"],
+        )

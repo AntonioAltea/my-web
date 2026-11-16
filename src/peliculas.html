@@ -61,10 +61,7 @@
       </section>
 
       <section class="movies-toolbar" aria-label="Lista">
-        <div class="movies-tabs" role="group" aria-label="Qué mostrar">
-          <button type="button" data-status="pending" aria-pressed="true">pendientes <span id="movies-count-pending" class="movies-count"></span></button>
-          <button type="button" data-status="watched" aria-pressed="false">vistas <span id="movies-count-watched" class="movies-count"></span></button>
-        </div>
+        <p id="movies-count" class="movies-count" aria-live="polite"></p>
         <button
           id="movies-filters-toggle"
           class="movies-filters-toggle"
@@ -72,6 +69,17 @@
           aria-expanded="false"
           aria-controls="movies-filters"
         >filtros <span id="movies-filters-count" class="movies-badge"></span></button>
+        <div id="movies-sort" class="movies-sort">
+          <button
+            id="movies-sort-toggle"
+            class="movies-sort-toggle"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            aria-controls="movies-sort-menu"
+          ><span class="movies-sort-icon" aria-hidden="true">⇅</span> <span id="movies-sort-label"></span></button>
+          <div id="movies-sort-menu" class="movies-sort-menu" role="menu" aria-label="Ordenar por" hidden></div>
+        </div>
         <button id="movies-random" class="movies-random" type="button">elegir una al azar</button>
       </section>
 

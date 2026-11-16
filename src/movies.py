@@ -35,7 +35,7 @@ PERSON_MOVIE_LIMIT = 24
 NAME_MAX_LENGTH = 40
 FAILED_LOGIN_DELAY_SECONDS = 1.0
 MOVIES_LOCK = threading.Lock()
-MOVIE_ITEM_PATH = re.compile(r"^/api/movies/(?P<id>\d+)(?P<action>/watched|/wanted)?$")
+MOVIE_ITEM_PATH = re.compile(r"^/api/movies/(?P<id>\d+)(?P<action>/seen|/wanted)?$")
 
 
 class MovieError(Exception):
@@ -122,6 +122,11 @@ def with_wanted_by(movie: dict[str, object]) -> dict[str, object]:
         )
     if not isinstance(movie.get("not_wanted_by"), list):
         movie["not_wanted_by"] = []
+    if not isinstance(movie.get("seen_by"), list):
+        # Before "ya la he visto" a movie was watched or not, by nobody in
+        # particular; the closest guess is that whoever wanted it saw it.
+        movie["seen_by"] = list(movie["wanted_by"]) if movie.get("watched_at") else []
+    movie.pop("watched_at", None)
     return movie
 
 
@@ -133,6 +138,33 @@ def save_movies(path: Path, movies: list[dict[str, object]]) -> None:
         encoding="utf-8",
     )
     temporary.replace(path)
+    notify_change()
+
+
+# Live updates: every save bumps a version and wakes the open event streams
+# (Server-Sent Events at /api/movies/events), which tell each browser to
+# fetch the list again. One machine serves the app, so memory is enough.
+CHANGES = threading.Condition()
+_change_version = 0
+
+
+def notify_change() -> None:
+    global _change_version
+    with CHANGES:
+        _change_version += 1
+        CHANGES.notify_all()
+
+
+def change_version() -> int:
+    with CHANGES:
+        return _change_version
+
+
+def wait_for_change(version: int, timeout: float) -> int:
+    """Block until the list changes past `version` or `timeout` passes."""
+    with CHANGES:
+        CHANGES.wait_for(lambda: _change_version != version, timeout)
+        return _change_version
 
 
 def tmdb_get(endpoint: str, params: dict[str, str]) -> dict[str, object]:
@@ -300,7 +332,57 @@ def movie_details(tmdb_id: int) -> dict[str, object]:
         "directors": directors,
         "genres": genres,
         "runtime": runtime if isinstance(runtime, int) and runtime > 0 else None,
+        "rating": tmdb_rating(payload),
     }
+
+
+def tmdb_rating(payload: dict[str, object]) -> float | None:
+    """TMDB's average vote out of 10, or None while nobody has voted."""
+    average = payload.get("vote_average")
+    votes = payload.get("vote_count")
+    if not isinstance(average, (int, float)) or not isinstance(votes, int) or votes < 1:
+        return None
+    return round(float(average), 1)
+
+
+# Movies added before ratings were stored get theirs from TMDB in the
+# background the first time the list is read; the save that follows tells
+# every open page to refresh.
+BACKFILL_LOCK = threading.Lock()
+
+
+def missing_ratings(movies: list[dict[str, object]]) -> list[int]:
+    return [
+        movie["tmdb_id"]
+        for movie in movies
+        if "rating" not in movie and isinstance(movie.get("tmdb_id"), int)
+    ]
+
+
+def backfill_ratings(path: Path) -> None:
+    if not BACKFILL_LOCK.acquire(blocking=False):
+        return  # another backfill is already running
+    try:
+        ratings: dict[int, float | None] = {}
+        for tmdb_id in missing_ratings(load_movies(path)):
+            try:
+                ratings[tmdb_id] = movie_details(tmdb_id)["rating"]
+            except MovieError:
+                continue  # try again on a later read
+        if not ratings:
+            return
+        with MOVIES_LOCK:
+            movies = load_movies(path)
+            for movie in movies:
+                if movie.get("tmdb_id") in ratings and "rating" not in movie:
+                    movie["rating"] = ratings[movie["tmdb_id"]]
+            save_movies(path, movies)
+    finally:
+        BACKFILL_LOCK.release()
+
+
+def start_backfill(path: Path) -> None:
+    threading.Thread(target=backfill_ratings, args=(path,), daemon=True).start()
 
 
 def clean_name(value: object) -> str:
@@ -333,25 +415,28 @@ def add_movie(path: Path, payload: dict[str, object]) -> dict[str, object]:
             "added_by": added_by,
             "wanted_by": [added_by],
             "not_wanted_by": [],
+            "seen_by": [],
             "added_at": utc_now_iso(),
-            "watched_at": None,
         }
         movies.append(movie)
         save_movies(path, movies)
         return movie
 
 
-def set_watched(
-    path: Path, tmdb_id: int, payload: dict[str, object]
-) -> dict[str, object]:
-    watched = payload.get("watched")
-    if not isinstance(watched, bool):
-        raise MovieError(400, "Falta indicar si está vista.")
+def set_seen(path: Path, tmdb_id: int, payload: dict[str, object]) -> dict[str, object]:
+    """Mark or unmark one person as having seen a movie ("ya la he visto")."""
+    name = clean_name(payload.get("name"))
+    seen = payload.get("seen")
+    if not name:
+        raise MovieError(400, "Dinos quién eres.")
+    if not isinstance(seen, bool):
+        raise MovieError(400, "Falta indicar si la has visto.")
     with MOVIES_LOCK:
         movies = load_movies(path)
         for movie in movies:
             if movie.get("tmdb_id") == tmdb_id:
-                movie["watched_at"] = utc_now_iso() if watched else None
+                others = [person for person in movie["seen_by"] if person != name]
+                movie["seen_by"] = [*others, name] if seen else others
                 save_movies(path, movies)
                 return movie
     raise MovieError(404, "Esa película no está en la lista.")
@@ -435,7 +520,10 @@ def handle_request(
             raise MovieError(401, "Hace falta la contraseña.")
 
         if route == "/api/movies" and method == "GET":
-            return 200, {"movies": load_movies(path)}, []
+            movies = load_movies(path)
+            if missing_ratings(movies) and configured_tmdb_key():
+                start_backfill(path)
+            return 200, {"movies": movies}, []
 
         if route == "/api/movies" and method == "POST":
             return 201, {"movie": add_movie(path, parse_json_body(body))}, []
@@ -449,7 +537,7 @@ def handle_request(
             tmdb_id = int(match.group("id"))
             action = match.group("action")
             if action and method == "POST":
-                update = set_watched if action == "/watched" else set_wanted
+                update = set_seen if action == "/seen" else set_wanted
                 movie = update(path, tmdb_id, parse_json_body(body))
                 return 200, {"movie": movie}, []
             if not action and method == "DELETE":

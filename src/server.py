@@ -24,6 +24,8 @@ ZINES_DIR = MEDIA_ROOT / "zines"
 ANALYTICS_FILE = MEDIA_ROOT / "analytics.json"
 MOVIES_FILE = MEDIA_ROOT / "movies.json"
 MOVIES_PAGE_PATHS = {"/peliculas", "/peliculas/", "/peliculas.html"}
+MOVIE_EVENTS_PATH = "/api/movies/events"
+MOVIE_EVENTS_HEARTBEAT = 25
 CANONICAL_HOST = os.environ.get("CANONICAL_HOST", "").strip()
 REDIRECT_HOSTS = {
     host.strip()
@@ -893,6 +895,10 @@ class MediaHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             return
 
+        if urlparse(self.path).path == MOVIE_EVENTS_PATH:
+            self._stream_movie_events()
+            return
+
         if movies.is_movies_request(self.path):
             self._handle_movies_request("GET")
             return
@@ -963,6 +969,38 @@ class MediaHandler(SimpleHTTPRequestHandler):
             body_length = 0
         # The movie API only takes tiny JSON bodies.
         return self.rfile.read(min(max(body_length, 0), 16_384))
+
+    def _stream_movie_events(self) -> None:
+        """Server-Sent Events: "changed" whenever the movie list is saved.
+
+        A comment line goes out every MOVIE_EVENTS_HEARTBEAT seconds so
+        proxies (Fly closes idle connections after a minute) keep it open.
+        The browser's EventSource reconnects by itself if it drops.
+        """
+        if not movies.is_authorized(self.headers.get("Cookie")):
+            self._send_json_response({"error": "Hace falta la contraseña."}, 401)
+            return
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+        version = movies.change_version()
+        try:
+            self.wfile.write(b"retry: 3000\n\n")
+            self.wfile.flush()
+            while True:
+                latest = movies.wait_for_change(version, MOVIE_EVENTS_HEARTBEAT)
+                if latest != version:
+                    version = latest
+                    self.wfile.write(f"event: changed\ndata: {latest}\n\n".encode())
+                else:
+                    self.wfile.write(b": ping\n\n")
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return  # the page went away
 
     def _handle_movies_request(self, method: str) -> None:
         body = self._request_body() if method == "POST" else b""
