@@ -1432,7 +1432,40 @@ async function testMoviesSortOrders() {
   assert.equal(formatRating(7.8), "★ 7,8");
   assert.equal(formatRating(8), "★ 8,0");
   assert.equal(formatRating(null), "");
-  assert.equal(movieMeta({ year: "1979", runtime: 117, rating: 8.1 }), "1979 · 1 h 57 min · ★ 8,1");
+  assert.equal(
+    movieMeta({ year: "1979", runtime: 117, rating: 8.1, directors: ["Ridley Scott"] }),
+    "Ridley Scott · 1979 · 1\u00a0h\u00a057\u00a0min",
+  );
+}
+
+async function testMoviesPeopleLine() {
+  const { humanList, peopleLines } = moviesModule();
+
+  assert.equal(humanList(["Miguel", "Antonio"]), "Antonio y Miguel");
+  assert.equal(humanList(["Jorge", "Antonio", "Javi"]), "Antonio, Javi y Jorge");
+  assert.equal(humanList(["Javi"]), "Javi");
+  assert.equal(humanList(["Miguel", "Jorge", "Javi", "Antonio"]), "todos");
+
+  const lines = (movie) => peopleLines(movie).map((line) => [line.kind, line.label, line.names]);
+  assert.deepEqual(
+    lines({
+      wanted_by: ["Antonio", "Miguel", "Jorge", "Javi"],
+      seen_by: ["Javi", "Jorge", "Antonio", "Miguel"],
+    }),
+    [["wanted", "la queréis ver", "todos"], ["seen", "vista por", "todos"]],
+  );
+  assert.deepEqual(
+    lines({ wanted_by: ["Miguel", "Antonio"], not_wanted_by: ["Javi"], seen_by: [] }),
+    [["wanted", "la quieren ver", "Antonio y Miguel"], ["against", "no quiere", "Javi"]],
+  );
+  assert.deepEqual(lines({ wanted_by: ["Jorge"], seen_by: ["Jorge"] }), [
+    ["wanted", "la quiere ver", "Jorge"],
+    ["seen", "vista por", "Jorge"],
+  ]);
+  assert.deepEqual(lines({ wanted_by: [], not_wanted_by: ["Javi", "Jorge"] }), [
+    ["none", "no la quiere ver nadie", ""],
+    ["against", "no quieren", "Javi y Jorge"],
+  ]);
 }
 
 async function testMoviesRuntimeSliderAndSummary() {
@@ -1509,6 +1542,7 @@ async function run() {
     ["filters movies by who wants them, duration and genre", testMoviesFilterByWhoWantsItDurationAndGenre],
     ["reads the runtime slider and sums up the filters", testMoviesRuntimeSliderAndSummary],
     ["sorts movies every way", testMoviesSortOrders],
+    ["says who a movie is for, one line per kind", testMoviesPeopleLine],
     ["filters and sorts the movie list", testMoviesFilterAndSort],
     ["picks a random movie for whoever is home", testMoviesRandomPickHonoursWhoIsHome],
     ["formats movie details and links", testMoviesMetaAndLinks],

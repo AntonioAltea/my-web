@@ -243,6 +243,12 @@ body {
   color: var(--muted);
 }
 
+.movies-in-list {
+  color: var(--accent);
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
 .movies-thumb {
   width: 40px;
   aspect-ratio: 2 / 3;
@@ -266,17 +272,6 @@ body {
   margin: 0 8px 0 0;
   color: var(--muted);
   font-size: 0.95rem;
-}
-
-.movies-page .movies-seen[aria-pressed="true"] {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--bg);
-}
-
-.movies-seen-by {
-  color: var(--muted);
-  font-size: 0.88rem;
 }
 
 /* Filters: a toggle in the toolbar opens a panel; shut, a line says what is
@@ -311,43 +306,73 @@ body {
   background: var(--mark-soft);
 }
 
+/* A floating card: two short groups ("ordenar por", "sentido"), the chosen
+   item marked with a tick rather than a block of colour. */
 .movies-sort-menu {
+  --menu-bg: var(--bg);
+  --menu-shadow: 0 14px 34px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06);
   position: absolute;
   z-index: 10;
   top: calc(100% + 6px);
   left: 0;
   display: grid;
-  min-width: 260px;
+  min-width: 230px;
   padding: 6px;
   border: 1px solid var(--line-strong);
-  background: var(--bg);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  background: var(--menu-bg);
+  box-shadow: var(--menu-shadow);
   animation: movies-reveal 0.15s ease-out;
 }
 
+:root[data-theme="dark"] .movies-sort-menu {
+  --menu-bg: var(--paper-strong);
+  --menu-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .movies-sort-menu {
+    --menu-bg: var(--paper-strong);
+    --menu-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  }
+}
+
+.movies-menu-label {
+  margin: 6px 10px 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.movies-menu-separator {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--line-strong);
+}
+
 .movies-page .movies-sort-option {
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  align-items: baseline;
-  min-height: 38px;
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
   padding: 0 10px;
   border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 0.98rem;
   text-align: left;
 }
 
 .movies-page .movies-sort-option:hover,
 .movies-page .movies-sort-option:focus-visible {
+  outline: none;
   background: var(--mark-soft);
 }
 
-.movies-page .movies-sort-option[aria-checked="true"] {
-  background: var(--mark);
-}
-
-.movies-sort-way {
-  color: var(--muted);
-  font-size: 0.85rem;
+.movies-sort-check {
+  color: var(--accent);
+  font-size: 0.9rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -473,33 +498,24 @@ body {
   font-size: 0.92rem;
 }
 
-.movies-card-body .movies-added {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-  align-items: center;
-}
-
-.movies-want-group {
-  display: inline-flex;
-  gap: 4px;
-}
-
-.movies-page .movies-want {
-  min-height: 28px;
-  padding: 0 10px;
+/* Small rounded buttons: "yo también" in search results and the three
+   per-person buttons on each card. */
+.movies-page .movies-want,
+.movies-page .movies-pill {
+  min-height: 30px;
+  padding: 0 12px;
   border-radius: 999px;
   color: var(--ink);
   font-size: 0.85rem;
 }
 
-.movies-page .movies-want[aria-pressed="true"] {
+.movies-page .movies-pill[aria-pressed="true"] {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--bg);
 }
 
-.movies-page .movies-want-no[aria-pressed="true"] {
+.movies-page .movies-pill-no[aria-pressed="true"] {
   border-color: var(--danger);
   background: var(--danger);
   color: var(--bg);
@@ -538,19 +554,26 @@ body {
   color: var(--muted);
 }
 
+/* Two columns at most: three made the cards too narrow and ragged. Each
+   card sits under a thin rule so the rows read as rows. */
 .movies-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-  gap: 28px 24px;
-  margin: 24px 0 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 40px;
+  margin: 20px 0 0;
   padding: 0;
   list-style: none;
 }
 
+.movies-list > li {
+  padding: 22px 0;
+  border-top: 1px solid var(--line-strong);
+}
+
 .movies-card {
   display: grid;
-  grid-template-columns: 100px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 18px;
   align-items: start;
 }
 
@@ -565,9 +588,24 @@ body {
   background: var(--paper-strong);
 }
 
+/* Card: title and rating, then facts, then people, then links, then your
+   buttons, each group a little apart from the next. */
+.movies-card-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.movies-card-head {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
 .movies-card-body h3 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   font-weight: 400;
   line-height: 1.2;
 }
@@ -576,19 +614,77 @@ body {
   font-size: 1.6rem;
 }
 
+.movies-rating {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
 .movies-card-body p {
-  margin: 3px 0 0;
+  margin: 0;
 }
 
 .movies-original {
+  margin-top: 2px;
   color: var(--muted);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-style: italic;
 }
 
-.movies-director,
-.movies-meta {
+.movies-card-body .movies-meta {
+  margin-top: 6px;
   font-size: 0.95rem;
+}
+
+.movies-card-body .movies-genres {
+  margin-top: 2px;
+}
+
+/* Who it is for: one line each, the label coloured by kind (green wants it,
+   red does not, grey has seen it) and the names in the text colour. */
+.movies-card-body .movies-people {
+  display: grid;
+  gap: 2px;
+  margin-top: 10px;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.movies-people-label {
+  font-style: italic;
+}
+
+.movies-people-wanted .movies-people-label {
+  color: var(--accent);
+}
+
+.movies-people-against .movies-people-label {
+  color: var(--danger);
+}
+
+.movies-people-seen .movies-people-label,
+.movies-people-none .movies-people-label {
+  color: var(--muted);
+}
+
+/* "✓ vista" shares the grey of "vista por": seen is done, not a wish. */
+.movies-page .movies-pill-seen[aria-pressed="true"] {
+  border-color: var(--muted);
+  background: var(--muted);
+  color: var(--bg);
+}
+
+.movies-card-body .movies-links {
+  margin-top: 6px;
+}
+
+.movies-card-body .movies-overview {
+  margin-top: 6px;
+}
+
+.movies-card-body .movies-actions {
+  margin-top: 12px;
 }
 
 .movies-poster-empty {
@@ -603,21 +699,9 @@ body {
   font-size: 0.8rem;
 }
 
-.movies-genres,
-.movies-added {
+.movies-genres {
   color: var(--muted);
   font-size: 0.88rem;
-}
-
-.movies-details {
-  margin-top: 4px;
-  font-size: 0.92rem;
-}
-
-.movies-details summary {
-  width: fit-content;
-  color: var(--muted);
-  cursor: pointer;
 }
 
 .movies-overview {
@@ -627,21 +711,39 @@ body {
 
 .movies-links {
   display: flex;
-  gap: 14px;
-  font-size: 0.92rem;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: baseline;
+  font-size: 0.88rem;
+}
+
+.movies-page .movies-synopsis-toggle {
+  color: var(--accent);
+}
+
+.movies-synopsis-toggle::after {
+  display: inline-block;
+  margin-left: 3px;
+  content: "▾";
+  font-size: 0.8em;
+  text-decoration: none;
+}
+
+.movies-synopsis-toggle[aria-expanded="true"]::after {
+  content: "▴";
 }
 
 .movies-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 6px;
   align-items: center;
-  margin-top: 10px;
 }
 
-.movies-actions button:not(.movies-link) {
-  min-height: 36px;
-  font-size: 0.95rem;
+/* "quitar" sits apart at the end of the links row. */
+.movies-links .movies-remove-wrap {
+  margin-left: auto;
+  padding-left: 8px;
 }
 
 .movies-confirm {
@@ -726,7 +828,10 @@ body {
 
   .movies-list {
     grid-template-columns: 1fr;
-    gap: 24px;
+  }
+
+  .movies-list > li {
+    padding: 18px 0;
   }
 
   .movies-card {

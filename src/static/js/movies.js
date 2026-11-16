@@ -173,14 +173,49 @@
     return rest ? `${hours} h ${rest} min` : `${hours} h`;
   }
 
+  // One line of facts: director · year · runtime (the rating sits by the title).
   function movieMeta(movie) {
     const parts = [];
+    if (movie.directors && movie.directors.length) parts.push(movie.directors.join(", "));
     if (movie.year) parts.push(movie.year);
     const runtime = formatRuntime(movie.runtime);
     if (runtime) parts.push(runtime);
-    const rating = formatRating(movie.rating);
-    if (rating) parts.push(rating);
     return parts.join(" · ");
+  }
+
+  // "Antonio", "Antonio y Miguel", "Antonio, Javi y Miguel", or "todos" when
+  // it's the whole flat. Names keep the flat's order.
+  function humanList(names) {
+    const ordered = [
+      ...NAMES.filter((name) => names.includes(name)),
+      ...names.filter((name) => !NAMES.includes(name)),
+    ];
+    if (NAMES.every((name) => ordered.includes(name))) return "todos";
+    if (ordered.length < 2) return ordered.join("");
+    return `${ordered.slice(0, -1).join(", ")} y ${ordered[ordered.length - 1]}`;
+  }
+
+  // Who it is for, one line per kind: who wants it, who doesn't, who has
+  // seen it. Each line is a coloured label plus the names.
+  function peopleLines(movie) {
+    const wanted = wantedBy(movie);
+    const against = notWantedBy(movie);
+    const seen = seenBy(movie);
+    const lines = [];
+    if (!wanted.length) {
+      lines.push({ kind: "none", label: "no la quiere ver nadie", names: "" });
+    } else if (humanList(wanted) === "todos") {
+      lines.push({ kind: "wanted", label: "la queréis ver", names: "todos" });
+    } else {
+      const verb = wanted.length > 1 ? "la quieren ver" : "la quiere ver";
+      lines.push({ kind: "wanted", label: verb, names: humanList(wanted) });
+    }
+    if (against.length) {
+      const verb = against.length > 1 ? "no quieren" : "no quiere";
+      lines.push({ kind: "against", label: verb, names: humanList(against) });
+    }
+    if (seen.length) lines.push({ kind: "seen", label: "vista por", names: humanList(seen) });
+    return lines;
   }
 
   function letterboxdUrl(movie) {
@@ -227,6 +262,8 @@
     pickRandom,
     formatRuntime,
     movieMeta,
+    humanList,
+    peopleLines,
     letterboxdUrl,
     imdbUrl,
     searchGroups,
@@ -472,110 +509,99 @@
     filtersChanged();
   }
 
-  function linkList(movie) {
-    return el("p", { className: "movies-links" }, [
-      el("a", { href: letterboxdUrl(movie), textContent: "Letterboxd", rel: "noopener", target: "_blank" }),
-      imdbUrl(movie)
-        ? el("a", { href: imdbUrl(movie), textContent: "IMDb", rel: "noopener", target: "_blank" })
-        : null,
-    ]);
-  }
+  // A card reads top to bottom: what the movie is, who it is for, where to
+  // look it up, and what you can do with it.
 
-  function wantedLine(movie) {
-    const people = wantedBy(movie);
-    const against = notWantedBy(movie);
-    let who = people.length ? `quieren verla: ${people.join(", ")}` : "no la quiere ver nadie";
-    if (against.length) who += ` · ${against.length > 1 ? "no quieren" : "no quiere"}: ${against.join(", ")}`;
-    return who;
-  }
-
-  function seenButton(movie) {
-    const seen = Boolean(state.name) && seenBy(movie).includes(state.name);
+  function pill(text, pressed, onclick, extraClass = "") {
     return el("button", {
       type: "button",
-      className: "movies-seen",
-      textContent: seen ? "✓ ya la he visto" : "ya la he visto",
-      ariaPressed: String(seen),
-      onclick: () => toggleSeen(movie, !seen),
+      className: `movies-pill ${extraClass}`.trim(),
+      textContent: text,
+      ariaPressed: String(pressed),
+      onclick,
     });
   }
 
-  // "yo también" and "yo no" exclude each other; pressing the one already on
-  // goes back to no opinion.
-  function wantButtons(movie) {
-    const yes = Boolean(state.name) && wantedBy(movie).includes(state.name);
-    const no = Boolean(state.name) && notWantedBy(movie).includes(state.name);
-    return el("span", { className: "movies-want-group" }, [
-      el("button", {
-        type: "button",
-        className: "movies-want",
-        textContent: "yo también",
-        ariaPressed: String(yes),
-        title: yes ? "Quitarte de quienes quieren verla" : "Apuntarte para verla",
-        onclick: () => toggleWanted(movie, yes ? null : true),
-      }),
-      el("button", {
-        type: "button",
-        className: "movies-want movies-want-no",
-        textContent: "yo no",
-        ariaPressed: String(no),
-        title: no
-          ? "Volver a dejar que salga cuando estés en casa"
-          : "Que no salga cuando estés en casa",
-        onclick: () => toggleWanted(movie, no ? null : false),
-      }),
+  // Your own say on this movie. "yo también" and "yo no" exclude each other;
+  // pressing the one already on goes back to no opinion.
+  function myButtons(movie) {
+    const me = state.name;
+    const yes = Boolean(me) && wantedBy(movie).includes(me);
+    const no = Boolean(me) && notWantedBy(movie).includes(me);
+    const seen = Boolean(me) && seenBy(movie).includes(me);
+    return el("div", { className: "movies-actions" }, [
+      pill("yo también", yes, () => toggleWanted(movie, yes ? null : true)),
+      pill("yo no", no, () => toggleWanted(movie, no ? null : false), "movies-pill-no"),
+      pill(seen ? "✓ vista" : "ya la he visto", seen, () => toggleSeen(movie, !seen), "movies-pill-seen"),
     ]);
   }
 
-  // Open synopses stay open when the list is drawn again (after any button,
-  // or a live update), so the page doesn't jump under your finger.
-  function synopsis(movie) {
-    const details = el("details", { className: "movies-details", open: state.openSynopses.has(movie.tmdb_id) }, [
-      el("summary", { textContent: "sinopsis" }),
-      el("p", { className: "movies-overview", textContent: movie.overview }),
-    ]);
-    details.addEventListener("toggle", () => {
-      if (details.open) state.openSynopses.add(movie.tmdb_id);
-      else state.openSynopses.delete(movie.tmdb_id);
-    });
-    return details;
+  // "sinopsis" toggles the text under the links; open ones stay open when the
+  // list is drawn again (after any button, or a live update), so the page
+  // doesn't jump under your finger.
+  function lookUpRow(movie, overview, { removable = false } = {}) {
+    const items = [];
+    if (overview) {
+      const open = () => state.openSynopses.has(movie.tmdb_id);
+      const button = el("button", {
+        type: "button",
+        className: "movies-link movies-synopsis-toggle",
+        textContent: "sinopsis",
+        ariaExpanded: String(open()),
+        onclick: () => {
+          if (open()) state.openSynopses.delete(movie.tmdb_id);
+          else state.openSynopses.add(movie.tmdb_id);
+          button.ariaExpanded = String(open());
+          overview.hidden = !open();
+        },
+      });
+      overview.hidden = !open();
+      items.push(button);
+    }
+    items.push(el("a", { href: letterboxdUrl(movie), textContent: "Letterboxd", rel: "noopener", target: "_blank" }));
+    if (imdbUrl(movie)) {
+      items.push(el("a", { href: imdbUrl(movie), textContent: "IMDb", rel: "noopener", target: "_blank" }));
+    }
+    // "quitar" closes the row, out of the way of the buttons you use often.
+    if (removable) items.push(removeControl(movie));
+    return el("p", { className: "movies-links" }, items);
   }
 
   function movieCard(movie, { pick = false } = {}) {
-    const seen = seenBy(movie);
+    const overview = movie.overview
+      ? el("p", { className: "movies-overview", textContent: movie.overview })
+      : null;
+    const rating = formatRating(movie.rating);
     const original = movie.original_title && movie.original_title !== movie.title
       ? el("p", { className: "movies-original", textContent: movie.original_title })
       : null;
-    const overview = movie.overview
-      ? pick
-        ? el("p", { className: "movies-overview", textContent: movie.overview })
-        : synopsis(movie)
+    const genres = movie.genres && movie.genres.length
+      ? el("p", { className: "movies-genres", textContent: movie.genres.join(" · ") })
       : null;
 
     const body = el("div", { className: "movies-card-body" }, [
-      el("h3", { textContent: movie.title }),
-      original,
-      movie.directors && movie.directors.length
-        ? el("p", { className: "movies-director", textContent: movie.directors.join(", ") })
-        : null,
-      el("p", { className: "movies-meta", textContent: movieMeta(movie) }),
-      movie.genres && movie.genres.length
-        ? el("p", { className: "movies-genres", textContent: movie.genres.join(", ") })
-        : null,
-      overview,
-      el("p", { className: "movies-added" }, [
-        wantedLine(movie),
-        pick ? null : wantButtons(movie),
+      el("div", { className: "movies-card-head" }, [
+        el("h3", { textContent: movie.title }),
+        rating ? el("span", { className: "movies-rating", textContent: rating }) : null,
       ]),
-      seen.length ? el("p", { className: "movies-seen-by", textContent: `vista por: ${seen.join(", ")}` }) : null,
-      linkList(movie),
+      original,
+      el("p", { className: "movies-meta", textContent: movieMeta(movie) }),
+      genres,
+      el(
+        "div",
+        { className: "movies-people" },
+        peopleLines(movie).map((line) =>
+          el("p", { className: `movies-people-${line.kind}` }, [
+            el("span", { className: "movies-people-label", textContent: line.label }),
+            line.names ? ` ${line.names}` : null,
+          ]),
+        ),
+      ),
+      pick ? overview : null,
+      lookUpRow(movie, pick ? null : overview, { removable: !pick }),
+      pick ? null : overview,
+      pick ? null : myButtons(movie),
     ]);
-
-    if (!pick) {
-      body.append(
-        el("div", { className: "movies-actions" }, [seenButton(movie), removeControl(movie)]),
-      );
-    }
 
     return el("article", { className: pick ? "movies-card movies-card-pick" : "movies-card" }, [
       poster(movie, "movies-poster"),
@@ -797,15 +823,16 @@
     // Already on the list: the button signs you up for it instead.
     const listed = state.movies.find((movie) => movie.tmdb_id === result.tmdb_id);
     let button;
-    if (listed) {
-      const yes = Boolean(state.name) && wantedBy(listed).includes(state.name);
+    if (listed && state.name && wantedBy(listed).includes(state.name)) {
+      // You added it or already signed up: nothing to ask.
+      button = el("span", { className: "movies-in-list", textContent: "✓ en la lista" });
+    } else if (listed) {
       button = el("button", {
         type: "button",
         className: "movies-want",
         textContent: "yo también",
-        ariaPressed: String(yes),
-        title: yes ? "Ya está en la lista y la quieres ver" : "Ya está en la lista: apúntate",
-        onclick: () => toggleWanted(listed, yes ? null : true),
+        title: "Ya está en la lista: apúntate",
+        onclick: () => toggleWanted(listed, true),
       });
     } else {
       button = el("button", { type: "button", textContent: "añadir" });
@@ -959,37 +986,59 @@
     return { ...DEFAULT_SORT };
   }
 
+  function applySort(sort) {
+    state.sort = sort;
+    try {
+      global.localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(state.sort));
+    } catch {
+      // The order just lasts this visit.
+    }
+    renderList();
+  }
+
+  function sortItem(label, checked, onChoose) {
+    return el("button", {
+      type: "button",
+      role: "menuitemradio",
+      className: "movies-sort-option",
+      ariaChecked: String(checked),
+      onclick: (event) => {
+        // The menu is redrawn under the pointer; keep the outside-click
+        // handler from reading that as a click elsewhere.
+        event.stopPropagation();
+        onChoose();
+      },
+    }, [
+      el("span", { className: "movies-sort-check", ariaHidden: "true", textContent: checked ? "✓" : "" }),
+      el("span", { textContent: label }),
+    ]);
+  }
+
+  // Two groups: what to sort by (stays open so you can pick the direction
+  // next) and which way (closes the menu).
   function renderSort() {
-    const current = SORTS.find((option) => option.key === state.sort.key);
+    const current = sortOption(state.sort.key);
     sortLabel.textContent = current.label;
     sortToggle.title = `Ordenar: ${current.label}, ${sortWay(state.sort)}`;
     sortToggle.setAttribute("aria-expanded", String(!sortMenu.hidden));
     sortMenu.replaceChildren(
-      ...SORTS.map((option) => {
-        const active = option.key === state.sort.key;
-        return el("button", {
-          type: "button",
-          role: "menuitemradio",
-          className: "movies-sort-option",
-          ariaChecked: String(active),
-          onclick: () => {
-            state.sort = nextSort(state.sort, option.key);
-            try {
-              global.localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(state.sort));
-            } catch {
-              // The order just lasts this visit.
-            }
-            renderSort();
-            renderList();
-          },
-        }, [
-          el("span", { textContent: option.label }),
-          el("span", {
-            className: "movies-sort-way",
-            textContent: active ? `${sortWay(state.sort)} ⇅` : "",
-          }),
-        ]);
-      }),
+      el("p", { className: "movies-menu-label", textContent: "ordenar por" }),
+      ...SORTS.map((option) =>
+        sortItem(option.label, option.key === state.sort.key, () => {
+          if (option.key !== state.sort.key) applySort(nextSort(state.sort, option.key));
+          renderSort();
+          sortMenu.querySelector("[aria-checked='true']").focus();
+        }),
+      ),
+      el("div", { className: "movies-menu-separator", role: "separator" }),
+      el("p", { className: "movies-menu-label", textContent: "sentido" }),
+      ...[1, -1].map((dir) =>
+        sortItem(current.ways[dir === 1 ? 0 : 1], state.sort.dir === dir, () => {
+          applySort({ key: state.sort.key, dir });
+          setSortMenu(false);
+          sortToggle.focus();
+        }),
+      ),
     );
   }
 
