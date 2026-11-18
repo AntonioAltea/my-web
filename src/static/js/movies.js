@@ -235,6 +235,49 @@
     return items;
   }
 
+  // Newspaper reveal: the front page of a made-up paper spins in from afar,
+  // the way films break big news, with the pick as its headline.
+  // Its name is drawn each time: "<paper> de <place>".
+  const PAPER_NAMES = [
+    "el dominical", "el semanal", "el diario", "el heraldo", "el matinal",
+    "el vespertino", "la gaceta", "la crónica", "la opinión", "el magacín",
+    "la tribuna", "el pelotero", "el pregonero", "el porculero",
+  ];
+  const PAPER_PLACES = [
+    "Manufa", "Manuel de Falla", "Alcobendas", "Alcosanse", "Monzón", "Palencia",
+    "Ponferrada", "León", "Las Navas", "Loyber", "Rosella",
+  ];
+
+  function paperMasthead(random = Math.random) {
+    const name = PAPER_NAMES[Math.floor(random() * PAPER_NAMES.length)];
+    const place = PAPER_PLACES[Math.floor(random() * PAPER_PLACES.length)];
+    return `${name} de ${place}`.toUpperCase();
+  }
+  const WEEKDAYS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  const MONTHS = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+  ];
+
+  // "martes, 18 de noviembre de 2026", without relying on the browser's locale data.
+  function paperDate(date) {
+    return `${WEEKDAYS[date.getDay()]}, ${date.getDate()} de ${MONTHS[date.getMonth()]} de ${date.getFullYear()}`;
+  }
+
+  // The line under the headline: the usual facts, then the genres.
+  function paperDeck(movie) {
+    const genres = (movie.genres || []).join(", ");
+    return [movieMeta(movie), genres].filter(Boolean).join(" · ");
+  }
+
+  // Long titles get a smaller headline so they stay within a few lines.
+  function headlineSize(title) {
+    const length = String(title || "").length;
+    if (length > 40) return "small";
+    if (length > 18) return "medium";
+    return "large";
+  }
+
   function formatRuntime(minutes) {
     if (!minutes) return "";
     const hours = Math.floor(minutes / 60);
@@ -343,6 +386,12 @@
     scrambledOrder,
     settleTiles,
     reelItems,
+    PAPER_NAMES,
+    PAPER_PLACES,
+    paperMasthead,
+    paperDate,
+    paperDeck,
+    headlineSize,
     someoneAwayWants,
     unwanted,
     formatRuntime,
@@ -1096,6 +1145,96 @@
     global.setTimeout(finish, REELS.stops[REELS.stops.length - 1] + REELS.settleMs);
   }
 
+  // The newspaper: it spins in over the page, holds still long enough to read
+  // the headline and then fades, leaving the pick card with its details. A
+  // click or Escape skips ahead. Timers end each phase, since animations
+  // pause in a background tab.
+  const PAPER = { spinMs: 1500, turns: 3, tilt: -3, holdMs: 2600, leaveMs: 320 };
+
+  function filler(lines) {
+    const block = el("div", { className: "movies-paper-filler" });
+    block.style.setProperty("--lines", lines);
+    return block;
+  }
+
+  function newspaper(movie) {
+    const text = el("div", { className: "movies-paper-text" }, [
+      movie.overview ? el("p", { className: "movies-paper-lead", textContent: movie.overview }) : null,
+      filler(movie.overview ? 3 : 9),
+    ]);
+    // The name stays on one line; longer ones get smaller type to fit.
+    const name = paperMasthead();
+    const masthead = el("p", { className: "movies-paper-name", textContent: name });
+    masthead.style.setProperty("--chars", name.length);
+    return el("article", { className: "movies-paper" }, [
+      el("header", { className: "movies-paper-mast" }, [
+        masthead,
+        el("p", { className: "movies-paper-dateline" }, [
+          el("span", { textContent: "Edición de noche" }),
+          el("span", { textContent: paperDate(new Date()) }),
+        ]),
+      ]),
+      el("p", { className: "movies-paper-kicker", textContent: "Última hora" }),
+      el("h2", {
+        className: `movies-paper-headline movies-paper-headline-${headlineSize(movie.title)}`,
+        textContent: movie.title,
+      }),
+      el("p", { className: "movies-paper-deck", textContent: paperDeck(movie) }),
+      el("div", { className: "movies-paper-body" }, [
+        el("img", { className: "movies-paper-photo", src: movie.poster, alt: "", decoding: "async" }),
+        text,
+      ]),
+      el("div", { className: "movies-paper-columns" }, [filler(5), filler(5), filler(5)]),
+    ]);
+  }
+
+  function spinNewspaper(movie) {
+    const card = pickCard.querySelector(".movies-card");
+    if (!card) return;
+    state.revealing = movie.tmdb_id;
+    card.classList.add("movies-revealing", "movies-papering");
+
+    const paper = newspaper(movie);
+    const stage = el("div", { className: "movies-paper-stage", ariaHidden: "true" }, [paper]);
+    document.body.append(stage);
+    const rest = `scale(1) rotate(${PAPER.tilt}deg)`;
+    paper.style.transform = rest;
+    paper.animate(
+      [
+        { transform: "scale(0.03) rotate(0deg)", opacity: 0 },
+        { opacity: 1, offset: 0.08 },
+        { transform: `scale(1) rotate(${PAPER.turns * 360 + PAPER.tilt}deg)`, opacity: 1 },
+      ],
+      { duration: PAPER.spinMs, easing: "cubic-bezier(.3,.55,.25,1)" },
+    );
+    stage.animate([{ opacity: 0 }, { opacity: 1 }], { duration: PAPER.spinMs * 0.4, easing: "ease-out" });
+
+    let timer = null;
+    const leave = () => {
+      global.clearTimeout(timer);
+      stage.removeEventListener("click", leave);
+      document.removeEventListener("keydown", onKey);
+      if (state.revealing === movie.tmdb_id) {
+        card.classList.remove("movies-revealing", "movies-papering");
+        state.revealing = null;
+      }
+      stage.style.pointerEvents = "none";
+      stage.animate([{ opacity: 1 }, { opacity: 0 }], { duration: PAPER.leaveMs, easing: "ease-in", fill: "forwards" });
+      paper.animate([{ transform: rest }, { transform: `scale(0.94) rotate(${PAPER.tilt}deg)` }], {
+        duration: PAPER.leaveMs,
+        easing: "ease-in",
+        fill: "forwards",
+      });
+      global.setTimeout(() => stage.remove(), PAPER.leaveMs + 40);
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") leave();
+    };
+    stage.addEventListener("click", leave);
+    document.addEventListener("keydown", onKey);
+    timer = global.setTimeout(leave, PAPER.spinMs + PAPER.holdMs);
+  }
+
   function choose() {
     const movie = pickRandom(state.movies, { ...activeFilters(), exclude: state.picked });
     state.revealing = null;
@@ -1104,10 +1243,12 @@
     if (!movie) return;
     pickSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
     if (prefersReducedMotion() || !movie.poster) return;
-    // Two ways to unveil it, chosen at random each time.
+    // Three ways to unveil it, chosen at random each time (the reels need
+    // more than one poster to spin through).
     const posters = [...new Set(state.movies.map((item) => item.poster).filter(Boolean))];
-    if (posters.length > 1 && Math.random() < 0.5) spinReels(movie, posters);
-    else revealPick(movie);
+    const reveals = [revealPick, spinNewspaper];
+    if (posters.length > 1) reveals.push((picked) => spinReels(picked, posters));
+    reveals[Math.floor(Math.random() * reveals.length)](movie);
   }
 
   async function loadMovies() {

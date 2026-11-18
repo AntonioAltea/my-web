@@ -649,7 +649,19 @@ body {
   transition: none;
 }
 
+/* Under the newspaper the poster waits too, so the pick isn't given away
+   behind it; it fades in with the details when the paper goes. */
+.movies-card-pick > :first-child {
+  transition: opacity 0.35s ease;
+}
+
+.movies-papering > :first-child {
+  opacity: 0;
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .movies-card-pick > :first-child,
   .movies-card-pick .movies-card-body,
   .movies-card-pick .movies-card-foot {
     transition: none;
@@ -689,6 +701,210 @@ body {
 .movies-pick .movies-row {
   gap: 16px;
   margin-top: 16px;
+}
+
+/* Newspaper reveal: a front page over the whole screen. It is newsprint in
+   both themes (a thing on the table, not part of the page); only the dimmed
+   backdrop follows the theme. Sizes come from the paper's own width, so the
+   phone gets the same page, smaller. */
+.movies-paper-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(17, 17, 17, 0.45);
+  cursor: pointer;
+}
+
+.movies-paper {
+  --newsprint: #f2eee3;
+  --print: #1d1b17;
+  --print-soft: #5b564c;
+  --print-faint: rgba(29, 27, 23, 0.16);
+  container-type: inline-size;
+  box-sizing: border-box;
+  width: min(540px, 100%);
+  max-height: 100%;
+  overflow: hidden;
+  padding: 4.5cqi 5cqi 3.6cqi;
+  color: var(--print);
+  background: var(--newsprint);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  will-change: transform;
+}
+
+:root[data-theme="dark"] .movies-paper {
+  --newsprint: #e4dfd2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .movies-paper {
+    --newsprint: #e4dfd2;
+  }
+}
+
+.movies-paper p,
+.movies-paper h2 {
+  margin: 0;
+}
+
+.movies-paper-mast {
+  padding-bottom: 1.6cqi;
+  border-bottom: 3px double var(--print);
+  text-align: center;
+}
+
+.movies-paper-name {
+  font-family: "IM FELL DW Pica", serif;
+  font-size: min(7.6cqi, calc(165cqi / var(--chars, 20)));
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.movies-paper-dateline {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 1.2cqi;
+  padding-top: 1.2cqi;
+  border-top: 1px solid var(--print);
+  color: var(--print-soft);
+  font-size: max(10px, 2.3cqi);
+  font-style: italic;
+}
+
+.movies-paper-kicker {
+  display: flex;
+  align-items: center;
+  gap: 2.4cqi;
+  margin-top: 3.4cqi;
+  font-size: max(10px, 2.4cqi);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.movies-paper-kicker::before,
+.movies-paper-kicker::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--print);
+}
+
+.movies-paper-headline {
+  margin-top: 1.6cqi;
+  font-weight: 600;
+  line-height: 1.02;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.movies-paper-headline-large {
+  font-size: 11cqi;
+}
+
+.movies-paper-headline-medium {
+  font-size: 8cqi;
+}
+
+.movies-paper-headline-small {
+  font-size: 6cqi;
+}
+
+.movies-paper-deck {
+  margin-top: 2.6cqi;
+  padding-bottom: 3cqi;
+  border-bottom: 1px solid var(--print);
+  color: var(--print-soft);
+  font-size: max(11px, 2.7cqi);
+  font-style: italic;
+  text-align: center;
+}
+
+.movies-paper-body {
+  display: grid;
+  grid-template-columns: 36% minmax(0, 1fr);
+  gap: 3.6cqi;
+  margin-top: 3.6cqi;
+}
+
+/* Halftone-ish: the poster printed in black and white. */
+.movies-paper-photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  filter: grayscale(1) sepia(0.15) contrast(1.08);
+}
+
+.movies-paper-text {
+  min-width: 0;
+}
+
+.movies-paper-lead {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 9;
+  font-size: max(10.5px, 2.65cqi);
+  line-height: 1.4;
+  text-align: justify;
+  hyphens: auto;
+}
+
+.movies-paper-lead::first-letter {
+  float: left;
+  margin: 0.08em 0.08em 0 0;
+  font-size: 2.7em;
+  font-weight: 600;
+  line-height: 0.85;
+}
+
+/* Placeholder copy: grey bars on a text rhythm, the last one shorter. The
+   bars repeat with "round" so a block that stretches still ends on a whole
+   line. */
+.movies-paper-filler {
+  --row: max(9px, 2.6cqi);
+  min-height: calc(var(--lines) * var(--row));
+  margin-top: 0.6em;
+  background:
+    linear-gradient(var(--newsprint), var(--newsprint)) right bottom / 40% var(--row) no-repeat,
+    linear-gradient(to bottom, var(--print-faint) 45%, transparent 45%) left top / 100% var(--row) round;
+}
+
+/* Beside the photo the text runs down to the photo's foot. */
+.movies-paper-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.movies-paper-text .movies-paper-filler {
+  flex: 1;
+}
+
+.movies-paper-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3.6cqi;
+  margin-top: 3.6cqi;
+  padding-top: 1.6cqi;
+  border-top: 1px solid var(--print);
+}
+
+.movies-paper-columns .movies-paper-filler + .movies-paper-filler {
+  position: relative;
+}
+
+.movies-paper-columns .movies-paper-filler + .movies-paper-filler::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1.8cqi;
+  border-left: 1px solid var(--print-faint);
 }
 
 /* List */

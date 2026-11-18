@@ -1496,6 +1496,37 @@ async function testMoviesReelsEndOnTheWinner() {
   assert.deepEqual([...reelItems(["win"], "win", 3)], ["win", "win", "win"]);
 }
 
+async function testMoviesNewspaperFrontPage() {
+  const { PAPER_NAMES, PAPER_PLACES, paperMasthead, paperDate, paperDeck, headlineSize } = moviesModule();
+  assert.equal(paperMasthead(() => 0), "EL DOMINICAL DE MANUFA");
+  assert.equal(paperMasthead(() => 0.999), "EL PORCULERO DE ROSELLA");
+  // Every paper and every place can come up.
+  const seen = new Set();
+  for (let i = 0; i < PAPER_NAMES.length; i += 1) {
+    for (let j = 0; j < PAPER_PLACES.length; j += 1) {
+      const draws = [i / PAPER_NAMES.length, j / PAPER_PLACES.length];
+      seen.add(paperMasthead(() => draws.shift()));
+    }
+  }
+  assert.equal(seen.size, PAPER_NAMES.length * PAPER_PLACES.length);
+  assert.ok(seen.has("LA CRÓNICA DE MANUEL DE FALLA"));
+  assert.equal(paperDate(new Date(2026, 10, 18)), "miércoles, 18 de noviembre de 2026");
+  assert.equal(paperDate(new Date(2027, 0, 3)), "domingo, 3 de enero de 2027");
+
+  assert.equal(
+    paperDeck({ directors: ["Alejandro Amenábar"], year: "1996", runtime: 125, genres: ["Terror", "Suspense"] })
+      .replace(/\u00a0/g, " "),
+    "Alejandro Amenábar · 1996 · 2 h 5 min · Terror, Suspense",
+  );
+  assert.equal(paperDeck({ year: "1996" }), "1996");
+  assert.equal(paperDeck({}), "");
+
+  assert.equal(headlineSize("Tesis"), "large");
+  assert.equal(headlineSize("El club de la lucha"), "medium");
+  assert.equal(headlineSize("Mujeres al borde de un ataque de nervios, versión extendida"), "small");
+  assert.equal(headlineSize(undefined), "large");
+}
+
 async function testMoviesRevealSettlesEveryTile() {
   const { scrambledOrder, settleTiles } = moviesModule();
   let seed = 7;
@@ -1659,6 +1690,7 @@ async function run() {
     ["matches lax, strict or ideal for whoever is home", testMoviesMatchModesForWhoIsHome],
     ["settles every tile of the reveal", testMoviesRevealSettlesEveryTile],
     ["stops every slot reel on the winner", testMoviesReelsEndOnTheWinner],
+    ["builds the newspaper front page", testMoviesNewspaperFrontPage],
     ["formats movie details and links", testMoviesMetaAndLinks],
     ["locks photo controls while loading", testPhotoControlsLockWhileLoading],
     ["unlocks photo controls after a stalled image times out", testPhotoLoadTimeoutUnlocksControls],
