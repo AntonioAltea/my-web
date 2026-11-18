@@ -1091,7 +1091,11 @@
     const itemH = box.height;
     const gap = parseFloat(getComputedStyle(card).columnGap) || 14;
     const reels = REELS.stops.map((stop, index) => {
+      // Neighbouring reels spin opposite ways: odd ones run downwards, so
+      // their strip is reversed and the winner, now first, stops at the top.
+      const down = index % 2 === 1;
       const items = reelItems(posters, movie.poster, 10 + index * 3);
+      if (down) items.reverse();
       const strip = el(
         "div",
         { className: "movies-reel-strip" },
@@ -1104,12 +1108,14 @@
       reel.style.height = `${itemH}px`;
       reel.style.setProperty("--item-h", `${itemH}px`);
       card.append(reel);
+      const top = "translateY(0)";
+      const bottom = `translateY(${-(items.length - 1) * itemH}px)`;
       strip.animate(
         [
-          { transform: "translateY(0)", filter: "blur(0)" },
+          { transform: down ? bottom : top, filter: "blur(0)" },
           { filter: "blur(1.5px)", offset: 0.2 },
           { filter: "blur(1px)", offset: 0.8 },
-          { transform: `translateY(${-(items.length - 1) * itemH}px)`, filter: "blur(0)" },
+          { transform: down ? top : bottom, filter: "blur(0)" },
         ],
         { duration: stop, easing: "cubic-bezier(.2,.65,.3,1)", fill: "forwards" },
       );
