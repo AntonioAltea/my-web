@@ -225,7 +225,10 @@
   //   hint: element shown beside the poster meanwhile (it may hold a button
   //     with data-uncover that takes the foil off at once)
   //   alive(): false once another pick takes over, which ends it at once
-  //   onDone(): over; the foil may still be fading
+  //   onDone(): scratched enough; the foil starts fading and the details
+  //     can show
+  //   onGone(): the foil is gone; until then the card must keep its
+  //     positioning, or the fading foil jumps to another corner of the page
   function cover(card, poster, options = {}) {
     const w = poster.offsetWidth;
     const h = poster.offsetHeight;
@@ -334,12 +337,16 @@
       sound.stop();
       flakes.remove();
       if (hint) hint.remove();
-      if (instant) {
+      const gone = () => {
         foil.remove();
+        if (options.onGone) options.onGone();
+      };
+      if (instant) {
+        gone();
       } else {
         // What's left of the foil fades off; the poster was there all along.
         foil.classList.add("movies-scratch-gone");
-        global.setTimeout(() => foil.remove(), SCRATCH.fadeMs + 50);
+        global.setTimeout(gone, SCRATCH.fadeMs + 50);
       }
       if (options.onDone) options.onDone();
     }

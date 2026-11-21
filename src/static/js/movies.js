@@ -1337,9 +1337,10 @@
       hint,
       alive,
       onDone: () => {
-        card.classList.remove("movies-revealing", "movies-scratching");
+        card.classList.remove("movies-revealing");
         if (alive()) state.revealing = null;
       },
+      onGone: () => card.classList.remove("movies-scratching"),
     });
   }
 
