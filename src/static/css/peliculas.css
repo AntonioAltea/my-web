@@ -688,6 +688,55 @@ body {
   transition: none;
 }
 
+/* Scratch card: foil over the poster, the hint where the details go. The
+   foil takes the touch (touch-action none) so a finger scratches instead of
+   scrolling, and the cursor is a coin. */
+.movies-scratching {
+  position: relative;
+}
+
+.movies-scratch-foil {
+  position: absolute;
+  z-index: 2;
+  touch-action: none;
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'><defs><radialGradient id='g' cx='.38' cy='.35' r='.7'><stop offset='0' stop-color='%23fff3c4'/><stop offset='.55' stop-color='%23d9a740'/><stop offset='1' stop-color='%23946a1c'/></radialGradient></defs><circle cx='14' cy='14' r='12' fill='url(%23g)' stroke='%237a5512' stroke-width='1'/><circle cx='14' cy='14' r='8.5' fill='none' stroke='%23b78a2c' stroke-width='1'/></svg>") 14 14, pointer;
+}
+
+.movies-scratch-gone {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+}
+
+.movies-scratch-hint {
+  position: absolute;
+  right: 0;
+  z-index: 2;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.movies-page .movies-scratch-hint button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.movies-scratch-flakes {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 /* Wrecking ball: one canvas over the whole page draws the glass, the ball
    and the shards; a click skips it. */
 .movies-smash-stage {

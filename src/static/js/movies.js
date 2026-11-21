@@ -1314,6 +1314,35 @@
     );
   }
 
+  // The scratch card (scratch-card.js): silver foil over the poster that you
+  // scratch off; the details wait beside it behind a short hint.
+  function scratchCard(movie) {
+    const scratch = global.ManturonScratchCard;
+    const card = pickCard.querySelector(".movies-card");
+    const img = card && card.querySelector("img.movies-poster");
+    const body = card && card.querySelector(".movies-card-body");
+    if (!scratch || !img || !body) return;
+    state.revealing = movie.tmdb_id;
+    card.classList.add("movies-revealing", "movies-scratching");
+    const hint = el("p", { className: "movies-scratch-hint" }, [
+      "Rasca el póster con el ratón o el dedo.",
+      el("br"),
+      el("button", { type: "button", textContent: "Destaparlo todo" }),
+    ]);
+    hint.querySelector("button").dataset.uncover = "";
+    hint.style.left = `${body.offsetLeft}px`;
+    hint.style.top = `${body.offsetTop}px`;
+    const alive = () => state.revealing === movie.tmdb_id;
+    scratch.cover(card, img, {
+      hint,
+      alive,
+      onDone: () => {
+        card.classList.remove("movies-revealing", "movies-scratching");
+        if (alive()) state.revealing = null;
+      },
+    });
+  }
+
   function choose() {
     const movie = pickRandom(state.movies, { ...activeFilters(), exclude: state.picked });
     state.revealing = null;
@@ -1322,10 +1351,10 @@
     if (!movie) return;
     pickSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
     if (prefersReducedMotion() || !movie.poster) return;
-    // Four ways to unveil it, chosen at random each time (the reels need
+    // Five ways to unveil it, chosen at random each time (the reels need
     // more than one poster to spin through).
     const posters = [...new Set(state.movies.map((item) => item.poster).filter(Boolean))];
-    const reveals = [revealPick, spinNewspaper, smashGlass];
+    const reveals = [revealPick, spinNewspaper, smashGlass, scratchCard];
     if (posters.length > 1) reveals.push((picked) => spinReels(picked, posters));
     reveals[Math.floor(Math.random() * reveals.length)](movie);
   }

@@ -1538,10 +1538,59 @@ async function testWreckingBallSwingsThroughSmoothly() {
   assert.ok(peak > 0 && peak < Math.abs(theta0) / 2);
 }
 
-async function testMoviesPageLoadsTheWreckingBallFirst() {
+async function testMoviesPageLoadsTheRevealsFirst() {
   const html = fs.readFileSync(path.join(__dirname, "..", "src", "peliculas.html"), "utf8");
-  const ball = html.indexOf("/static/js/wrecking-ball.js");
-  assert.ok(ball > 0 && ball < html.indexOf("/static/js/movies.js"));
+  const movies = html.indexOf("/static/js/movies.js");
+  for (const reveal of ["wrecking-ball.js", "scratch-card.js"]) {
+    const at = html.indexOf(`/static/js/${reveal}`);
+    assert.ok(at > 0 && at < movies, reveal);
+  }
+}
+
+function scratchCardModule() {
+  const code = fs.readFileSync(
+    path.join(__dirname, "..", "src", "static", "js", "scratch-card.js"),
+    "utf8",
+  );
+  const sandbox = {};
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(code, sandbox, { filename: "scratch-card.js" });
+  return sandbox.ManturonScratchCard;
+}
+
+async function testScratchCardCountsWhatIsScratched() {
+  const { coverageGrid, SCRATCH } = scratchCardModule();
+  const grid = coverageGrid(150, 225);
+  assert.equal(grid.cols, SCRATCH.cells);
+  assert.equal(grid.rows, 18);
+  assert.equal(grid.fraction(), 0);
+  // Scratching the same spot again adds nothing.
+  grid.mark(75, 112, 10);
+  const once = grid.fraction();
+  assert.ok(once > 0 && once < 0.05);
+  grid.mark(75, 112, 10);
+  assert.equal(grid.fraction(), once);
+  // Outside the card counts for nothing.
+  grid.mark(-100, -100, 10);
+  grid.mark(400, 900, 10);
+  assert.equal(grid.fraction(), once);
+  // Over everything, everything is scratched.
+  grid.mark(75, 112, 500);
+  assert.equal(grid.fraction(), 1);
+}
+
+async function testScratchCardStrokesLeaveNoGaps() {
+  const { strokePoints } = scratchCardModule();
+  const points = strokePoints({ x: 0, y: 0 }, { x: 100, y: 0 }, 4);
+  assert.equal(points.length, 25);
+  assert.deepEqual({ ...points[points.length - 1] }, { x: 100, y: 0 });
+  let previous = { x: 0, y: 0 };
+  for (const point of points) {
+    assert.ok(Math.hypot(point.x - previous.x, point.y - previous.y) <= 4 + 1e-9);
+    previous = point;
+  }
+  // A tap still scratches the one spot.
+  assert.equal(strokePoints({ x: 5, y: 5 }, { x: 5, y: 5 }, 4).length, 1);
 }
 
 async function testMoviesReelsEndOnTheWinner() {
@@ -1758,7 +1807,9 @@ async function run() {
     ["builds the newspaper front page", testMoviesNewspaperFrontPage],
     ["breaks the glass into shards that tile the pane", testWreckingBallShardsTileThePane],
     ["swings the wrecking ball through without jumps", testWreckingBallSwingsThroughSmoothly],
-    ["loads the wrecking ball before the movies page", testMoviesPageLoadsTheWreckingBallFirst],
+    ["loads the reveal scripts before the movies page", testMoviesPageLoadsTheRevealsFirst],
+    ["counts how much of the scratch card is scratched", testScratchCardCountsWhatIsScratched],
+    ["scratches whole strokes without gaps", testScratchCardStrokesLeaveNoGaps],
     ["formats movie details and links", testMoviesMetaAndLinks],
     ["locks photo controls while loading", testPhotoControlsLockWhileLoading],
     ["unlocks photo controls after a stalled image times out", testPhotoLoadTimeoutUnlocksControls],
