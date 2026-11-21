@@ -1378,6 +1378,9 @@ async function testMoviesFilterByWhoWantsItDurationAndGenre() {
   // Nobody wants 2: hidden with nobody ticked, unless asked for.
   assert.deepEqual(ids(filterMovies(movies, {})), [1, 3, 4]);
   assert.deepEqual(ids(filterMovies(movies, { includeUnwanted: true })), [1, 2, 3, 4]);
+  // Once shown, the ones nobody wants go together at the end, order kept.
+  const { unwantedLast } = moviesModule();
+  assert.deepEqual(ids(unwantedLast([movies[1], movies[0], movies[3], movies[2]])), [1, 4, 3, 2]);
 
   const all = { includeUnwanted: true };
   assert.deepEqual(ids(filterMovies(movies, { ...all, maxRuntime: 90 })), [1]);

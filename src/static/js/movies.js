@@ -52,6 +52,11 @@
     return wantedBy(movie).length === 0;
   }
 
+  // Once shown, they go together after the rest, keeping order.
+  function unwantedLast(movies) {
+    return [...movies.filter((movie) => !unwanted(movie)), ...movies.filter(unwanted)];
+  }
+
   // The duration slider runs from one hour to three in quarter hours; its
   // last stop means no limit.
   const RUNTIME_SLIDER = { min: 60, max: 180, step: 15 };
@@ -394,6 +399,7 @@
     headlineSize,
     someoneAwayWants,
     unwanted,
+    unwantedLast,
     formatRuntime,
     movieMeta,
     humanList,
@@ -840,7 +846,8 @@
           if (open === key) state.openPanels.delete(scope);
           else state.openPanels.set(scope, key);
           sync();
-          if (state.openPanels.get(scope) === "comments") {
+          // On touch screens focusing would pop the keyboard over the comments.
+          if (state.openPanels.get(scope) === "comments" && !touchScreen()) {
             const input = panel.querySelector("input");
             if (input) input.focus({ preventScroll: true });
           }
@@ -924,19 +931,40 @@
     ]);
   }
 
+  function matches(query) {
+    return Boolean(global.matchMedia && global.matchMedia(query).matches);
+  }
+
+  function touchScreen() {
+    return matches("(pointer: coarse)");
+  }
+
   function renderList() {
     renderToolbar();
-    const visible = sortMovies(
+    let visible = sortMovies(
       filterMovies(state.movies, activeFilters()),
       state.sort,
     );
+    const grouped = state.showUnwanted;
+    if (grouped) visible = unwantedLast(visible);
     // If you are typing a comment when the list is redrawn (someone else's
     // change arriving live), put the cursor back where it was.
     const typing = document.activeElement && document.activeElement.dataset
       ? document.activeElement.dataset.draftFor
       : undefined;
     const caret = typing ? document.activeElement.selectionStart : null;
-    list.replaceChildren(...visible.map((movie) => el("li", {}, [movieCard(movie)])));
+    const items = [];
+    let dividerPlaced = false;
+    for (const movie of visible) {
+      if (grouped && !dividerPlaced && unwanted(movie)) {
+        dividerPlaced = true;
+        items.push(el("li", { className: "movies-list-divider", textContent: "Las que no quiere nadie" }));
+      }
+      const item = el("li", {}, [movieCard(movie)]);
+      item.dataset.movieId = String(movie.tmdb_id);
+      items.push(item);
+    }
+    list.replaceChildren(...items);
     // With nobody ticked, movies nobody wants wait behind a link.
     const hiddenCount = state.people.length
       ? 0
@@ -1491,7 +1519,13 @@
     let button;
     if (listed && state.name && wantedBy(listed).includes(state.name)) {
       // You added it or already signed up: nothing to ask.
-      button = el("span", { className: "movies-in-list", textContent: "✓ en la lista" });
+      button = el("button", {
+        type: "button",
+        className: "movies-link movies-in-list",
+        textContent: "✓ en la lista",
+        title: "Ir a la película en la lista",
+        onclick: () => goToMovie(listed.tmdb_id),
+      });
     } else if (listed) {
       button = el("button", {
         type: "button",
@@ -1507,7 +1541,7 @@
     const original = result.original_title && result.original_title !== result.title
       ? result.original_title
       : "";
-    return el("li", { className: "movies-result" }, [
+    const row = el("li", { className: listed ? "movies-result movies-result-listed" : "movies-result" }, [
       poster(result, "movies-thumb"),
       el("div", { className: "movies-result-text" }, [
         el("p", { className: "movies-result-title" }, [
@@ -1518,6 +1552,34 @@
       ]),
       button,
     ]);
+    // Anywhere on a listed row but its button takes you to the movie.
+    if (listed) {
+      row.title = "Ir a la película en la lista";
+      row.addEventListener("click", (event) => {
+        if (!event.target.closest("button")) goToMovie(listed.tmdb_id);
+      });
+    }
+    return row;
+  }
+
+  // Scroll the list to a movie, first undoing whatever hides it.
+  function goToMovie(tmdbId) {
+    const find = () => list.querySelector(`li[data-movie-id="${tmdbId}"]`);
+    const movie = state.movies.find((item) => item.tmdb_id === tmdbId);
+    if (!find() && movie && !filterMovies([movie], { ...activeFilters(), includeUnwanted: true }).length) {
+      clearFilters();
+    }
+    if (!find() && movie && unwanted(movie)) {
+      state.showUnwanted = true;
+      renderList();
+    }
+    const item = find();
+    if (!item) return;
+    queryInput.blur();
+    item.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "center" });
+    item.classList.remove("movies-flash");
+    void item.offsetWidth;
+    item.classList.add("movies-flash");
   }
 
   function renderResults(data) {

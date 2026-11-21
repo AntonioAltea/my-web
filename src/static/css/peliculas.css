@@ -285,10 +285,37 @@ body {
   color: var(--muted);
 }
 
-.movies-in-list {
+.movies-page .movies-in-list {
   color: var(--accent);
   font-size: 0.92rem;
+  text-decoration: none;
   white-space: nowrap;
+}
+
+/* Rows already on the list take you to the movie. */
+.movies-result-listed {
+  cursor: pointer;
+}
+
+/* The movie you jumped to from the search glows for a moment. */
+.movies-list > li.movies-flash {
+  animation: movies-flash 1.6s ease-out;
+}
+
+@keyframes movies-flash {
+  0%, 30% {
+    background: var(--paper-strong);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+.movies-list > li.movies-list-divider {
+  grid-column: 1 / -1;
+  padding: 28px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .movies-thumb {
