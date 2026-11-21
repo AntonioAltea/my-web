@@ -1269,6 +1269,51 @@
     timer = global.setTimeout(leave, PAPER.spinMs + PAPER.holdMs);
   }
 
+  // The wrecking ball (wrecking-ball.js): the poster waits behind frosted
+  // glass that a swinging ball smashes, with sound. The audio context is
+  // opened here, still inside the click, or browsers keep it silent.
+  function isDarkPage() {
+    const theme = document.documentElement.dataset.theme;
+    if (theme) return theme === "dark";
+    return Boolean(global.matchMedia && global.matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+
+  function smashGlass(movie) {
+    const wreck = global.ManturonWreckingBall;
+    const card = pickCard.querySelector(".movies-card");
+    const img = card && card.querySelector("img.movies-poster");
+    if (!wreck || !img) return;
+    state.revealing = movie.tmdb_id;
+    card.classList.add("movies-revealing", "movies-smashing");
+    const audio = wreck.openAudio();
+    const alive = () => state.revealing === movie.tmdb_id;
+    const release = () => {
+      card.classList.remove("movies-revealing", "movies-smashing");
+      if (alive()) state.revealing = null;
+    };
+    loadImage(movie.poster).then(
+      (image) => {
+        if (!alive()) {
+          if (audio) audio.close().catch(() => {});
+          return;
+        }
+        wreck.smash(img, image, {
+          audio,
+          dark: isDarkPage(),
+          shake: pickSection,
+          alive,
+          onCovered: () => card.classList.remove("movies-smashing"),
+          onHit: () => global.setTimeout(() => card.classList.remove("movies-revealing"), 250),
+          onDone: release,
+        });
+      },
+      () => {
+        if (audio) audio.close().catch(() => {});
+        release();
+      },
+    );
+  }
+
   function choose() {
     const movie = pickRandom(state.movies, { ...activeFilters(), exclude: state.picked });
     state.revealing = null;
@@ -1277,10 +1322,10 @@
     if (!movie) return;
     pickSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
     if (prefersReducedMotion() || !movie.poster) return;
-    // Three ways to unveil it, chosen at random each time (the reels need
+    // Four ways to unveil it, chosen at random each time (the reels need
     // more than one poster to spin through).
     const posters = [...new Set(state.movies.map((item) => item.poster).filter(Boolean))];
-    const reveals = [revealPick, spinNewspaper];
+    const reveals = [revealPick, spinNewspaper, smashGlass];
     if (posters.length > 1) reveals.push((picked) => spinReels(picked, posters));
     reveals[Math.floor(Math.random() * reveals.length)](movie);
   }

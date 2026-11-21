@@ -1482,6 +1482,68 @@ async function testMoviesRuntimeSliderAndSummary() {
   );
 }
 
+function wreckingBallModule() {
+  const code = fs.readFileSync(
+    path.join(__dirname, "..", "src", "static", "js", "wrecking-ball.js"),
+    "utf8",
+  );
+  const sandbox = {};
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(code, sandbox, { filename: "wrecking-ball.js" });
+  return sandbox.ManturonWreckingBall;
+}
+
+async function testWreckingBallShardsTileThePane() {
+  const { rng, clipPoly, polyArea, makeShards } = wreckingBallModule();
+  const rect = { x: 40, y: 100, w: 150, h: 225 };
+
+  // Clipping keeps what is inside and cuts at the edges.
+  assert.equal(polyArea(clipPoly([[0, 0], [100, 0], [100, 200], [0, 200]], rect)), 60 * 100);
+  assert.equal(clipPoly([[0, 0], [10, 0], [10, 10]], rect).length, 0);
+
+  // Wherever the hit lands, the shards cover the pane exactly, all inside it.
+  for (const [ix, iy, seed] of [[115, 212, 1], [48, 108, 2], [182, 317, 3], [60, 300, 4]]) {
+    const shards = makeShards(rect, ix, iy, rng(seed));
+    assert.ok(shards.length > 40);
+    const area = shards.reduce((sum, shard) => sum + polyArea(shard.poly), 0);
+    assert.ok(Math.abs(area - rect.w * rect.h) < 1, `area ${area} at ${ix},${iy}`);
+    for (const shard of shards) {
+      for (const [x, y] of shard.poly) {
+        assert.ok(x >= rect.x - 1e-6 && x <= rect.x + rect.w + 1e-6);
+        assert.ok(y >= rect.y - 1e-6 && y <= rect.y + rect.h + 1e-6);
+      }
+    }
+  }
+  // Same seed, same break.
+  const a = makeShards(rect, 100, 200, rng(9)).map((shard) => shard.poly);
+  const b = makeShards(rect, 100, 200, rng(9)).map((shard) => shard.poly);
+  assert.deepEqual(a, b);
+}
+
+async function testWreckingBallSwingsThroughSmoothly() {
+  const { swingAngle, riseMs } = wreckingBallModule();
+  const theta0 = -1.3;
+  const swing = 760;
+  assert.equal(swingAngle(0, theta0, swing), theta0);
+  assert.ok(Math.abs(swingAngle(swing, theta0, swing)) < 1e-9);
+  // No jumps anywhere along the way: small steps, small changes.
+  let last = swingAngle(0, theta0, swing);
+  for (let t = 1; t < swing + riseMs(theta0, swing) + 900; t += 1) {
+    const angle = swingAngle(t, theta0, swing);
+    assert.ok(Math.abs(angle - last) < 0.01, `jump at ${t} ms`);
+    last = angle;
+  }
+  // It keeps going after the hit, but not as far as it came from.
+  const peak = swingAngle(swing + riseMs(theta0, swing), theta0, swing);
+  assert.ok(peak > 0 && peak < Math.abs(theta0) / 2);
+}
+
+async function testMoviesPageLoadsTheWreckingBallFirst() {
+  const html = fs.readFileSync(path.join(__dirname, "..", "src", "peliculas.html"), "utf8");
+  const ball = html.indexOf("/static/js/wrecking-ball.js");
+  assert.ok(ball > 0 && ball < html.indexOf("/static/js/movies.js"));
+}
+
 async function testMoviesReelsEndOnTheWinner() {
   const { reelItems } = moviesModule();
   const posters = ["a", "b", "c", "win"];
@@ -1694,6 +1756,9 @@ async function run() {
     ["settles every tile of the reveal", testMoviesRevealSettlesEveryTile],
     ["stops every slot reel on the winner", testMoviesReelsEndOnTheWinner],
     ["builds the newspaper front page", testMoviesNewspaperFrontPage],
+    ["breaks the glass into shards that tile the pane", testWreckingBallShardsTileThePane],
+    ["swings the wrecking ball through without jumps", testWreckingBallSwingsThroughSmoothly],
+    ["loads the wrecking ball before the movies page", testMoviesPageLoadsTheWreckingBallFirst],
     ["formats movie details and links", testMoviesMetaAndLinks],
     ["locks photo controls while loading", testPhotoControlsLockWhileLoading],
     ["unlocks photo controls after a stalled image times out", testPhotoLoadTimeoutUnlocksControls],
